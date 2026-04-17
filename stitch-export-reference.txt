@@ -1,0 +1,1255 @@
+<!-- Student Dashboard Preview -->
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Scholarly Manuscript - Workspace</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#261900",
+                        "on-tertiary": "#ffffff",
+                        "surface-container": "#f0eee9",
+                        "surface-container-low": "#f5f3ee",
+                        "secondary-container": "#fddba0",
+                        "secondary-fixed": "#ffdea5",
+                        "surface-container-high": "#eae8e3",
+                        "surface-container-highest": "#e4e2dd",
+                        "primary": "#00152a",
+                        "outline": "#74777e",
+                        "tertiary": "#201100",
+                        "on-secondary-fixed-variant": "#594316",
+                        "on-secondary": "#ffffff",
+                        "tertiary-fixed-dim": "#e8c08c",
+                        "on-background": "#1b1c19",
+                        "on-secondary-container": "#775f2f",
+                        "on-primary": "#ffffff",
+                        "surface-variant": "#e4e2dd",
+                        "error": "#ba1a1a",
+                        "on-surface-variant": "#43474d",
+                        "on-tertiary-fixed": "#291800",
+                        "tertiary-container": "#3b2400",
+                        "inverse-on-surface": "#f2f1ec",
+                        "surface-tint": "#316192",
+                        "on-surface": "#1b1c19",
+                        "primary-fixed": "#d1e4ff",
+                        "on-tertiary-container": "#ad8a5a",
+                        "on-primary-fixed-variant": "#104978",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed": "#001d36",
+                        "on-error-container": "#93000a",
+                        "on-error": "#ffffff",
+                        "surface-bright": "#fbf9f4",
+                        "inverse-primary": "#9ecaff",
+                        "outline-variant": "#c3c6ce",
+                        "secondary-fixed-dim": "#e2c289",
+                        "on-tertiary-fixed-variant": "#5d4119",
+                        "secondary": "#735b2b",
+                        "inverse-surface": "#30312e",
+                        "background": "#fbf9f4",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed": "#ffddb4",
+                        "primary-container": "#002a4b",
+                        "primary-fixed-dim": "#9ecaff",
+                        "surface-dim": "#dbdad5",
+                        "on-primary-container": "#6593c7",
+                        "surface": "#fbf9f4"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {},
+                    "fontFamily": {
+                        "headline": ["Newsreader", "serif"],
+                        "body": ["Manrope", "sans-serif"],
+                        "label": ["Manrope", "sans-serif"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Manrope', sans-serif; }
+        h1, h2, h3, h4, h5, h6, .font-headline { font-family: 'Newsreader', serif; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; }
+        .material-symbols-outlined.fill { font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface antialiased min-h-screen flex">
+<!-- TopNav for Mobile -->
+<header class="md:hidden flex justify-between items-center w-full px-6 py-4 bg-surface-container-low border-b border-outline-variant/40 fixed top-0 z-50">
+<div class="font-headline text-xl text-primary italic">The Scholarly Manuscript</div>
+<button class="text-primary hover:text-secondary transition-colors duration-300">
+<span class="material-symbols-outlined text-2xl">menu</span>
+</button>
+</header>
+<!-- SideNavBar (Desktop) -->
+<nav class="hidden md:flex fixed left-0 top-0 h-full w-64 bg-[#f5f3ee] dark:bg-slate-900 border-r-0 flex-col py-8 z-40 transition-transform duration-300">
+<div class="px-8 mb-12">
+<div class="font-serif text-xl text-[#00152a] dark:text-white italic mb-2">The Scholarly Manuscript</div>
+</div>
+<div class="flex flex-col gap-2 flex-grow">
+<!-- Active State: Workspace -->
+<a class="flex items-center gap-3 py-3 text-[#00152a] dark:text-white font-bold border-l-4 border-[#735b2b] pl-4 bg-[#fbf9f4] dark:bg-slate-800 transition-all font-sans font-medium tracking-tight Manrope opacity-80 scale-95" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="menu_book" data-weight="fill" style="font-variation-settings: 'FILL' 1;">menu_book</span>
+<span>Workspace</span>
+</a>
+<a class="flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 pl-5 hover:bg-[#fbf9f4] dark:hover:bg-slate-800 transition-all font-sans font-medium tracking-tight Manrope" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="local_library">local_library</span>
+<span>Library</span>
+</a>
+<a class="flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 pl-5 hover:bg-[#fbf9f4] dark:hover:bg-slate-800 transition-all font-sans font-medium tracking-tight Manrope" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="history_edu">history_edu</span>
+<span>Assessments</span>
+</a>
+<a class="flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 pl-5 hover:bg-[#fbf9f4] dark:hover:bg-slate-800 transition-all font-sans font-medium tracking-tight Manrope" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="insights">insights</span>
+<span>Analytics</span>
+</a>
+<a class="flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 pl-5 hover:bg-[#fbf9f4] dark:hover:bg-slate-800 transition-all font-sans font-medium tracking-tight Manrope" href="#">
+<span class="material-symbols-outlined text-xl" data-icon="settings">settings</span>
+<span>Settings</span>
+</a>
+</div>
+<div class="px-6 mt-auto">
+<div class="flex items-center gap-4 mb-6">
+<img alt="Student Profile" class="w-10 h-10 rounded-full object-cover outline outline-1 outline-outline-variant/40" data-alt="close up portrait of a young student in natural light, wearing a neutral tone sweater, blurred bookshelf background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSlLP_c-gNyjhpBVVqur5u7JEe29b1q0CrpSnolt2WBLoKAGrY0up48OZP46PYg3i05UpBX9DaMbkIHXl3tDya9i4-mv5jro1Yp9dDjzK2COdX2Jn6xnbhn6ouc2VsPdmKDcOphUCBgmrLS3DxSrpfJbarE0go3S5neenwKixK2wBeQkRYmF32sF8A5s743WXWsvIAPpVDcsCDR07Gz9GfC_t8Af0wwQ-k81laJBLlTIsWH0pcv1QXwq_doKKM4gZV2KDAsqggvgxv"/>
+<div>
+<p class="text-sm font-semibold text-primary">Academic Portal</p>
+<p class="text-xs text-on-surface-variant">MYP eAssessment Prep</p>
+</div>
+</div>
+<button class="w-full py-3 bg-primary text-on-primary rounded-md font-body text-sm hover:opacity-90 transition-opacity">
+                Start Practice
+            </button>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 md:ml-64 pt-20 md:pt-0 min-h-screen pb-24">
+<!-- Exam Status Bar (Custom Component per Design System) -->
+<div class="w-full bg-surface-container-high py-2 px-8 flex items-center justify-between border-b border-outline-variant/20 sticky top-0 md:top-0 z-30">
+<span class="font-body text-xs text-on-surface-variant tracking-wider uppercase">Exam Readiness</span>
+<div class="w-1/3 bg-surface-container-lowest h-1 rounded-full overflow-hidden">
+<div class="bg-secondary h-full w-[65%]"></div>
+</div>
+<span class="font-headline text-sm italic text-secondary">65% Optimal</span>
+</div>
+<div class="max-w-6xl mx-auto px-6 md:px-12 py-12 flex flex-col gap-12">
+<!-- Header Section with asymmetric layout -->
+<header class="flex flex-col md:flex-row justify-between items-end gap-6 mb-4">
+<div class="w-full md:w-2/3 pr-0 md:pr-12">
+<h1 class="font-headline text-4xl md:text-5xl text-primary leading-tight mb-4 tracking-tight">Your Workspace</h1>
+<p class="font-body text-lg text-on-surface-variant leading-relaxed">Focus on completing the Language and Literature module today. Consistent analysis builds enduring comprehension.</p>
+</div>
+<div class="text-right hidden md:block">
+<p class="font-headline italic text-lg text-secondary">Tuesday, October 24</p>
+</div>
+</header>
+<!-- Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<!-- Main Column -->
+<div class="lg:col-span-8 flex flex-col gap-8">
+<!-- Resume Practice (Hero Card) -->
+<section class="bg-surface-container-lowest rounded-md border border-outline-variant/40 overflow-hidden relative p-8 md:p-12 flex flex-col justify-center min-h-[300px]">
+<div class="absolute inset-0 bg-surface-tint/5 opacity-50 z-0"></div>
+<div class="relative z-10 w-full md:w-3/4">
+<span class="font-body text-xs tracking-[0.05em] uppercase text-primary mb-4 block">Last Active Session</span>
+<h2 class="font-headline text-3xl text-primary mb-4">Language &amp; Literature: Paper 1 Analysis</h2>
+<p class="font-body text-sm text-on-surface-variant mb-8 leading-relaxed">You were reviewing narrative techniques in mid-century fiction. 4 questions remain in this set.</p>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-on-primary px-6 py-3 rounded-md font-body text-sm hover:opacity-90 transition-opacity">
+                                    Resume Practice
+                                </button>
+<button class="text-secondary font-body text-sm hover:opacity-80 transition-opacity flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">history</span> Review Notes
+                                </button>
+</div>
+</div>
+<div class="hidden md:block absolute right-0 top-0 bottom-0 w-1/3 border-l border-outline-variant/20">
+<div class="h-full w-full bg-[url('https://images.unsplash.com/photo-1457369804613-52c61a468e7d?w=800&amp;q=80')] bg-cover bg-center opacity-20 mix-blend-multiply" data-alt="vintage typewriter keys on faded paper texture in warm soft lighting, macro photography"></div>
+</div>
+</section>
+<!-- My Subjects Grid -->
+<section>
+<div class="flex justify-between items-baseline mb-6 border-b border-outline-variant/20 pb-2">
+<h3 class="font-headline text-2xl text-primary">Curriculum Focus</h3>
+<a class="font-body text-xs text-secondary hover:text-primary transition-colors tracking-widest uppercase" href="#">View All Index</a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Subject Card 1 -->
+<div class="bg-surface-container-low p-6 rounded-md group hover:bg-surface-container-lowest transition-colors border border-transparent hover:border-outline-variant/40">
+<div class="flex justify-between items-start mb-6">
+<span class="material-symbols-outlined text-primary text-2xl" data-icon="science">science</span>
+<span class="font-headline text-sm italic text-secondary">82% Mastery</span>
+</div>
+<h4 class="font-headline text-xl text-primary mb-2">Sciences</h4>
+<p class="font-body text-sm text-on-surface-variant mb-6">Criterion B &amp; C Focus</p>
+<div class="w-full bg-surface-variant h-0.5 mb-2">
+<div class="bg-primary h-full w-[82%]"></div>
+</div>
+</div>
+<!-- Subject Card 2 -->
+<div class="bg-surface-container-low p-6 rounded-md group hover:bg-surface-container-lowest transition-colors border border-transparent hover:border-outline-variant/40">
+<div class="flex justify-between items-start mb-6">
+<span class="material-symbols-outlined text-primary text-2xl" data-icon="functions">functions</span>
+<span class="font-headline text-sm italic text-secondary">68% Mastery</span>
+</div>
+<h4 class="font-headline text-xl text-primary mb-2">Mathematics</h4>
+<p class="font-body text-sm text-on-surface-variant mb-6">Extended Concepts</p>
+<div class="w-full bg-surface-variant h-0.5 mb-2">
+<div class="bg-primary h-full w-[68%]"></div>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- Secondary Column -->
+<div class="lg:col-span-4 flex flex-col gap-8">
+<!-- Progress Insights (Minimalist Ledger style) -->
+<section class="bg-surface-container-lowest rounded-md border border-outline-variant/40 p-6">
+<h3 class="font-headline text-xl text-primary mb-6 border-b border-outline-variant/20 pb-4">Performance Insights</h3>
+<div class="space-y-6">
+<div class="flex items-center justify-between">
+<span class="font-body text-sm text-on-surface-variant">Analytical Thinking</span>
+<span class="font-headline text-sm text-primary">High</span>
+</div>
+<div class="flex items-center justify-between border-t border-outline-variant/20 pt-4">
+<span class="font-body text-sm text-on-surface-variant">Source Evaluation</span>
+<span class="font-headline text-sm text-secondary">Needs Review</span>
+</div>
+<div class="flex items-center justify-between border-t border-outline-variant/20 pt-4">
+<span class="font-body text-sm text-on-surface-variant">Time Management</span>
+<span class="font-headline text-sm text-primary">Optimal</span>
+</div>
+</div>
+<div class="mt-8 pt-6 border-t border-outline-variant/40">
+<p class="font-headline italic text-sm text-on-surface-variant leading-relaxed">
+                                "Consider reviewing historical context sources prior to your next humanities assessment to strengthen Criterion A."
+                            </p>
+</div>
+</section>
+<!-- Bookmarked Questions -->
+<section class="bg-surface-container-low p-6 rounded-md">
+<div class="flex items-center gap-2 mb-6">
+<span class="material-symbols-outlined text-secondary text-lg" data-icon="bookmark">bookmark</span>
+<h3 class="font-headline text-lg text-primary">Curated Revisions</h3>
+</div>
+<ul class="space-y-4">
+<li>
+<a class="block p-4 bg-surface-container-lowest border border-outline-variant/20 rounded-md hover:border-primary/50 transition-colors" href="#">
+<span class="font-body text-xs text-secondary tracking-widest uppercase mb-1 block">Sciences</span>
+<p class="font-body text-sm text-primary truncate">Explain the effect of catalysts on...</p>
+</a>
+</li>
+<li>
+<a class="block p-4 bg-surface-container-lowest border border-outline-variant/20 rounded-md hover:border-primary/50 transition-colors" href="#">
+<span class="font-body text-xs text-secondary tracking-widest uppercase mb-1 block">Individuals &amp; Societies</span>
+<p class="font-body text-sm text-primary truncate">Analyze the demographic shift during...</p>
+</a>
+</li>
+</ul>
+</section>
+</div>
+</div>
+</div>
+</main>
+</body></html>
+
+<!-- Login Page -->
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Log In - The Scholarly Manuscript</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-secondary-fixed": "#261900",
+                      "on-tertiary": "#ffffff",
+                      "surface-container": "#f0eee9",
+                      "surface-container-low": "#f5f3ee",
+                      "secondary-container": "#fddba0",
+                      "secondary-fixed": "#ffdea5",
+                      "surface-container-high": "#eae8e3",
+                      "surface-container-highest": "#e4e2dd",
+                      "primary": "#00152a",
+                      "outline": "#74777e",
+                      "tertiary": "#201100",
+                      "on-secondary-fixed-variant": "#594316",
+                      "on-secondary": "#ffffff",
+                      "tertiary-fixed-dim": "#e8c08c",
+                      "on-background": "#1b1c19",
+                      "on-secondary-container": "#775f2f",
+                      "on-primary": "#ffffff",
+                      "surface-variant": "#e4e2dd",
+                      "error": "#ba1a1a",
+                      "on-surface-variant": "#43474d",
+                      "on-tertiary-fixed": "#291800",
+                      "tertiary-container": "#3b2400",
+                      "inverse-on-surface": "#f2f1ec",
+                      "surface-tint": "#316192",
+                      "on-surface": "#1b1c19",
+                      "primary-fixed": "#d1e4ff",
+                      "on-tertiary-container": "#ad8a5a",
+                      "on-primary-fixed-variant": "#104978",
+                      "surface-container-lowest": "#ffffff",
+                      "on-primary-fixed": "#001d36",
+                      "on-error-container": "#93000a",
+                      "on-error": "#ffffff",
+                      "surface-bright": "#fbf9f4",
+                      "inverse-primary": "#9ecaff",
+                      "outline-variant": "#c3c6ce",
+                      "secondary-fixed-dim": "#e2c289",
+                      "on-tertiary-fixed-variant": "#5d4119",
+                      "secondary": "#735b2b",
+                      "inverse-surface": "#30312e",
+                      "background": "#fbf9f4",
+                      "error-container": "#ffdad6",
+                      "tertiary-fixed": "#ffddb4",
+                      "primary-container": "#002a4b",
+                      "primary-fixed-dim": "#9ecaff",
+                      "surface-dim": "#dbdad5",
+                      "on-primary-container": "#6593c7",
+                      "surface": "#fbf9f4"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {},
+              "fontFamily": {
+                      "headline": [
+                              "Newsreader"
+                      ],
+                      "body": [
+                              "Manrope"
+                      ],
+                      "label": [
+                              "Manrope"
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        .material-symbols-outlined {
+          font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+      </style>
+</head>
+<body class="bg-background text-on-background font-body min-h-screen flex selection:bg-secondary-container selection:text-on-secondary-container">
+<div class="hidden lg:flex lg:w-5/12 xl:w-1/2 relative bg-surface-container-highest overflow-hidden">
+<img alt="Academic Library Background" class="absolute inset-0 w-full h-full object-cover opacity-80 mix-blend-multiply grayscale-[20%]" data-alt="Close up of rows of antique, leather-bound books on wooden library shelves, warm amber lighting, shallow depth of field, scholarly atmosphere" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBLeK63l6VVsNnVWvh3uVXAnnZsgAj7UJ-UBiSPSdA7apzJ7hI0ugMJGOMEkEaqmyuXFfFHn-lpmTejw5B9JzOmHxZ2udgDe-fYLdeobl10FMNmRdOb6gyzCuZY22kySUGL3Symd-qRoixI5kgwloZJnL51NmQ9YSvYG4uMcIOdsAtSzTVL8n1_Bf3UIkXiHR-jF6VSi0ueMRbWcZTsKyzOe6n_ZFl8EwpuCQz7uo1joyvlsNYbldAKfW1QJkshoAL6mGfAV24oR-Tr"/>
+<div class="absolute inset-0 bg-primary/10"></div>
+<div class="relative z-10 p-16 flex flex-col justify-between h-full">
+<div>
+<span class="font-headline italic text-2xl text-primary">The Scholarly Manuscript</span>
+</div>
+<div class="max-w-md">
+<blockquote class="font-headline text-4xl leading-[1.2] tracking-[-0.02em] text-primary mb-6">
+                    "Education is not the learning of facts, but the training of the mind to think."
+                </blockquote>
+<div class="w-12 h-[2px] bg-secondary mb-4"></div>
+<p class="font-body text-on-surface-variant text-sm uppercase tracking-widest">Albert Einstein</p>
+</div>
+</div>
+</div>
+<div class="w-full lg:w-7/12 xl:w-1/2 flex items-center justify-center p-8 sm:p-16 md:p-24 bg-surface">
+<div class="w-full max-w-md">
+<div class="mb-16">
+<h1 class="font-headline text-5xl text-primary leading-tight tracking-[-0.02em] mb-4">Log In</h1>
+<p class="font-body text-on-surface-variant text-lg">Enter your credentials to access your academic portal and continue your preparation.</p>
+</div>
+<form action="#" class="space-y-10" method="POST">
+<div class="flex flex-col gap-2">
+<label class="font-label text-xs uppercase tracking-[0.05em] text-on-surface-variant" for="email">Email Address</label>
+<input class="w-full bg-transparent border-0 border-b border-outline-variant/40 px-0 pb-3 pt-1 text-on-surface focus:ring-0 focus:border-b-2 focus:border-primary transition-all font-body text-lg placeholder:text-on-surface-variant/30" id="email" name="email" placeholder="scholar@institution.edu" required="" type="email"/>
+</div>
+<div class="flex flex-col gap-2 relative">
+<label class="font-label text-xs uppercase tracking-[0.05em] text-on-surface-variant" for="password">Password</label>
+<input class="w-full bg-transparent border-0 border-b border-outline-variant/40 px-0 pb-3 pt-1 text-on-surface focus:ring-0 focus:border-b-2 focus:border-primary transition-all font-body text-lg placeholder:text-on-surface-variant/30" id="password" name="password" placeholder="••••••••" required="" type="password"/>
+<div class="absolute right-0 top-0">
+<a class="font-label text-xs text-secondary hover:text-primary transition-colors duration-300" href="#">Forgot Password?</a>
+</div>
+</div>
+<div class="pt-4">
+<button class="w-full bg-primary text-on-primary font-label text-sm uppercase tracking-widest py-5 rounded DEFAULT hover:bg-primary/90 transition-colors duration-300 flex items-center justify-center gap-2 group" type="submit">
+                        Access Portal
+                        <span class="material-symbols-outlined text-lg group-hover:translate-x-1 transition-transform duration-300" data-icon="arrow_right_alt">arrow_right_alt</span>
+</button>
+</div>
+</form>
+<div class="mt-16 pt-8 border-t border-outline-variant/20 text-center">
+<p class="font-body text-on-surface-variant">
+                    Don't have an account? 
+                    <a class="font-label text-primary font-semibold hover:text-secondary transition-colors duration-300 ml-1" href="#">Sign Up</a>
+</p>
+</div>
+</div>
+</div>
+</body></html>
+
+<!-- Sign Up Page -->
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sign Up - The Scholarly Manuscript</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&amp;family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#261900",
+                        "on-tertiary": "#ffffff",
+                        "surface-container": "#f0eee9",
+                        "surface-container-low": "#f5f3ee",
+                        "secondary-container": "#fddba0",
+                        "secondary-fixed": "#ffdea5",
+                        "surface-container-high": "#eae8e3",
+                        "surface-container-highest": "#e4e2dd",
+                        "primary": "#00152a",
+                        "outline": "#74777e",
+                        "tertiary": "#201100",
+                        "on-secondary-fixed-variant": "#594316",
+                        "on-secondary": "#ffffff",
+                        "tertiary-fixed-dim": "#e8c08c",
+                        "on-background": "#1b1c19",
+                        "on-secondary-container": "#775f2f",
+                        "on-primary": "#ffffff",
+                        "surface-variant": "#e4e2dd",
+                        "error": "#ba1a1a",
+                        "on-surface-variant": "#43474d",
+                        "on-tertiary-fixed": "#291800",
+                        "tertiary-container": "#3b2400",
+                        "inverse-on-surface": "#f2f1ec",
+                        "surface-tint": "#316192",
+                        "on-surface": "#1b1c19",
+                        "primary-fixed": "#d1e4ff",
+                        "on-tertiary-container": "#ad8a5a",
+                        "on-primary-fixed-variant": "#104978",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed": "#001d36",
+                        "on-error-container": "#93000a",
+                        "on-error": "#ffffff",
+                        "surface-bright": "#fbf9f4",
+                        "inverse-primary": "#9ecaff",
+                        "outline-variant": "#c3c6ce",
+                        "secondary-fixed-dim": "#e2c289",
+                        "on-tertiary-fixed-variant": "#5d4119",
+                        "secondary": "#735b2b",
+                        "inverse-surface": "#30312e",
+                        "background": "#fbf9f4",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed": "#ffddb4",
+                        "primary-container": "#002a4b",
+                        "primary-fixed-dim": "#9ecaff",
+                        "surface-dim": "#dbdad5",
+                        "on-primary-container": "#6593c7",
+                        "surface": "#fbf9f4"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "headline": ["Newsreader", "serif"],
+                        "body": ["Manrope", "sans-serif"],
+                        "label": ["Manrope", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: theme('colors.surface'); color: theme('colors.on-background'); }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex selection:bg-secondary-container selection:text-on-secondary-container">
+<!-- Left Column: The Anchor (Editorial/Branding) -->
+<div class="hidden lg:flex lg:w-5/12 bg-primary relative overflow-hidden flex-col justify-between p-16 xl:p-24">
+<!-- Subtle Texture Overlay -->
+<div class="absolute inset-0 opacity-10 mix-blend-overlay" data-alt="close up of textured archival paper in dark lighting with subtle fibrous details" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAuRfRijaupfunUTMNJ8s_qK_qqzRNkgebYYgQpG_4kryE_L4r6kAo0LrHUEoTWxlU4fhg5HS5uTsaqeMD7UebTgVzCWOfdv9j74shdRoS-9WMb310ZD2hZXrhYTok-HWEZLuTYlKFiwW_MnqCM52l3oYIyPDNkG5lRRZMsRKuXEKp0ssKsOXHrMHwycqHjwpeLX_mcuwBJDhQCNjSg8SneFHFFPh-EItnEtNaZnwKdI8q4jCG84TPfkXZUG4nssq69vsp2vGtUENIa'); background-size: cover; background-position: center;"></div>
+<div class="relative z-10">
+<h1 class="font-headline italic text-2xl text-on-primary">The Scholarly Manuscript</h1>
+</div>
+<div class="relative z-10 max-w-md">
+<span class="material-symbols-outlined text-secondary text-4xl mb-6 block" data-icon="auto_stories" data-weight="fill" style="font-variation-settings: 'FILL' 1;">auto_stories</span>
+<h2 class="font-headline text-5xl text-on-primary leading-[1.1] tracking-tight mb-8">
+                Cultivate your academic focus.
+            </h2>
+<div class="space-y-6">
+<p class="font-body text-lg text-on-primary/80 leading-relaxed font-light">
+                    Join a disciplined environment dedicated to rigorous MYP eAssessment preparation. Our curated resources are designed for deep work, eliminating distraction to foster genuine comprehension.
+                </p>
+<div class="h-px w-12 bg-secondary opacity-50"></div>
+<p class="font-body text-sm text-on-primary/60">
+                    Secure access restricted to verified institutional scholars.
+                </p>
+</div>
+</div>
+</div>
+<!-- Right Column: The Form Canvas -->
+<div class="w-full lg:w-7/12 flex items-center justify-center p-8 sm:p-16 xl:p-32 bg-surface relative">
+<!-- Mobile/Tablet Brand Header -->
+<div class="absolute top-8 left-8 lg:hidden">
+<h1 class="font-headline italic text-xl text-primary">The Scholarly Manuscript</h1>
+</div>
+<div class="w-full max-w-md space-y-16">
+<!-- Header -->
+<div class="space-y-4">
+<h2 class="font-headline text-4xl text-primary tracking-tight">Initiate Enrollment</h2>
+<p class="font-body text-on-surface-variant leading-relaxed">
+                    Enter your academic credentials to establish your personalized study archive.
+                </p>
+</div>
+<!-- Form -->
+<form action="#" class="space-y-10" method="POST">
+<div class="space-y-8">
+<!-- Full Name Field -->
+<div class="relative group">
+<label class="block font-label text-xs font-semibold tracking-widest uppercase text-on-surface-variant mb-2" for="full-name">
+                            Full Name
+                        </label>
+<input autocomplete="name" class="block w-full border-0 border-b border-outline-variant/40 bg-transparent px-0 py-2.5 text-primary font-body text-lg focus:ring-0 focus:border-primary focus:border-b-2 transition-all placeholder:text-outline-variant" id="full-name" name="full-name" placeholder="e.g., Eleanor Vance" required="" type="text"/>
+</div>
+<!-- School Email Field -->
+<div class="relative group">
+<label class="block font-label text-xs font-semibold tracking-widest uppercase text-on-surface-variant mb-2" for="email">
+                            Institutional Email
+                        </label>
+<input autocomplete="email" class="block w-full border-0 border-b border-outline-variant/40 bg-transparent px-0 py-2.5 text-primary font-body text-lg focus:ring-0 focus:border-primary focus:border-b-2 transition-all placeholder:text-outline-variant" id="email" name="email" placeholder="student@academy.edu" required="" type="email"/>
+</div>
+<!-- Password Field -->
+<div class="relative group">
+<label class="block font-label text-xs font-semibold tracking-widest uppercase text-on-surface-variant mb-2" for="password">
+                            Passphrase
+                        </label>
+<input autocomplete="new-password" class="block w-full border-0 border-b border-outline-variant/40 bg-transparent px-0 py-2.5 text-primary font-body text-lg focus:ring-0 focus:border-primary focus:border-b-2 transition-all placeholder:text-outline-variant" id="password" name="password" placeholder="Minimum 12 characters" required="" type="password"/>
+</div>
+</div>
+<!-- Action Button -->
+<div class="pt-4">
+<button class="w-full flex items-center justify-center gap-3 bg-primary text-on-primary py-4 px-8 rounded-DEFAULT font-label font-medium text-[15px] hover:bg-primary/90 transition-colors focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 focus:ring-offset-surface" type="submit">
+<span>Establish Archive</span>
+<span class="material-symbols-outlined text-[18px]" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</form>
+<!-- Footer / Login Link -->
+<div class="text-center pt-8 border-t border-outline-variant/20">
+<p class="font-body text-sm text-on-surface-variant">
+                    Already maintain an archive? 
+                    <a class="font-semibold text-secondary hover:text-primary transition-colors ml-1" href="#">
+                        Access Here
+                    </a>
+</p>
+</div>
+</div>
+</div>
+</body></html>
+
+<!-- Sign Up Success / Verification -->
+<!DOCTYPE html>
+
+<html class="h-full bg-surface" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Scholarly Manuscript - Verification Success</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&amp;family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-secondary-fixed": "#261900",
+                        "on-tertiary": "#ffffff",
+                        "surface-container": "#f0eee9",
+                        "surface-container-low": "#f5f3ee",
+                        "secondary-container": "#fddba0",
+                        "secondary-fixed": "#ffdea5",
+                        "surface-container-high": "#eae8e3",
+                        "surface-container-highest": "#e4e2dd",
+                        "primary": "#00152a",
+                        "outline": "#74777e",
+                        "tertiary": "#201100",
+                        "on-secondary-fixed-variant": "#594316",
+                        "on-secondary": "#ffffff",
+                        "tertiary-fixed-dim": "#e8c08c",
+                        "on-background": "#1b1c19",
+                        "on-secondary-container": "#775f2f",
+                        "on-primary": "#ffffff",
+                        "surface-variant": "#e4e2dd",
+                        "error": "#ba1a1a",
+                        "on-surface-variant": "#43474d",
+                        "on-tertiary-fixed": "#291800",
+                        "tertiary-container": "#3b2400",
+                        "inverse-on-surface": "#f2f1ec",
+                        "surface-tint": "#316192",
+                        "on-surface": "#1b1c19",
+                        "primary-fixed": "#d1e4ff",
+                        "on-tertiary-container": "#ad8a5a",
+                        "on-primary-fixed-variant": "#104978",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed": "#001d36",
+                        "on-error-container": "#93000a",
+                        "on-error": "#ffffff",
+                        "surface-bright": "#fbf9f4",
+                        "inverse-primary": "#9ecaff",
+                        "outline-variant": "#c3c6ce",
+                        "secondary-fixed-dim": "#e2c289",
+                        "on-tertiary-fixed-variant": "#5d4119",
+                        "secondary": "#735b2b",
+                        "inverse-surface": "#30312e",
+                        "background": "#fbf9f4",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed": "#ffddb4",
+                        "primary-container": "#002a4b",
+                        "primary-fixed-dim": "#9ecaff",
+                        "surface-dim": "#dbdad5",
+                        "on-primary-container": "#6593c7",
+                        "surface": "#fbf9f4"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    fontFamily: {
+                        "headline": ["Newsreader", "serif"],
+                        "body": ["Manrope", "sans-serif"],
+                        "label": ["Manrope", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .ghost-border { border: 1px solid rgba(195, 198, 206, 0.4); }
+    </style>
+</head>
+<body class="h-full flex flex-col font-body text-on-surface antialiased selection:bg-secondary-container selection:text-on-secondary-container bg-surface">
+<!-- Navbar: Suppressed for transactional/success screen per design system -->
+<main class="flex-grow flex items-center justify-center p-6 md:p-12 relative overflow-hidden">
+<!-- Subtle Background Texture/Accent -->
+<div class="absolute inset-0 pointer-events-none opacity-20">
+<div class="absolute top-[-10%] right-[-5%] w-96 h-96 bg-surface-container-high rounded-full mix-blend-multiply blur-3xl"></div>
+<div class="absolute bottom-[-10%] left-[-5%] w-96 h-96 bg-surface-container rounded-full mix-blend-multiply blur-3xl"></div>
+</div>
+<!-- Main Card -->
+<div class="relative w-full max-w-lg mx-auto bg-surface-container-lowest rounded-DEFAULT ghost-border p-8 md:p-16 flex flex-col items-center text-center shadow-[0_12px_32px_rgba(27,28,25,0.06)]">
+<!-- Icon/Illustration -->
+<div class="mb-10 w-24 h-24 rounded-full bg-surface-container-low flex items-center justify-center ghost-border relative">
+<div class="absolute inset-0 rounded-full border border-outline-variant/20 scale-[1.15]"></div>
+<span class="material-symbols-outlined text-5xl text-secondary" style="font-variation-settings: 'FILL' 0, 'wght' 200;">mark_email_read</span>
+</div>
+<!-- Header -->
+<h1 class="font-headline text-4xl md:text-5xl text-primary tracking-[-0.02em] leading-[1.2] mb-6">
+                Verification email sent
+            </h1>
+<!-- Message -->
+<p class="font-body text-lg text-on-surface-variant mb-12 max-w-sm mx-auto leading-relaxed">
+                Check your inbox to activate your account. We've sent a link to confirm your address.
+            </p>
+<!-- Action Area -->
+<div class="w-full flex flex-col gap-4">
+<button class="w-full bg-primary text-on-primary py-4 px-6 rounded-DEFAULT font-label font-medium tracking-wide transition-opacity hover:opacity-90 active:opacity-100" type="button">
+                    Return to Log In
+                </button>
+<div class="pt-6 border-t border-outline-variant/40 mt-2">
+<p class="text-sm text-on-surface-variant font-body">
+                        Didn't receive the email? 
+                        <button class="text-secondary font-medium hover:text-primary transition-colors" type="button">Resend Link</button>
+</p>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer: Shared Component -->
+<footer class="w-full py-12 px-12 flex flex-col items-center gap-4 text-center bg-[#fbf9f4] dark:bg-slate-950 text-[#00152a] dark:text-blue-400 font-sans text-xs tracking-widest uppercase Manrope full-width border-t border-[#c3c6ce]/40 ghost-border at 40% opacity flat no shadows">
+<div class="flex gap-6 mb-4">
+<a class="text-slate-400 hover:text-[#00152a] dark:hover:text-white transition-colors" href="#">Privacy Policy</a>
+<a class="text-slate-400 hover:text-[#00152a] dark:hover:text-white transition-colors" href="#">Terms of Service</a>
+<a class="text-slate-400 hover:text-[#00152a] dark:hover:text-white transition-colors" href="#">Academic Integrity</a>
+<a class="text-slate-400 hover:text-[#00152a] dark:hover:text-white transition-colors" href="#">Support</a>
+</div>
+<p class="text-slate-400">© 2024 The Scholarly Manuscript. All rights reserved.</p>
+</footer>
+</body></html>
+
+<!-- Subject Selection Onboarding -->
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Scholarly Manuscript - Onboarding</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&amp;family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#261900",
+                        "on-tertiary": "#ffffff",
+                        "surface-container": "#f0eee9",
+                        "surface-container-low": "#f5f3ee",
+                        "secondary-container": "#fddba0",
+                        "secondary-fixed": "#ffdea5",
+                        "surface-container-high": "#eae8e3",
+                        "surface-container-highest": "#e4e2dd",
+                        "primary": "#00152a",
+                        "outline": "#74777e",
+                        "tertiary": "#201100",
+                        "on-secondary-fixed-variant": "#594316",
+                        "on-secondary": "#ffffff",
+                        "tertiary-fixed-dim": "#e8c08c",
+                        "on-background": "#1b1c19",
+                        "on-secondary-container": "#775f2f",
+                        "on-primary": "#ffffff",
+                        "surface-variant": "#e4e2dd",
+                        "error": "#ba1a1a",
+                        "on-surface-variant": "#43474d",
+                        "on-tertiary-fixed": "#291800",
+                        "tertiary-container": "#3b2400",
+                        "inverse-on-surface": "#f2f1ec",
+                        "surface-tint": "#316192",
+                        "on-surface": "#1b1c19",
+                        "primary-fixed": "#d1e4ff",
+                        "on-tertiary-container": "#ad8a5a",
+                        "on-primary-fixed-variant": "#104978",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed": "#001d36",
+                        "on-error-container": "#93000a",
+                        "on-error": "#ffffff",
+                        "surface-bright": "#fbf9f4",
+                        "inverse-primary": "#9ecaff",
+                        "outline-variant": "#c3c6ce",
+                        "secondary-fixed-dim": "#e2c289",
+                        "on-tertiary-fixed-variant": "#5d4119",
+                        "secondary": "#735b2b",
+                        "inverse-surface": "#30312e",
+                        "background": "#fbf9f4",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed": "#ffddb4",
+                        "primary-container": "#002a4b",
+                        "primary-fixed-dim": "#9ecaff",
+                        "surface-dim": "#dbdad5",
+                        "on-primary-container": "#6593c7",
+                        "surface": "#fbf9f4"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {},
+                    "fontFamily": {
+                        "headline": ["Newsreader"],
+                        "body": ["Manrope"],
+                        "label": ["Manrope"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        .text-shadow-ambient {
+            text-shadow: 0 4px 12px rgba(27, 28, 25, 0.08);
+        }
+        .box-shadow-ambient {
+            box-shadow: 0 12px 32px rgba(27, 28, 25, 0.06);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body antialiased min-h-screen flex flex-col">
+<!-- TopNavBar (Suppressed for Onboarding - Transactional Intent) -->
+<!-- Main Content -->
+<main class="flex-grow flex items-center justify-center p-6 md:p-12 lg:p-24 w-full">
+<div class="max-w-4xl w-full grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-24 items-start">
+<!-- Left Header Section (Asymmetric Editorial Layout) -->
+<div class="lg:col-span-5 flex flex-col gap-8">
+<div>
+<h1 class="font-headline text-5xl md:text-6xl text-primary leading-[1.1] tracking-tight mb-4">Curate Your Study.</h1>
+<p class="font-body text-lg text-on-surface-variant leading-relaxed">
+                        Select your academic year and focus disciplines to tailor your eAssessment preparation materials.
+                    </p>
+</div>
+<!-- Custom Exam Status / Progress -->
+<div class="flex flex-col gap-2 mt-4">
+<div class="flex justify-between text-sm font-label tracking-wide text-on-surface-variant uppercase">
+<span>Step 1 of 2</span>
+<span>Year &amp; Subjects</span>
+</div>
+<div class="w-full h-1 bg-surface-container-high rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-1/2 rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Right Content Section (Bento Grid Style Selection) -->
+<div class="lg:col-span-7 flex flex-col gap-12">
+<!-- Section 1: Year Selection -->
+<section class="flex flex-col gap-6">
+<h2 class="font-headline text-2xl text-primary">Academic Year</h2>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<!-- Option 1 -->
+<label class="cursor-pointer relative group">
+<input class="peer sr-only" name="academic_year" type="radio" value="myp4"/>
+<div class="bg-surface-container-lowest border border-outline-variant/40 rounded-lg p-6 flex items-center justify-between transition-all duration-300 peer-checked:bg-primary-container peer-checked:border-primary-container peer-checked:box-shadow-ambient">
+<span class="font-body text-lg font-medium text-on-surface transition-colors duration-300 peer-checked:text-on-primary-container group-hover:text-primary">MYP 4</span>
+<span class="material-symbols-outlined text-outline-variant transition-colors duration-300 peer-checked:text-on-primary-container opacity-0 peer-checked:opacity-100" data-icon="check_circle">check_circle</span>
+</div>
+</label>
+<!-- Option 2 -->
+<label class="cursor-pointer relative group">
+<input checked="" class="peer sr-only" name="academic_year" type="radio" value="myp5"/>
+<div class="bg-primary-container border border-primary-container rounded-lg p-6 flex items-center justify-between box-shadow-ambient transition-all duration-300">
+<span class="font-body text-lg font-medium text-on-primary-container">MYP 5</span>
+<span class="material-symbols-outlined text-on-primary-container" data-icon="check_circle" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+</label>
+</div>
+</section>
+<!-- Section 2: Subject Selection -->
+<section class="flex flex-col gap-6">
+<div class="flex items-baseline justify-between">
+<h2 class="font-headline text-2xl text-primary">Disciplines</h2>
+<span class="font-label text-sm text-on-surface-variant uppercase tracking-wider">Select Multiple</span>
+</div>
+<div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+<!-- Subject Card 1 -->
+<label class="cursor-pointer relative group">
+<input checked="" class="peer sr-only" name="subjects" type="checkbox" value="math"/>
+<div class="bg-surface-container-lowest border border-outline-variant/40 rounded-lg p-5 flex flex-col items-center justify-center gap-3 text-center transition-all duration-300 peer-checked:bg-surface-container-low peer-checked:border-primary peer-checked:box-shadow-ambient h-32">
+<span class="material-symbols-outlined text-3xl text-on-surface-variant transition-colors duration-300 peer-checked:text-primary" data-icon="calculate">calculate</span>
+<span class="font-body text-sm font-medium text-on-surface transition-colors duration-300 peer-checked:text-primary">Mathematics</span>
+</div>
+</label>
+<!-- Subject Card 2 -->
+<label class="cursor-pointer relative group">
+<input checked="" class="peer sr-only" name="subjects" type="checkbox" value="sciences"/>
+<div class="bg-surface-container-lowest border border-outline-variant/40 rounded-lg p-5 flex flex-col items-center justify-center gap-3 text-center transition-all duration-300 peer-checked:bg-surface-container-low peer-checked:border-primary peer-checked:box-shadow-ambient h-32">
+<span class="material-symbols-outlined text-3xl text-on-surface-variant transition-colors duration-300 peer-checked:text-primary" data-icon="science">science</span>
+<span class="font-body text-sm font-medium text-on-surface transition-colors duration-300 peer-checked:text-primary">Sciences</span>
+</div>
+</label>
+<!-- Subject Card 3 -->
+<label class="cursor-pointer relative group">
+<input class="peer sr-only" name="subjects" type="checkbox" value="individuals"/>
+<div class="bg-surface-container-lowest border border-outline-variant/40 rounded-lg p-5 flex flex-col items-center justify-center gap-3 text-center transition-all duration-300 peer-checked:bg-surface-container-low peer-checked:border-primary peer-checked:box-shadow-ambient h-32 hover:bg-surface-container">
+<span class="material-symbols-outlined text-3xl text-on-surface-variant transition-colors duration-300 peer-checked:text-primary" data-icon="public">public</span>
+<span class="font-body text-sm font-medium text-on-surface transition-colors duration-300 peer-checked:text-primary">Individuals &amp; Societies</span>
+</div>
+</label>
+<!-- Subject Card 4 -->
+<label class="cursor-pointer relative group">
+<input class="peer sr-only" name="subjects" type="checkbox" value="language_lit"/>
+<div class="bg-surface-container-lowest border border-outline-variant/40 rounded-lg p-5 flex flex-col items-center justify-center gap-3 text-center transition-all duration-300 peer-checked:bg-surface-container-low peer-checked:border-primary peer-checked:box-shadow-ambient h-32 hover:bg-surface-container">
+<span class="material-symbols-outlined text-3xl text-on-surface-variant transition-colors duration-300 peer-checked:text-primary" data-icon="menu_book">menu_book</span>
+<span class="font-body text-sm font-medium text-on-surface transition-colors duration-300 peer-checked:text-primary">Language &amp; Literature</span>
+</div>
+</label>
+<!-- Subject Card 5 -->
+<label class="cursor-pointer relative group">
+<input class="peer sr-only" name="subjects" type="checkbox" value="language_acq"/>
+<div class="bg-surface-container-lowest border border-outline-variant/40 rounded-lg p-5 flex flex-col items-center justify-center gap-3 text-center transition-all duration-300 peer-checked:bg-surface-container-low peer-checked:border-primary peer-checked:box-shadow-ambient h-32 hover:bg-surface-container">
+<span class="material-symbols-outlined text-3xl text-on-surface-variant transition-colors duration-300 peer-checked:text-primary" data-icon="translate">translate</span>
+<span class="font-body text-sm font-medium text-on-surface transition-colors duration-300 peer-checked:text-primary">Language Acquisition</span>
+</div>
+</label>
+</div>
+</section>
+<!-- Actions -->
+<div class="flex justify-end pt-8">
+<button class="bg-primary text-on-primary font-body font-medium py-3 px-8 rounded-md transition-opacity hover:opacity-90 flex items-center gap-2">
+                        Continue
+                        <span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer (Suppressed for Onboarding - Transactional Intent) -->
+</body></html>
+
+<!-- Design System -->
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Scholarly Manuscript - Master your MYP eAssessments</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&amp;family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#261900",
+                        "on-tertiary": "#ffffff",
+                        "surface-container": "#f0eee9",
+                        "surface-container-low": "#f5f3ee",
+                        "secondary-container": "#fddba0",
+                        "secondary-fixed": "#ffdea5",
+                        "surface-container-high": "#eae8e3",
+                        "surface-container-highest": "#e4e2dd",
+                        "primary": "#00152a",
+                        "outline": "#74777e",
+                        "tertiary": "#201100",
+                        "on-secondary-fixed-variant": "#594316",
+                        "on-secondary": "#ffffff",
+                        "tertiary-fixed-dim": "#e8c08c",
+                        "on-background": "#1b1c19",
+                        "on-secondary-container": "#775f2f",
+                        "on-primary": "#ffffff",
+                        "surface-variant": "#e4e2dd",
+                        "error": "#ba1a1a",
+                        "on-surface-variant": "#43474d",
+                        "on-tertiary-fixed": "#291800",
+                        "tertiary-container": "#3b2400",
+                        "inverse-on-surface": "#f2f1ec",
+                        "surface-tint": "#316192",
+                        "on-surface": "#1b1c19",
+                        "primary-fixed": "#d1e4ff",
+                        "on-tertiary-container": "#ad8a5a",
+                        "on-primary-fixed-variant": "#104978",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed": "#001d36",
+                        "on-error-container": "#93000a",
+                        "on-error": "#ffffff",
+                        "surface-bright": "#fbf9f4",
+                        "inverse-primary": "#9ecaff",
+                        "outline-variant": "#c3c6ce",
+                        "secondary-fixed-dim": "#e2c289",
+                        "on-tertiary-fixed-variant": "#5d4119",
+                        "secondary": "#735b2b",
+                        "inverse-surface": "#30312e",
+                        "background": "#fbf9f4",
+                        "error-container": "#ffdad6",
+                        "tertiary-fixed": "#ffddb4",
+                        "primary-container": "#002a4b",
+                        "primary-fixed-dim": "#9ecaff",
+                        "surface-dim": "#dbdad5",
+                        "on-primary-container": "#6593c7",
+                        "surface": "#fbf9f4"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {},
+                    "fontFamily": {
+                        "headline": ["Newsreader", "serif"],
+                        "body": ["Manrope", "sans-serif"],
+                        "label": ["Manrope", "sans-serif"]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Manrope', sans-serif; background-color: #fbf9f4; color: #1b1c19; }
+        h1, h2, h3, h4, h5, h6, .font-serif { font-family: 'Newsreader', serif; }
+        
+        .ghost-border { border: 1px solid rgba(195, 198, 206, 0.4); }
+        .ghost-border-b { border-bottom: 1px solid rgba(195, 198, 206, 0.4); }
+        .ghost-border-t { border-top: 1px solid rgba(195, 198, 206, 0.4); }
+        
+        .vellum-overlay::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-color: #316192;
+            opacity: 0.05;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface antialiased flex flex-col min-h-screen">
+<!-- TopNavBar (Shared Component) -->
+<header class="bg-[#fbf9f4] dark:bg-slate-950 w-full top-0 z-50 sticky transition-all duration-300">
+<div class="flex justify-between items-center w-full px-6 md:px-12 py-6 max-w-screen-2xl mx-auto">
+<div class="flex items-center gap-8">
+<a class="text-2xl font-serif italic text-[#00152a] dark:text-white tracking-tight" href="#">
+                    The Scholarly Manuscript
+                </a>
+<nav class="hidden md:flex items-center gap-6 ml-8">
+<a class="font-serif text-lg leading-relaxed Newsreader text-[#00152a]/60 dark:text-slate-400 hover:text-[#735b2b] transition-colors duration-300" href="#">Curriculum</a>
+<a class="font-serif text-lg leading-relaxed Newsreader text-[#00152a]/60 dark:text-slate-400 hover:text-[#735b2b] transition-colors duration-300" href="#">Subjects</a>
+<a class="font-serif text-lg leading-relaxed Newsreader text-[#00152a]/60 dark:text-slate-400 hover:text-[#735b2b] transition-colors duration-300" href="#">Resources</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="hidden md:block font-body font-medium text-sm text-primary hover:text-secondary transition-colors px-4 py-2">Log In</button>
+<button class="bg-primary text-on-primary font-body font-medium text-sm px-6 py-2.5 rounded-DEFAULT hover:opacity-90 transition-opacity">Sign Up</button>
+</div>
+</div>
+<div class="w-full h-px bg-[#f5f3ee] dark:bg-slate-900"></div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow flex flex-col">
+<!-- Hero Section -->
+<section class="relative w-full pt-24 pb-32 px-6 md:px-12 max-w-screen-2xl mx-auto overflow-hidden">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+<!-- Hero Text -->
+<div class="lg:col-span-5 flex flex-col items-start z-10 pl-0 lg:pl-8">
+<span class="font-label text-sm uppercase tracking-[0.05em] text-on-surface-variant mb-6 font-semibold">MYP eAssessment Preparation</span>
+<h1 class="font-headline text-5xl md:text-6xl lg:text-7xl text-primary leading-[1.1] tracking-[-0.02em] mb-8 font-medium">
+                        Master your <br/>
+<span class="italic text-secondary">MYP eAssessments.</span>
+</h1>
+<p class="font-body text-lg md:text-xl text-on-surface-variant leading-relaxed max-w-lg mb-10">
+                        Practice with precision. Filter by subject, year, session, and topic to build a customized study regimen that reflects true exam conditions.
+                    </p>
+<div class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+<button class="bg-primary text-on-primary font-body font-medium text-base px-8 py-4 rounded-DEFAULT hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+                            Start Practicing
+                            <span aria-hidden="true" class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+<button class="ghost-border bg-transparent text-primary font-body font-medium text-base px-8 py-4 rounded-DEFAULT hover:bg-surface-container-low transition-colors flex items-center justify-center gap-2">
+                            View Demo
+                            <span aria-hidden="true" class="material-symbols-outlined text-sm">play_circle</span>
+</button>
+</div>
+</div>
+<!-- Hero Visual (Asymmetric Mockup) -->
+<div class="lg:col-span-7 relative h-[500px] lg:h-[700px] w-full mt-12 lg:mt-0 right-[-5%] lg:right-[-10%]">
+<!-- Base Container -->
+<div class="absolute inset-0 bg-surface-container-low rounded-lg ghost-border overflow-hidden shadow-[0_12px_32px_rgba(27,28,25,0.06)] flex flex-col">
+<!-- Mockup Header -->
+<div class="h-16 w-full ghost-border-b bg-surface-container-lowest flex items-center px-6 justify-between">
+<div class="flex items-center gap-4">
+<span aria-hidden="true" class="material-symbols-outlined text-primary">filter_list</span>
+<span class="font-body font-medium text-sm text-primary">Exam Filter Criteria</span>
+</div>
+<span class="font-label text-xs uppercase tracking-widest text-on-surface-variant">Mathematics</span>
+</div>
+<!-- Mockup Body (Image placeholder for the UI mockup) -->
+<div class="flex-grow relative bg-surface-container-highest">
+<img alt="Platform Mockup" class="absolute inset-0 w-full h-full object-cover mix-blend-multiply opacity-80" data-alt="Close-up of a student working on a digital tablet with complex mathematical charts and graphs visible on screen, warm lighting, focused atmosphere" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5o2Tw1KKMkldPd3NPkrAjCi2l2Nh3eeUAnbByTlCbRJ1iZip4OQZ8Hrx0Pzdzh8YqvkmTUaPdVFIQzgRLygBAPZbqfhuYd12MOuvuWrFrrD2anICHdLS0eusLJf23qb9liIo_YV_8zLh3tDz-AScI4C6L-THPjvO1HOG-dtfYKO2g1Bod1u95twdUpht9TBoo8KMg0MaEgUjdppwEX_pAA-fTSCLxuhMniiEBpu_S6CqcfXPq8wxgigWamqcw20K4d34EdjP3qJSr"/>
+<!-- Overlay UI Elements to simulate the product -->
+<div class="absolute top-8 left-8 right-8 bottom-8 flex flex-col gap-4">
+<div class="bg-surface-container-lowest/90 backdrop-blur-sm p-6 rounded-DEFAULT ghost-border w-2/3">
+<div class="font-label text-xs text-on-surface-variant uppercase tracking-wider mb-2">Topic Selected</div>
+<div class="font-headline text-xl text-primary mb-1">Algebraic Expressions</div>
+<div class="w-full h-1 bg-surface-container-high mt-4">
+<div class="h-full bg-secondary w-[65%]"></div>
+</div>
+</div>
+<div class="bg-surface-container-lowest/90 backdrop-blur-sm p-6 rounded-DEFAULT ghost-border w-1/2 ml-auto self-end mt-auto">
+<div class="flex items-center gap-3">
+<span aria-hidden="true" class="material-symbols-outlined text-secondary">check_circle</span>
+<span class="font-body text-sm text-primary">Filter: May 2022 Session</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 1: Subject-Based Practice Grid (Bento Style) -->
+<section class="w-full py-24 bg-surface-container-low">
+<div class="max-w-screen-2xl mx-auto px-6 md:px-12">
+<div class="flex flex-col md:flex-row justify-between items-end mb-16 gap-8">
+<div class="max-w-2xl">
+<h2 class="font-headline text-4xl text-primary leading-tight mb-4 font-medium">Curated by Subject</h2>
+<p class="font-body text-lg text-on-surface-variant">Focus your efforts. Select a discipline to access categorized past papers and topic-specific question banks.</p>
+</div>
+<button class="text-secondary font-body font-medium text-sm uppercase tracking-wider hover:text-primary transition-colors flex items-center gap-1">
+                        View All Subjects <span aria-hidden="true" class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+<!-- Large Card (Span 2) -->
+<div class="md:col-span-2 lg:col-span-2 bg-surface-container-lowest rounded-lg ghost-border p-8 hover:bg-surface transition-colors cursor-pointer group flex flex-col h-[320px]">
+<div class="mb-auto">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center mb-6 text-primary group-hover:text-secondary transition-colors">
+<span aria-hidden="true" class="material-symbols-outlined">calculate</span>
+</div>
+<h3 class="font-headline text-2xl text-primary mb-2">Mathematics</h3>
+<p class="font-body text-sm text-on-surface-variant leading-relaxed">Extended and Standard level coverage, including complex problem-solving and real-world application contexts.</p>
+</div>
+<div class="flex items-center justify-between border-t ghost-border-t pt-4 mt-8">
+<span class="font-label text-xs uppercase tracking-widest text-on-surface-variant">1,200+ Questions</span>
+<span aria-hidden="true" class="material-symbols-outlined text-secondary opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+</div>
+</div>
+<!-- Standard Cards -->
+<div class="bg-surface-container-lowest rounded-lg ghost-border p-8 hover:bg-surface transition-colors cursor-pointer group flex flex-col h-[320px]">
+<div class="mb-auto">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center mb-6 text-primary group-hover:text-secondary transition-colors">
+<span aria-hidden="true" class="material-symbols-outlined">science</span>
+</div>
+<h3 class="font-headline text-2xl text-primary mb-2">Sciences</h3>
+<p class="font-body text-sm text-on-surface-variant leading-relaxed">Biology, Chemistry, and Physics integrated assessments.</p>
+</div>
+<div class="flex items-center justify-between border-t ghost-border-t pt-4 mt-8">
+<span class="font-label text-xs uppercase tracking-widest text-on-surface-variant">850+ Questions</span>
+<span aria-hidden="true" class="material-symbols-outlined text-secondary opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest rounded-lg ghost-border p-8 hover:bg-surface transition-colors cursor-pointer group flex flex-col h-[320px]">
+<div class="mb-auto">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center mb-6 text-primary group-hover:text-secondary transition-colors">
+<span aria-hidden="true" class="material-symbols-outlined">public</span>
+</div>
+<h3 class="font-headline text-2xl text-primary mb-2">Individuals &amp; Societies</h3>
+<p class="font-body text-sm text-on-surface-variant leading-relaxed">Source analysis and essay framing techniques.</p>
+</div>
+<div class="flex items-center justify-between border-t ghost-border-t pt-4 mt-8">
+<span class="font-label text-xs uppercase tracking-widest text-on-surface-variant">600+ Questions</span>
+<span aria-hidden="true" class="material-symbols-outlined text-secondary opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+</div>
+</div>
+<div class="bg-surface-container-lowest rounded-lg ghost-border p-8 hover:bg-surface transition-colors cursor-pointer group flex flex-col h-[320px]">
+<div class="mb-auto">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center mb-6 text-primary group-hover:text-secondary transition-colors">
+<span aria-hidden="true" class="material-symbols-outlined">menu_book</span>
+</div>
+<h3 class="font-headline text-2xl text-primary mb-2">Language &amp; Literature</h3>
+<p class="font-body text-sm text-on-surface-variant leading-relaxed">Textual analysis and comparative commentary practice.</p>
+</div>
+<div class="flex items-center justify-between border-t ghost-border-t pt-4 mt-8">
+<span class="font-label text-xs uppercase tracking-widest text-on-surface-variant">450+ Questions</span>
+<span aria-hidden="true" class="material-symbols-outlined text-secondary opacity-0 group-hover:opacity-100 transition-opacity">arrow_forward</span>
+</div>
+</div>
+<!-- Span 3 Card -->
+<div class="md:col-span-2 lg:col-span-3 bg-surface-container-high rounded-lg ghost-border p-8 hover:bg-surface-variant transition-colors cursor-pointer flex flex-col justify-center items-center text-center h-[320px]">
+<h3 class="font-headline text-2xl text-primary mb-4">Interdisciplinary Prep</h3>
+<p class="font-body text-sm text-on-surface-variant leading-relaxed max-w-md mb-6">Master the unique demands of the interdisciplinary eAssessment with cross-subject synthesis scenarios.</p>
+<button class="bg-surface-container-lowest text-primary font-body font-medium text-sm px-6 py-2 rounded-DEFAULT ghost-border hover:bg-surface transition-colors">Explore Scenarios</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Section 2: Features (Asymmetric Layout) -->
+<section class="w-full py-32 bg-surface">
+<div class="max-w-screen-2xl mx-auto px-6 md:px-12">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-24 items-center">
+<!-- Feature Text -->
+<div class="order-2 lg:order-1 pr-0 lg:pr-12">
+<span class="font-label text-sm uppercase tracking-[0.05em] text-secondary mb-4 block font-semibold">Granular Control</span>
+<h2 class="font-headline text-4xl text-primary leading-tight mb-6 font-medium">Exam filters &amp; Progress tracking.</h2>
+<p class="font-body text-lg text-on-surface-variant leading-relaxed mb-8">
+                            Our platform doesn't just offer random questions. It allows you to isolate specific weaknesses by filtering historical data down to the exact topic and session. Track your mastery over time with academic-grade analytics.
+                        </p>
+<ul class="space-y-6">
+<li class="flex items-start gap-4">
+<span aria-hidden="true" class="material-symbols-outlined text-secondary mt-1">tune</span>
+<div>
+<h4 class="font-body font-bold text-base text-primary mb-1">Precision Filtering</h4>
+<p class="font-body text-sm text-on-surface-variant">Narrow down practice sessions by year, May/November session, and specific syllabus topics.</p>
+</div>
+</li>
+<li class="flex items-start gap-4">
+<span aria-hidden="true" class="material-symbols-outlined text-secondary mt-1">monitoring</span>
+<div>
+<h4 class="font-body font-bold text-base text-primary mb-1">Mastery Analytics</h4>
+<p class="font-body text-sm text-on-surface-variant">Visualize your performance trajectory across different disciplines to optimize study time.</p>
+</div>
+</li>
+</ul>
+</div>
+<!-- Feature Visual -->
+<div class="order-1 lg:order-2 relative h-[600px] w-full rounded-lg bg-surface-container-low ghost-border p-8 flex items-center justify-center overflow-hidden">
+<!-- Abstract Representation of UI -->
+<div class="absolute w-[120%] h-[120%] -top-[10%] -right-[10%] bg-surface-tint opacity-[0.02] rounded-full blur-3xl"></div>
+<div class="w-full max-w-md space-y-4 z-10">
+<!-- Simulated Filter Chips -->
+<div class="flex flex-wrap gap-2 mb-8">
+<div class="bg-primary-container text-on-primary-container font-body text-xs px-3 py-1.5 rounded-DEFAULT">2023</div>
+<div class="bg-primary-container text-on-primary-container font-body text-xs px-3 py-1.5 rounded-DEFAULT">May Session</div>
+<div class="bg-surface-container-highest text-on-surface-variant font-body text-xs px-3 py-1.5 rounded-DEFAULT ghost-border">Biology</div>
+<div class="bg-primary-container text-on-primary-container font-body text-xs px-3 py-1.5 rounded-DEFAULT">Cellular Biology</div>
+</div>
+<!-- Simulated Progress Card -->
+<div class="bg-surface-container-lowest p-6 rounded-lg shadow-[0_12px_32px_rgba(27,28,25,0.06)] ghost-border">
+<div class="flex justify-between items-end mb-4">
+<span class="font-headline text-lg text-primary">Topic Mastery</span>
+<span class="font-body text-sm text-secondary font-bold">78%</span>
+</div>
+<div class="w-full h-1 bg-surface-container-high mb-6">
+<div class="h-full bg-secondary w-[78%]"></div>
+</div>
+<div class="space-y-3">
+<div class="h-2 bg-surface-container rounded-sm w-full"></div>
+<div class="h-2 bg-surface-container rounded-sm w-5/6"></div>
+<div class="h-2 bg-surface-container rounded-sm w-4/6"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer (Shared Component) -->
+<footer class="bg-[#fbf9f4] dark:bg-slate-950 w-full py-12 px-12 flex flex-col items-center gap-4 text-center border-t border-[#c3c6ce]/40">
+<div class="flex flex-wrap justify-center gap-6 mb-4">
+<a class="font-sans text-xs tracking-widest uppercase Manrope text-slate-400 hover:text-[#00152a] dark:hover:text-white transition-colors" href="#">Privacy Policy</a>
+<a class="font-sans text-xs tracking-widest uppercase Manrope text-slate-400 hover:text-[#00152a] dark:hover:text-white transition-colors" href="#">Terms of Service</a>
+<a class="font-sans text-xs tracking-widest uppercase Manrope text-slate-400 hover:text-[#00152a] dark:hover:text-white transition-colors" href="#">Academic Integrity</a>
+<a class="font-sans text-xs tracking-widest uppercase Manrope text-slate-400 hover:text-[#00152a] dark:hover:text-white transition-colors" href="#">Support</a>
+</div>
+<p class="font-sans text-xs tracking-widest uppercase Manrope text-[#00152a] dark:text-blue-400">
+            © 2024 The Scholarly Manuscript. All rights reserved.
+        </p>
+</footer>
+</body></html>
