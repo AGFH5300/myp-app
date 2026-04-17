@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { AdSlot } from '@/components/ad-slot'
+import { adSlots } from '@/lib/ads'
 
 export default async function BookmarksPage() {
   const supabase = await createClient()
@@ -26,6 +28,7 @@ export default async function BookmarksPage() {
           </div>
         ))}
       </div>
+      <div className="mt-8"><AdSlot slot={adSlots.listFooter} label="Sponsored" /></div>
     </div>
   )
 }

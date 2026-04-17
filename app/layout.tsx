@@ -5,15 +5,32 @@ import './globals.css'
 const newsreader = Newsreader({ subsets: ['latin'], variable: '--font-newsreader' })
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' })
 
+const siteTitle = 'MYP Atlas'
+const siteDescription = 'MYP Atlas is a premium MYP eAssessment preparation workspace for focused, criterion-aligned practice.'
+
 export const metadata: Metadata = {
+  metadataBase: new URL('https://mypatlas.com'),
   title: {
-    default: 'MYP Atlas',
-    template: '%s · MYP Atlas',
+    default: siteTitle,
+    template: `%s · ${siteTitle}`,
   },
-  description: 'Premium MYP eAssessment preparation workspace.',
+  description: siteDescription,
+  applicationName: siteTitle,
+  keywords: ['MYP', 'eAssessment', 'study', 'practice', 'IB Middle Years Programme'],
   icons: {
-    icon: '/icon-light-32x32.png',
-    apple: '/apple-icon.png',
+    icon: '/myp-atlas-icon.svg',
+    shortcut: '/myp-atlas-icon.svg',
+  },
+  openGraph: {
+    title: siteTitle,
+    description: siteDescription,
+    type: 'website',
+    siteName: siteTitle,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: siteTitle,
+    description: siteDescription,
   },
 }
 

@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { AdSlot } from '@/components/ad-slot'
+import { adSlots } from '@/lib/ads'
 
 export default async function ProgressPage() {
   const supabase = await createClient()
@@ -25,12 +27,18 @@ export default async function ProgressPage() {
       <h1 className="font-headline text-4xl text-[#00152a]">Progress Overview</h1>
       <p className="font-body text-[#43474d] mt-2 mb-8">Track your mastery trajectory across disciplines.</p>
       <div className="space-y-4">
-        {!rows.length && <div className="bg-white border border-[#c3c6ce66] p-6 font-body text-[#43474d]">No progress data yet. Complete practice questions to build insights.</div>}
+        {!rows.length && <div className="bg-white border border-[#c3c6ce66] p-6 font-body text-[#43474d] rounded-md">No progress data yet. Complete practice questions to build insights.</div>}
         {rows.map((p) => {
           const accuracy = p.max ? Math.round((p.score / p.max) * 100) : 0
-          return <div key={p.name} className="bg-white border border-[#c3c6ce66] p-6"><div className="flex justify-between"><h2 className="font-headline text-2xl text-[#00152a]">{p.name}</h2><span className="font-headline italic text-[#735b2b]">{accuracy}%</span></div><div className="h-1 mt-4 bg-[#e4e2dd]"><div className="h-full bg-[#00152a]" style={{ width: `${accuracy}%` }} /></div></div>
+          return (
+            <div key={p.name} className="bg-white border border-[#c3c6ce66] p-6 rounded-md">
+              <div className="flex justify-between"><h2 className="font-headline text-2xl text-[#00152a]">{p.name}</h2><span className="font-headline text-[#735b2b]">{accuracy}%</span></div>
+              <div className="h-1 mt-4 bg-[#e4e2dd]"><div className="h-full bg-[#00152a]" style={{ width: `${accuracy}%` }} /></div>
+            </div>
+          )
         })}
       </div>
+      <div className="mt-8"><AdSlot slot={adSlots.listFooter} label="Sponsored" /></div>
     </div>
   )
 }
