@@ -1,18 +1,14 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { BookOpen, Loader2 } from "lucide-react"
+import { useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 export default function SignUpPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [fullName, setFullName] = useState("")
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -20,112 +16,39 @@ export default function SignUpPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    setError(null)
-
     const supabase = createClient()
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo:
-          process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ??
-          `${window.location.origin}/auth/callback`,
-        data: {
-          full_name: fullName,
-          role: "student",
-        },
+        emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ?? `${window.location.origin}/auth/callback`,
+        data: { full_name: fullName, role: 'student' },
       },
     })
-
     if (error) {
       setError(error.message)
       setLoading(false)
       return
     }
-
-    router.push("/auth/sign-up-success")
+    router.push('/auth/sign-up-success')
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-              <BookOpen className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-xl">MYP Practice</span>
-          </Link>
-          <h1 className="text-2xl font-bold">Create your account</h1>
-          <p className="text-muted-foreground mt-2">Start practicing for your MYP eAssessment</p>
+    <div className="min-h-screen bg-[#fbf9f4] lg:flex">
+      <aside className="hidden lg:flex lg:w-5/12 bg-[#00152a] p-16 text-white"><div className="flex h-full flex-col justify-between"><h1 className="font-headline italic text-2xl">The Scholarly Manuscript</h1><div className="max-w-md"><span className="material-symbols-outlined text-[#735b2b] text-4xl">auto_stories</span><h2 className="font-headline text-5xl mt-4">Cultivate your academic focus.</h2><p className="font-body text-lg mt-8 text-white/80">Join a disciplined environment dedicated to rigorous MYP eAssessment preparation.</p></div></div></aside>
+      <main className="w-full lg:w-7/12 flex items-center justify-center p-8 sm:p-16 xl:p-32">
+        <div className="w-full max-w-md space-y-14">
+          <div><h2 className="font-headline text-4xl text-[#00152a]">Initiate Enrollment</h2><p className="font-body text-[#43474d] mt-4">Enter your academic credentials to establish your personalized study archive.</p></div>
+          <form onSubmit={handleSubmit} className="space-y-8">
+            <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Full Name</label><input className="tsm-input" value={fullName} onChange={(e)=>setFullName(e.target.value)} placeholder="e.g., Eleanor Vance" required/></div>
+            <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Institutional Email</label><input className="tsm-input" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="student@academy.edu" required/></div>
+            <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Passphrase</label><input className="tsm-input" type="password" value={password} onChange={(e)=>setPassword(e.target.value)} placeholder="Minimum 12 characters" minLength={6} required/></div>
+            {error && <p className="text-sm text-red-700">{error}</p>}
+            <button className="w-full bg-[#00152a] text-white py-4" disabled={loading}>{loading ? 'Establishing...' : 'Establish Archive'}</button>
+          </form>
+          <p className="text-center pt-8 border-t border-[#c3c6ce55] font-body text-sm text-[#43474d]">Already maintain an archive?<Link href="/auth/login" className="ml-1 font-semibold text-[#735b2b]">Access Here</Link></p>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="fullName">Full Name</Label>
-            <Input
-              id="fullName"
-              type="text"
-              placeholder="Your full name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Create a password (min 6 characters)"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              disabled={loading}
-            />
-          </div>
-
-          {error && (
-            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-              {error}
-            </div>
-          )}
-
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Creating account...
-              </>
-            ) : (
-              "Create account"
-            )}
-          </Button>
-        </form>
-
-        <p className="text-center text-sm text-muted-foreground mt-6">
-          Already have an account?{" "}
-          <Link href="/auth/login" className="text-primary hover:underline">
-            Sign in
-          </Link>
-        </p>
-      </div>
+      </main>
     </div>
   )
 }

@@ -1,162 +1,33 @@
-import { createClient } from "@/lib/supabase/server"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowRight, BookOpen, Clock, Target, TrendingUp } from "lucide-react"
-import { SubjectCard } from "@/components/subject-card"
-
-export default async function DashboardPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user?.id)
-    .single()
-
-  const { data: subjects } = await supabase
-    .from("subjects")
-    .select("*, papers(count)")
-    .order("name")
-
-  const { data: recentAttempts } = await supabase
-    .from("attempts")
-    .select("*, papers(title, subjects(name, color))")
-    .eq("user_id", user?.id)
-    .order("created_at", { ascending: false })
-    .limit(3)
-
-  const { data: progress } = await supabase
-    .from("student_progress")
-    .select("*, subjects(name)")
-    .eq("user_id", user?.id)
-
-  const totalQuestionsAttempted = progress?.reduce((sum, p) => sum + (p.total_questions_attempted || 0), 0) || 0
-  const totalCorrect = progress?.reduce((sum, p) => sum + (p.total_questions_correct || 0), 0) || 0
-  const totalTimeSpent = progress?.reduce((sum, p) => sum + (p.total_time_spent_seconds || 0), 0) || 0
-  const overallAccuracy = totalQuestionsAttempted > 0 ? Math.round((totalCorrect / totalQuestionsAttempted) * 100) : 0
+export default function DashboardPage() {
+  const subjects = [
+    ['science', 'Sciences', 'Criterion B & C Focus', 82],
+    ['functions', 'Mathematics', 'Extended Concepts', 68],
+  ]
 
   return (
     <div className="space-y-8">
-      {/* Welcome Section */}
-      <div>
-        <h1 className="text-2xl font-bold">
-          Welcome back, {profile?.full_name?.split(" ")[0] || "Student"}
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Continue your MYP eAssessment preparation
-        </p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          icon={<Target className="w-5 h-5" />}
-          label="Questions Attempted"
-          value={totalQuestionsAttempted.toString()}
-        />
-        <StatCard
-          icon={<TrendingUp className="w-5 h-5" />}
-          label="Accuracy Rate"
-          value={`${overallAccuracy}%`}
-        />
-        <StatCard
-          icon={<Clock className="w-5 h-5" />}
-          label="Time Practiced"
-          value={formatTime(totalTimeSpent)}
-        />
-        <StatCard
-          icon={<BookOpen className="w-5 h-5" />}
-          label="Subjects Started"
-          value={(progress?.length || 0).toString()}
-        />
-      </div>
-
-      {/* Quick Actions */}
-      {recentAttempts && recentAttempts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Recent Activity</CardTitle>
-            <CardDescription>Continue where you left off</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recentAttempts.map((attempt) => (
-                <Link
-                  key={attempt.id}
-                  href={`/dashboard/attempt/${attempt.id}`}
-                  className="flex items-center justify-between p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: attempt.papers?.subjects?.color || "#3b82f6" }}
-                    />
-                    <div>
-                      <p className="font-medium text-sm">{attempt.papers?.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {attempt.status === "completed" 
-                          ? `Completed - ${attempt.percentage}%`
-                          : "In progress"}
-                      </p>
-                    </div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Subject Grid */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Subject Groups</h2>
-          <Link href="/dashboard/subjects">
-            <Button variant="ghost" size="sm" className="gap-1">
-              View all
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </Link>
+      <header className="flex flex-col md:flex-row justify-between items-end gap-6">
+        <div className="md:w-2/3"><h1 className="font-headline text-5xl text-[#00152a]">Your Workspace</h1><p className="font-body text-lg text-[#43474d] mt-4">Focus on completing the Language and Literature module today. Consistent analysis builds enduring comprehension.</p></div>
+        <p className="hidden md:block font-headline italic text-lg text-[#735b2b]">Tuesday, October 24</p>
+      </header>
+      <div className="grid lg:grid-cols-12 gap-8">
+        <div className="lg:col-span-8 space-y-8">
+          <section className="bg-white border border-[#c3c6ce66] p-8 md:p-12 min-h-[280px] relative overflow-hidden">
+            <span className="font-label text-xs uppercase tracking-widest text-[#00152a]">Last Active Session</span>
+            <h2 className="font-headline text-3xl text-[#00152a] mt-4">Language & Literature: Paper 1 Analysis</h2>
+            <p className="font-body text-sm text-[#43474d] mt-4 mb-8">You were reviewing narrative techniques in mid-century fiction. 4 questions remain in this set.</p>
+            <div className="flex gap-4"><button className="tsm-btn-primary">Resume Practice</button><button className="font-body text-sm text-[#735b2b]">Review Notes</button></div>
+          </section>
+          <section>
+            <div className="flex justify-between mb-6 border-b border-[#c3c6ce33] pb-2"><h3 className="font-headline text-2xl text-[#00152a]">Curriculum Focus</h3><a className="font-label text-xs uppercase tracking-widest text-[#735b2b]" href="#">View All Index</a></div>
+            <div className="grid md:grid-cols-2 gap-6">{subjects.map(([icon, title, subtitle, pct]) => <div key={title as string} className="bg-[#f5f3ee] p-6 border border-transparent hover:border-[#c3c6ce66]"><div className="flex justify-between mb-6"><span className="material-symbols-outlined text-[#00152a]">{icon as string}</span><span className="font-headline italic text-sm text-[#735b2b]">{pct}% Mastery</span></div><h4 className="font-headline text-xl text-[#00152a]">{title as string}</h4><p className="font-body text-sm text-[#43474d] my-3">{subtitle as string}</p><div className="h-0.5 bg-[#e4e2dd]"><div className="h-full bg-[#00152a]" style={{width:`${pct}%`}}/></div></div>)}</div>
+          </section>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {subjects?.slice(0, 4).map((subject) => (
-            <SubjectCard
-              key={subject.id}
-              subject={subject}
-              paperCount={subject.papers?.[0]?.count || 0}
-            />
-          ))}
+        <div className="lg:col-span-4 space-y-8">
+          <section className="bg-white border border-[#c3c6ce66] p-6"><h3 className="font-headline text-xl text-[#00152a] mb-4 pb-4 border-b border-[#c3c6ce33]">Performance Insights</h3><div className="space-y-4 font-body text-sm"><div className="flex justify-between"><span className="text-[#43474d]">Analytical Thinking</span><span className="font-headline text-[#00152a]">High</span></div><div className="flex justify-between pt-4 border-t border-[#c3c6ce33]"><span className="text-[#43474d]">Source Evaluation</span><span className="font-headline text-[#735b2b]">Needs Review</span></div></div></section>
+          <section className="bg-[#f5f3ee] p-6"><h3 className="font-headline text-lg text-[#00152a] mb-4">Curated Revisions</h3><div className="space-y-3">{['Explain the effect of catalysts on...','Analyze the demographic shift during...'].map((q)=><div key={q} className="p-4 bg-white border border-[#c3c6ce33]"><p className="font-body text-sm text-[#00152a] truncate">{q}</p></div>)}</div></section>
         </div>
       </div>
     </div>
   )
-}
-
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-            {icon}
-          </div>
-          <div>
-            <p className="text-2xl font-bold">{value}</p>
-            <p className="text-xs text-muted-foreground">{label}</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function formatTime(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  return `${hours}h ${minutes}m`
 }

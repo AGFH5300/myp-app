@@ -1,147 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
 @import 'tailwindcss';
-@import 'tw-animate-css';
-
-@custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Light theme - clean educational look */
-  --background: oklch(0.98 0 0);
-  --foreground: oklch(0.15 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.15 0 0);
-  --primary: oklch(0.55 0.2 250);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.96 0.01 250);
-  --secondary-foreground: oklch(0.25 0 0);
-  --muted: oklch(0.95 0 0);
-  --muted-foreground: oklch(0.45 0 0);
-  --accent: oklch(0.65 0.15 165);
-  --accent-foreground: oklch(1 0 0);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.90 0 0);
-  --input: oklch(0.92 0 0);
-  --ring: oklch(0.55 0.2 250);
-  --chart-1: oklch(0.55 0.2 250);
-  --chart-2: oklch(0.65 0.15 165);
-  --chart-3: oklch(0.7 0.15 45);
-  --chart-4: oklch(0.6 0.2 300);
-  --chart-5: oklch(0.55 0.15 25);
-  --radius: 0.75rem;
-  --sidebar: oklch(0.98 0 0);
-  --sidebar-foreground: oklch(0.15 0 0);
-  --sidebar-primary: oklch(0.55 0.2 250);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.95 0.01 250);
-  --sidebar-accent-foreground: oklch(0.25 0 0);
-  --sidebar-border: oklch(0.90 0 0);
-  --sidebar-ring: oklch(0.55 0.2 250);
-  
-  /* Subject colors */
-  --subject-math: oklch(0.6 0.2 250);
-  --subject-science: oklch(0.65 0.18 165);
-  --subject-language: oklch(0.6 0.2 300);
-  --subject-individuals: oklch(0.7 0.17 80);
-  --subject-design: oklch(0.65 0.2 350);
-  --subject-arts: oklch(0.65 0.15 200);
-  --subject-phe: oklch(0.6 0.2 25);
-  --subject-lacq: oklch(0.7 0.18 130);
+  --background: #fbf9f4;
+  --surface: #fbf9f4;
+  --surface-container: #f0eee9;
+  --surface-container-low: #f5f3ee;
+  --surface-container-high: #eae8e3;
+  --surface-container-highest: #e4e2dd;
+  --surface-container-lowest: #ffffff;
+  --surface-variant: #e4e2dd;
+  --primary: #00152a;
+  --secondary: #735b2b;
+  --primary-container: #d1e4ff;
+  --on-primary-container: #104978;
+  --text: #1b1c19;
+  --text-muted: #43474d;
+  --outline: #c3c6ce;
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --shadow-soft: 0 12px 32px rgba(27, 28, 25, 0.06);
 }
 
-.dark {
-  /* Dark theme - modern, focused learning environment */
-  --background: oklch(0.13 0.01 260);
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.18 0.01 260);
-  --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.18 0.01 260);
-  --popover-foreground: oklch(0.95 0 0);
-  --primary: oklch(0.65 0.2 250);
-  --primary-foreground: oklch(0.1 0 0);
-  --secondary: oklch(0.25 0.02 260);
-  --secondary-foreground: oklch(0.95 0 0);
-  --muted: oklch(0.25 0.01 260);
-  --muted-foreground: oklch(0.65 0 0);
-  --accent: oklch(0.7 0.15 165);
-  --accent-foreground: oklch(0.1 0 0);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.28 0.02 260);
-  --input: oklch(0.22 0.01 260);
-  --ring: oklch(0.65 0.2 250);
-  --chart-1: oklch(0.65 0.2 250);
-  --chart-2: oklch(0.7 0.15 165);
-  --chart-3: oklch(0.75 0.15 80);
-  --chart-4: oklch(0.65 0.2 300);
-  --chart-5: oklch(0.6 0.18 25);
-  --sidebar: oklch(0.15 0.01 260);
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.65 0.2 250);
-  --sidebar-primary-foreground: oklch(0.1 0 0);
-  --sidebar-accent: oklch(0.22 0.02 260);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(0.28 0.02 260);
-  --sidebar-ring: oklch(0.65 0.2 250);
-  
-  /* Subject colors - brighter for dark mode */
-  --subject-math: oklch(0.65 0.2 250);
-  --subject-science: oklch(0.7 0.18 165);
-  --subject-language: oklch(0.65 0.2 300);
-  --subject-individuals: oklch(0.75 0.17 80);
-  --subject-design: oklch(0.7 0.2 350);
-  --subject-arts: oklch(0.7 0.15 200);
-  --subject-phe: oklch(0.65 0.2 25);
-  --subject-lacq: oklch(0.75 0.18 130);
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--background);
+  color: var(--text);
 }
 
-@theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+  line-height: 1;
 }
 
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+.tsm-shell { max-width: 1536px; margin-inline: auto; padding-inline: 1.5rem; }
+@media (min-width: 768px) { .tsm-shell { padding-inline: 3rem; } }
+
+.tsm-ghost-border { border: 1px solid color-mix(in srgb, var(--outline) 40%, transparent); }
+.tsm-card { background: var(--surface-container-lowest); border: 1px solid color-mix(in srgb, var(--outline) 40%, transparent); border-radius: var(--radius-sm); }
+.tsm-input {
+  width: 100%; background: transparent; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--outline) 40%, transparent);
+  padding: .25rem 0 .75rem; font-size: 1.125rem; color: var(--text);
+}
+.tsm-input:focus { outline: none; border-bottom: 2px solid var(--primary); }
+
+.tsm-btn-primary {
+  background: var(--primary); color: #fff; border: 1px solid var(--primary);
+  border-radius: var(--radius-xs); padding: .8rem 1.4rem; font-weight: 500;
+}
+.tsm-btn-secondary {
+  background: transparent; color: var(--primary);
+  border: 1px solid color-mix(in srgb, var(--outline) 40%, transparent);
+  border-radius: var(--radius-xs); padding: .8rem 1.4rem; font-weight: 500;
 }

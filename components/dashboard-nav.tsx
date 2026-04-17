@@ -1,109 +1,38 @@
 "use client"
 
-import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { BookOpen, LayoutDashboard, GraduationCap, BarChart3, User, LogOut } from "lucide-react"
-import type { User as SupabaseUser } from "@supabase/supabase-js"
+import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
 
-interface Profile {
-  id: string
-  email: string | null
-  full_name: string | null
-  role: string | null
-}
+interface Profile { full_name: string | null }
+
+const nav = [
+  ['menu_book', 'Workspace', '/dashboard'],
+  ['local_library', 'Library', '/dashboard/subjects'],
+  ['history_edu', 'Assessments', '/dashboard/progress'],
+]
 
 export function DashboardNav({ user, profile }: { user: SupabaseUser; profile: Profile | null }) {
   const pathname = usePathname()
   const router = useRouter()
 
-  async function handleSignOut() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push("/")
-    router.refresh()
+  async function signOut() {
+    await createClient().auth.signOut()
+    router.push('/')
   }
 
-  const navItems = [
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/dashboard/subjects", label: "Subjects", icon: GraduationCap },
-    { href: "/dashboard/progress", label: "Progress", icon: BarChart3 },
-  ]
-
   return (
-    <header className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50">
-      <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-8">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <BookOpen className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-lg hidden sm:inline">MYP Practice</span>
-          </Link>
-
-          <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href || 
-                (item.href !== "/dashboard" && pathname.startsWith(item.href))
-              return (
-                <Link key={item.href} href={item.href}>
-                  <Button
-                    variant={isActive ? "secondary" : "ghost"}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <item.icon className="w-4 h-4" />
-                    {item.label}
-                  </Button>
-                </Link>
-              )
-            })}
-          </nav>
-        </div>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-2">
-              <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center">
-                <User className="w-4 h-4 text-primary" />
-              </div>
-              <span className="hidden sm:inline max-w-[150px] truncate">
-                {profile?.full_name || user.email?.split("@")[0]}
-              </span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <div className="px-2 py-1.5">
-              <p className="text-sm font-medium">{profile?.full_name || "Student"}</p>
-              <p className="text-xs text-muted-foreground">{user.email}</p>
-            </div>
-            <DropdownMenuSeparator />
-            <div className="md:hidden">
-              {navItems.map((item) => (
-                <DropdownMenuItem key={item.href} asChild>
-                  <Link href={item.href} className="gap-2">
-                    <item.icon className="w-4 h-4" />
-                    {item.label}
-                  </Link>
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-            </div>
-            <DropdownMenuItem onClick={handleSignOut} className="gap-2 text-destructive">
-              <LogOut className="w-4 h-4" />
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </header>
+    <>
+      <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#f5f3ee] border-b border-[#c3c6ce66] px-6 py-4 flex items-center justify-between"><div className="font-headline italic text-xl text-[#00152a]">The Scholarly Manuscript</div><span className="material-symbols-outlined">menu</span></header>
+      <nav className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-[#f5f3ee] flex-col py-8 z-40">
+        <div className="px-8 mb-12"><div className="font-headline text-xl italic text-[#00152a]">The Scholarly Manuscript</div></div>
+        <div className="flex flex-col gap-2 flex-1">{nav.map(([icon, label, href]) => {
+          const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href as string))
+          return <Link key={href as string} href={href as string} className={`flex items-center gap-3 py-3 ${active ? 'text-[#00152a] font-semibold border-l-4 border-[#735b2b] pl-4 bg-[#fbf9f4]' : 'text-[#6b7280] pl-5'}`}><span className="material-symbols-outlined text-xl">{icon as string}</span><span className="font-body">{label as string}</span></Link>
+        })}</div>
+        <div className="px-6"><div className="text-sm font-body text-[#00152a] mb-1">{profile?.full_name || 'Academic Portal'}</div><div className="text-xs text-[#43474d] mb-4">{user.email}</div><button className="w-full py-3 bg-[#00152a] text-white text-sm" onClick={signOut}>Sign Out</button></div>
+      </nav>
+    </>
   )
 }
