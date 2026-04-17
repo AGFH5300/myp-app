@@ -1,151 +1,135 @@
--- MYP eAssessment Platform Database Schema
+-- MYP Atlas Phase 1 schema
+-- Scope: real MYP eAssessment papers/questions/markschemes only (2016-2025)
 
--- Profiles table (extends auth.users)
+create extension if not exists pgcrypto;
+
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text,
+  username text unique,
   full_name text,
-  role text default 'student' check (role in ('student', 'teacher', 'admin')),
-  grade_level integer check (grade_level between 1 and 5),
-  school_name text,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
+  role text not null default 'student' check (role in ('student', 'admin')),
+  myp_year integer check (myp_year between 4 and 5),
+  school text,
+  selected_subject_ids uuid[] default '{}',
+  practice_focus text,
+  preferred_session text check (preferred_session in ('May', 'November')),
+  preferred_year integer check (preferred_year between 2016 and 2025),
+  onboarding_completed boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
--- Subjects table (MYP subject groups)
 create table if not exists public.subjects (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
-  code text not null unique,
+  code text unique,
   description text,
-  color text default '#3b82f6',
-  icon text,
-  created_at timestamptz default now()
+  created_at timestamptz not null default now()
 );
 
--- Papers table (exam papers for each subject)
+create table if not exists public.exam_sessions (
+  id uuid primary key default gen_random_uuid(),
+  session_month text not null check (session_month in ('May', 'November')),
+  session_year integer not null check (session_year between 2016 and 2025),
+  is_published boolean not null default true,
+  created_at timestamptz not null default now(),
+  unique (session_month, session_year)
+);
+
 create table if not exists public.papers (
   id uuid primary key default gen_random_uuid(),
-  subject_id uuid references public.subjects(id) on delete cascade,
+  subject_id uuid not null references public.subjects(id) on delete cascade,
+  exam_session_id uuid references public.exam_sessions(id) on delete set null,
   title text not null,
-  year integer not null,
-  session text check (session in ('May', 'November')),
-  timezone text check (timezone in ('TZ1', 'TZ2')),
-  paper_number integer default 1,
-  duration_minutes integer default 60,
-  total_marks integer default 100,
-  description text,
-  is_active boolean default true,
-  created_at timestamptz default now()
+  year integer not null check (year between 2016 and 2025),
+  paper_code text,
+  timezone text,
+  pdf_url text,
+  markscheme_url text,
+  markscheme_text text,
+  is_published boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
--- Questions table
 create table if not exists public.questions (
   id uuid primary key default gen_random_uuid(),
-  paper_id uuid references public.papers(id) on delete cascade,
+  paper_id uuid not null references public.papers(id) on delete cascade,
   question_number text not null,
-  question_text text not null,
-  question_type text default 'short_answer' check (question_type in ('multiple_choice', 'short_answer', 'extended_response', 'structured')),
-  marks integer default 1,
-  command_term text,
-  criterion text check (criterion in ('A', 'B', 'C', 'D')),
-  strand text,
+  prompt_text text not null,
   image_url text,
-  options jsonb, -- for multiple choice questions
-  correct_answer text,
-  mark_scheme text,
-  order_index integer default 0,
-  created_at timestamptz default now()
+  marks integer,
+  answer_mode text,
+  markscheme_text text,
+  is_published boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (paper_id, question_number)
 );
 
--- Student attempts table
+create table if not exists public.topics (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.question_topics (
+  question_id uuid not null references public.questions(id) on delete cascade,
+  topic_id uuid not null references public.topics(id) on delete cascade,
+  primary key (question_id, topic_id)
+);
+
+create table if not exists public.bookmarks (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references public.profiles(id) on delete cascade,
+  paper_id uuid references public.papers(id) on delete cascade,
+  question_id uuid references public.questions(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  check (paper_id is not null or question_id is not null),
+  unique (student_id, paper_id, question_id)
+);
+
+-- lightweight activity tables for dashboard "continue where you left off"
+create table if not exists public.paper_views (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references public.profiles(id) on delete cascade,
+  paper_id uuid not null references public.papers(id) on delete cascade,
+  viewed_at timestamptz not null default now()
+);
+
+create table if not exists public.recent_question_views (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references public.profiles(id) on delete cascade,
+  question_id uuid not null references public.questions(id) on delete cascade,
+  viewed_at timestamptz not null default now()
+);
+
+-- Keep attempts table optional/compatible if older code exists.
 create table if not exists public.attempts (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid references public.profiles(id) on delete cascade,
-  paper_id uuid references public.papers(id) on delete cascade,
-  started_at timestamptz default now(),
-  completed_at timestamptz,
-  time_spent_seconds integer default 0,
-  total_score integer,
+  student_id uuid not null references public.profiles(id) on delete cascade,
+  question_id uuid references public.questions(id) on delete set null,
+  score integer,
   max_score integer,
-  percentage numeric(5,2),
-  status text default 'in_progress' check (status in ('in_progress', 'completed', 'abandoned')),
-  created_at timestamptz default now()
+  created_at timestamptz not null default now()
 );
 
--- Question responses table
-create table if not exists public.question_responses (
-  id uuid primary key default gen_random_uuid(),
-  attempt_id uuid references public.attempts(id) on delete cascade,
-  question_id uuid references public.questions(id) on delete cascade,
-  user_answer text,
-  is_correct boolean,
-  marks_awarded integer default 0,
-  time_spent_seconds integer default 0,
-  flagged boolean default false,
-  created_at timestamptz default now(),
-  unique(attempt_id, question_id)
-);
+create or replace function public.set_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
 
--- Student progress tracking
-create table if not exists public.student_progress (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references public.profiles(id) on delete cascade,
-  subject_id uuid references public.subjects(id) on delete cascade,
-  total_questions_attempted integer default 0,
-  total_questions_correct integer default 0,
-  total_time_spent_seconds integer default 0,
-  last_activity_at timestamptz default now(),
-  criterion_a_score numeric(5,2) default 0,
-  criterion_b_score numeric(5,2) default 0,
-  criterion_c_score numeric(5,2) default 0,
-  criterion_d_score numeric(5,2) default 0,
-  updated_at timestamptz default now(),
-  unique(user_id, subject_id)
-);
+drop trigger if exists profiles_set_updated_at on public.profiles;
+create trigger profiles_set_updated_at before update on public.profiles for each row execute function public.set_updated_at();
+drop trigger if exists papers_set_updated_at on public.papers;
+create trigger papers_set_updated_at before update on public.papers for each row execute function public.set_updated_at();
+drop trigger if exists questions_set_updated_at on public.questions;
+create trigger questions_set_updated_at before update on public.questions for each row execute function public.set_updated_at();
 
--- Enable RLS on all tables
-alter table public.profiles enable row level security;
-alter table public.subjects enable row level security;
-alter table public.papers enable row level security;
-alter table public.questions enable row level security;
-alter table public.attempts enable row level security;
-alter table public.question_responses enable row level security;
-alter table public.student_progress enable row level security;
-
--- RLS Policies for profiles
-create policy "Users can view own profile" on public.profiles for select using (auth.uid() = id);
-create policy "Users can update own profile" on public.profiles for update using (auth.uid() = id);
-create policy "Users can insert own profile" on public.profiles for insert with check (auth.uid() = id);
-
--- RLS Policies for subjects (everyone can read)
-create policy "Anyone can view subjects" on public.subjects for select using (true);
-
--- RLS Policies for papers (everyone can read active papers)
-create policy "Anyone can view active papers" on public.papers for select using (is_active = true);
-
--- RLS Policies for questions (everyone can read)
-create policy "Anyone can view questions" on public.questions for select using (true);
-
--- RLS Policies for attempts
-create policy "Users can view own attempts" on public.attempts for select using (auth.uid() = user_id);
-create policy "Users can create own attempts" on public.attempts for insert with check (auth.uid() = user_id);
-create policy "Users can update own attempts" on public.attempts for update using (auth.uid() = user_id);
-
--- RLS Policies for question_responses
-create policy "Users can view own responses" on public.question_responses for select 
-  using (attempt_id in (select id from public.attempts where user_id = auth.uid()));
-create policy "Users can create own responses" on public.question_responses for insert 
-  with check (attempt_id in (select id from public.attempts where user_id = auth.uid()));
-create policy "Users can update own responses" on public.question_responses for update 
-  using (attempt_id in (select id from public.attempts where user_id = auth.uid()));
-
--- RLS Policies for student_progress
-create policy "Users can view own progress" on public.student_progress for select using (auth.uid() = user_id);
-create policy "Users can upsert own progress" on public.student_progress for insert with check (auth.uid() = user_id);
-create policy "Users can update own progress" on public.student_progress for update using (auth.uid() = user_id);
-
--- Function to auto-create profile on signup
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -153,21 +137,94 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, email, full_name, role)
+  insert into public.profiles (id, email, full_name, username)
   values (
     new.id,
     new.email,
     coalesce(new.raw_user_meta_data ->> 'full_name', split_part(new.email, '@', 1)),
-    coalesce(new.raw_user_meta_data ->> 'role', 'student')
+    nullif(new.raw_user_meta_data ->> 'username', '')
   )
-  on conflict (id) do nothing;
+  on conflict (id) do update
+  set email = excluded.email,
+      full_name = coalesce(excluded.full_name, public.profiles.full_name),
+      username = coalesce(excluded.username, public.profiles.username);
+
   return new;
 end;
 $$;
 
--- Trigger to create profile on user signup
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row
   execute function public.handle_new_user();
+
+alter table public.profiles enable row level security;
+alter table public.subjects enable row level security;
+alter table public.exam_sessions enable row level security;
+alter table public.papers enable row level security;
+alter table public.questions enable row level security;
+alter table public.topics enable row level security;
+alter table public.question_topics enable row level security;
+alter table public.bookmarks enable row level security;
+alter table public.paper_views enable row level security;
+alter table public.recent_question_views enable row level security;
+alter table public.attempts enable row level security;
+
+-- Profiles
+create policy "profiles_select_own" on public.profiles for select using (auth.uid() = id);
+create policy "profiles_insert_own" on public.profiles for insert with check (auth.uid() = id);
+create policy "profiles_update_own" on public.profiles for update using (auth.uid() = id);
+
+-- Public read for published archive content
+create policy "subjects_public_read" on public.subjects for select using (true);
+create policy "sessions_public_read" on public.exam_sessions for select using (is_published = true);
+create policy "papers_public_read" on public.papers for select using (is_published = true);
+create policy "questions_public_read" on public.questions for select using (is_published = true);
+create policy "topics_public_read" on public.topics for select using (true);
+create policy "question_topics_public_read" on public.question_topics for select using (true);
+
+-- Student-owned data
+create policy "bookmarks_select_own" on public.bookmarks for select using (auth.uid() = student_id);
+create policy "bookmarks_insert_own" on public.bookmarks for insert with check (auth.uid() = student_id);
+create policy "bookmarks_delete_own" on public.bookmarks for delete using (auth.uid() = student_id);
+
+create policy "paper_views_select_own" on public.paper_views for select using (auth.uid() = student_id);
+create policy "paper_views_insert_own" on public.paper_views for insert with check (auth.uid() = student_id);
+
+create policy "recent_question_views_select_own" on public.recent_question_views for select using (auth.uid() = student_id);
+create policy "recent_question_views_insert_own" on public.recent_question_views for insert with check (auth.uid() = student_id);
+
+create policy "attempts_select_own" on public.attempts for select using (auth.uid() = student_id);
+create policy "attempts_insert_own" on public.attempts for insert with check (auth.uid() = student_id);
+
+-- Admin writes for content
+create policy "subjects_admin_write" on public.subjects
+for all
+using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
+with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+create policy "sessions_admin_write" on public.exam_sessions
+for all
+using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
+with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+create policy "papers_admin_write" on public.papers
+for all
+using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
+with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+create policy "questions_admin_write" on public.questions
+for all
+using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
+with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+create policy "topics_admin_write" on public.topics
+for all
+using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
+with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+create policy "question_topics_admin_write" on public.question_topics
+for all
+using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
+with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));

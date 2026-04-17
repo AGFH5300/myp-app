@@ -13,11 +13,10 @@ interface Profile {
 }
 
 const baseNav = [
-  ['workspace', 'Workspace', '/dashboard'],
-  ['local_library', 'Subjects', '/dashboard/subjects'],
-  ['history_edu', 'Progress', '/dashboard/progress'],
+  ['dashboard', 'Dashboard', '/dashboard'],
+  ['description', 'Papers', '/dashboard/papers'],
+  ['category', 'Subjects', '/dashboard/subjects'],
   ['bookmark', 'Bookmarks', '/dashboard/bookmarks'],
-  ['history', 'Saved Attempts', '/dashboard/attempts'],
 ] as const
 
 export function DashboardNav({ user, profile }: { user: SupabaseUser; profile: Profile | null }) {
@@ -33,7 +32,7 @@ export function DashboardNav({ user, profile }: { user: SupabaseUser; profile: P
 
   return (
     <>
-      <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#f5f3ee] border-b border-[#c3c6ce66] px-6 py-4 flex items-center justify-between"><BrandWordmark className="text-xl" /><AppIcon name="menu" className="size-5 text-[#00152a]" /></header>
+      <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#f5f3ee] border-b border-[#c3c6ce66] px-6 py-4 flex items-center justify-between"><BrandWordmark className="text-xl" /><button onClick={signOut} className="text-sm">Sign out</button></header>
       <nav className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-[#f5f3ee] flex-col py-8 z-40 border-r border-[#c3c6ce33]">
         <div className="px-8 mb-12"><BrandWordmark className="text-xl" href="/dashboard" /></div>
         <div className="flex flex-col gap-2 flex-1">{nav.map(([icon, label, href]) => {
