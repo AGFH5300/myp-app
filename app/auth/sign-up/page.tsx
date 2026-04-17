@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { AppIcon } from '@/components/app-icon'
 
 export default function SignUpPage() {
   const [fullName, setFullName] = useState('')
@@ -35,7 +36,7 @@ export default function SignUpPage() {
 
   return (
     <div className="min-h-screen bg-[#fbf9f4] lg:flex">
-      <aside className="hidden lg:flex lg:w-5/12 bg-[#00152a] p-16 text-white"><div className="flex h-full flex-col justify-between"><h1 className="font-headline italic text-2xl">The Scholarly Manuscript</h1><div className="max-w-md"><span className="material-symbols-outlined text-[#735b2b] text-4xl">auto_stories</span><h2 className="font-headline text-5xl mt-4">Cultivate your academic focus.</h2><p className="font-body text-lg mt-8 text-white/80">Join a disciplined environment dedicated to rigorous MYP eAssessment preparation.</p></div></div></aside>
+      <aside className="hidden lg:flex lg:w-5/12 bg-[#00152a] p-16 text-white"><div className="flex h-full flex-col justify-between"><h1 className="font-headline italic text-2xl">MYP Atlas</h1><div className="max-w-md"><AppIcon name="auto_stories" className="size-10 text-[#735b2b]" /><h2 className="font-headline text-5xl mt-4">Cultivate your academic focus.</h2><p className="font-body text-lg mt-8 text-white/80">Join a disciplined environment dedicated to rigorous MYP eAssessment preparation.</p></div></div></aside>
       <main className="w-full lg:w-7/12 flex items-center justify-center p-8 sm:p-16 xl:p-32">
         <div className="w-full max-w-md space-y-14">
           <div><h2 className="font-headline text-4xl text-[#00152a]">Initiate Enrollment</h2><p className="font-body text-[#43474d] mt-4">Enter your academic credentials to establish your personalized study archive.</p></div>
@@ -44,9 +45,9 @@ export default function SignUpPage() {
             <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Institutional Email</label><input className="tsm-input" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="student@academy.edu" required/></div>
             <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Passphrase</label><input className="tsm-input" type="password" value={password} onChange={(e)=>setPassword(e.target.value)} placeholder="Minimum 12 characters" minLength={6} required/></div>
             {error && <p className="text-sm text-red-700">{error}</p>}
-            <button className="w-full bg-[#00152a] text-white py-4" disabled={loading}>{loading ? 'Establishing...' : 'Establish Archive'}</button>
+            <button className="w-full bg-[#00152a] text-white py-4" disabled={loading}>{loading ? 'Establishing...' : 'Create Account'}</button>
           </form>
-          <p className="text-center pt-8 border-t border-[#c3c6ce55] font-body text-sm text-[#43474d]">Already maintain an archive?<Link href="/auth/login" className="ml-1 font-semibold text-[#735b2b]">Access Here</Link></p>
+          <p className="text-center pt-8 border-t border-[#c3c6ce55] font-body text-sm text-[#43474d]">Already have an account?<Link href="/auth/login" className="ml-1 font-semibold text-[#735b2b]">Log In</Link></p>
         </div>
       </main>
     </div>
