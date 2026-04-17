@@ -1,108 +1,47 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { BookOpen, Loader2 } from "lucide-react"
+import { useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState<string | null>(null)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError(null)
-
     const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       setError(error.message)
       setLoading(false)
       return
     }
-
-    router.push("/dashboard")
-    router.refresh()
+    router.push('/dashboard')
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-              <BookOpen className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-xl">MYP Practice</span>
-          </Link>
-          <h1 className="text-2xl font-bold">Welcome back</h1>
-          <p className="text-muted-foreground mt-2">Sign in to continue your practice</p>
+    <div className="min-h-screen bg-[#fbf9f4] text-[#1b1c19] lg:flex">
+      <aside className="hidden lg:flex lg:w-5/12 bg-[#e4e2dd] relative p-16"><div className="flex flex-col justify-between h-full"><span className="font-headline italic text-2xl text-[#00152a]">The Scholarly Manuscript</span><div><blockquote className="font-headline text-4xl leading-[1.2] text-[#00152a]">"Education is not the learning of facts, but the training of the mind to think."</blockquote><div className="w-12 h-[2px] bg-[#735b2b] mt-6 mb-4" /><p className="font-body text-xs uppercase tracking-widest text-[#43474d]">Albert Einstein</p></div></div></aside>
+      <main className="w-full lg:w-7/12 flex items-center justify-center p-8 sm:p-16 md:p-24">
+        <div className="w-full max-w-md">
+          <h1 className="font-headline text-5xl text-[#00152a] mb-4">Log In</h1>
+          <p className="font-body text-lg text-[#43474d] mb-14">Enter your credentials to access your academic portal and continue your preparation.</p>
+          <form onSubmit={handleSubmit} className="space-y-10">
+            <div><label className="font-label text-xs uppercase tracking-[.05em] text-[#43474d]">Email Address</label><input className="tsm-input" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="scholar@institution.edu" required /></div>
+            <div><div className="flex justify-between"><label className="font-label text-xs uppercase tracking-[.05em] text-[#43474d]">Password</label><a href="#" className="font-label text-xs text-[#735b2b]">Forgot Password?</a></div><input className="tsm-input" type="password" value={password} onChange={(e)=>setPassword(e.target.value)} placeholder="••••••••" required /></div>
+            {error && <p className="text-sm text-red-700">{error}</p>}
+            <button className="w-full bg-[#00152a] text-white py-5 uppercase tracking-widest text-sm" disabled={loading}>{loading ? 'Accessing...' : 'Access Portal'}</button>
+          </form>
+          <p className="mt-12 pt-8 border-t border-[#c3c6ce55] text-center font-body text-[#43474d]">Don&apos;t have an account?<Link href="/auth/sign-up" className="ml-1 font-semibold text-[#00152a]">Sign Up</Link></p>
         </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
-
-          {error && (
-            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-              {error}
-            </div>
-          )}
-
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Signing in...
-              </>
-            ) : (
-              "Sign in"
-            )}
-          </Button>
-        </form>
-
-        <p className="text-center text-sm text-muted-foreground mt-6">
-          Don&apos;t have an account?{" "}
-          <Link href="/auth/sign-up" className="text-primary hover:underline">
-            Sign up
-          </Link>
-        </p>
-      </div>
+      </main>
     </div>
   )
 }

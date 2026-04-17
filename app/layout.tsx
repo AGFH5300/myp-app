@@ -1,44 +1,28 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
+import { Newsreader, Manrope } from 'next/font/google'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const newsreader = Newsreader({ subsets: ['latin'], variable: '--font-newsreader' })
+const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' })
 
 export const metadata: Metadata = {
-  title: 'MYP eAssessment Practice',
-  description: 'Practice platform for IB Middle Years Programme eAssessment preparation',
-  generator: 'v0.app',
+  title: 'The Scholarly Manuscript',
+  description: 'Master your MYP eAssessments',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
+    icon: '/icon-light-32x32.png',
     apple: '/apple-icon.png',
   },
 }
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark bg-background">
-      <body className="font-sans antialiased min-h-screen">
+    <html lang="en" className="bg-[#fbf9f4]">
+      <body className={`${newsreader.variable} ${manrope.variable} min-h-screen bg-[#fbf9f4] text-[#1b1c19] antialiased`}>
+        <style>{`
+          .font-headline{font-family:var(--font-newsreader),serif}
+          .font-body,.font-label{font-family:var(--font-manrope),sans-serif}
+        `}</style>
         {children}
-        {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
   )
