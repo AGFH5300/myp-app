@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { AdSlot } from '@/components/ad-slot'
+import { adSlots } from '@/lib/ads'
 
 export default async function AttemptsPage() {
   const supabase = await createClient()
@@ -22,6 +24,7 @@ export default async function AttemptsPage() {
           return <div key={attempt.id} className="bg-white border border-[#c3c6ce66] p-6 flex items-center justify-between gap-4"><div><h2 className="font-headline text-xl text-[#00152a]">{attempt.questions?.papers?.title || 'Practice Attempt'} · Q{attempt.questions?.question_number}</h2><p className="font-body text-sm text-[#43474d] mt-2">Score: {attempt.score ?? 0}/{attempt.max_score ?? 0} ({percent}%)</p></div><div className="flex gap-3"><Link href={`/dashboard/results/${attempt.id}`} className="tsm-btn-secondary">Result</Link>{attempt.questions?.papers?.id && <Link href={`/dashboard/practice/${attempt.questions.papers.id}`} className="tsm-btn-primary">Practice Again</Link>}</div></div>
         })}
       </div>
+      <div className="mt-8"><AdSlot slot={adSlots.listFooter} label="Sponsored" /></div>
     </div>
   )
 }

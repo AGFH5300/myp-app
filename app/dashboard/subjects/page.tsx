@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { SubjectCard } from '@/components/subject-card'
+import { AdSlot } from '@/components/ad-slot'
+import { adSlots } from '@/lib/ads'
 
 export default async function SubjectsPage() {
   const supabase = await createClient()
@@ -17,6 +19,7 @@ export default async function SubjectsPage() {
           {subjects.map((s) => <SubjectCard key={s.id} subject={s} paperCount={0} />)}
         </div>
       )}
+      <div className="mt-8"><AdSlot slot={adSlots.listFooter} label="Sponsored" /></div>
     </div>
   )
 }

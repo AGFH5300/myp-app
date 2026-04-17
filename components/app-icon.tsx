@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock3,
+  Compass,
   FileText,
   Globe2,
   GraduationCap,
@@ -23,6 +24,7 @@ import {
   Menu,
   Settings,
   Sparkles,
+  Target,
 } from 'lucide-react'
 
 const iconMap = {
@@ -31,13 +33,18 @@ const iconMap = {
   local_library: Library,
   history_edu: FileText,
   insights: BarChart3,
+  bar_chart: BarChart3,
   settings: Settings,
   logout: LogOut,
   science: Beaker,
+  chemistry: Atom,
   functions: Calculator,
   calculate: Calculator,
+  math: Calculator,
   public: Globe2,
+  globe: Globe2,
   translate: Languages,
+  language: Languages,
   bookmark: Bookmark,
   history: Clock3,
   auto_stories: BookOpenCheck,
@@ -49,9 +56,10 @@ const iconMap = {
   mark_email_read: MailCheck,
   workspace: Home,
   atlas: GraduationCap,
-  chemistry: Atom,
   complete: BadgeCheck,
   chevron_right: ChevronRight,
+  target: Target,
+  explore: Compass,
 } as const
 
 type IconName = keyof typeof iconMap
