@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:hot": "concurrently -s last -n \"NEXT,WARM\" -c \"cyan,magenta\" \"next dev -p 5000\" \"node scripts/warmup-dev.mjs\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint ."
