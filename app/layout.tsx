@@ -6,7 +6,7 @@ const newsreader = Newsreader({ subsets: ['latin'], variable: '--font-newsreader
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' })
 
 const siteTitle = 'MYP Atlas'
-const siteDescription = 'MYP Atlas is a premium MYP eAssessment preparation workspace for focused, criterion-aligned practice.'
+const siteDescription = 'MYP Atlas provides real MYP eAssessment past papers, real questions, and real markschemes from 2016 to 2025.'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://mypatlas.com'),
@@ -16,21 +16,10 @@ export const metadata: Metadata = {
   },
   description: siteDescription,
   applicationName: siteTitle,
-  keywords: ['MYP', 'eAssessment', 'study', 'practice', 'IB Middle Years Programme'],
+  keywords: ['MYP', 'eAssessment', 'past papers', 'markscheme', '2016', '2025', 'IB Middle Years Programme'],
   icons: {
     icon: '/myp-atlas-icon.svg',
     shortcut: '/myp-atlas-icon.svg',
-  },
-  openGraph: {
-    title: siteTitle,
-    description: siteDescription,
-    type: 'website',
-    siteName: siteTitle,
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: siteTitle,
-    description: siteDescription,
   },
 }
 

@@ -1,31 +1,27 @@
 "use client"
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { AppIcon } from '@/components/app-icon'
 
-type Subject = { id: string; name: string; icon: string | null }
+type Subject = { id: string; name: string }
 
 export default function OnboardingPage() {
-  const [gradeLevel, setGradeLevel] = useState(5)
+  const [mypYear, setMypYear] = useState('5')
+  const [school, setSchool] = useState('')
   const [subjects, setSubjects] = useState<Subject[]>([])
-  const [selected, setSelected] = useState<string[]>([])
+  const [chosenSubjects, setChosenSubjects] = useState<string[]>([])
+  const [practiceFocus, setPracticeFocus] = useState('')
+  const [preferredSession, setPreferredSession] = useState<'May' | 'November' | ''>('')
+  const [preferredYear, setPreferredYear] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  const selectedSet = useMemo(() => new Set(selected), [selected])
-
   useEffect(() => {
-    const supabase = createClient()
-    supabase.from('subjects').select('id,name,icon').order('name').then(({ data, error }) => {
-      if (error) {
-        setError(error.message)
-        return
-      }
+    createClient().from('subjects').select('id,name').order('name').then(({ data, error }) => {
+      if (error) return setError(error.message)
       setSubjects(data || [])
-      setSelected((data || []).slice(0, 2).map((s) => s.id))
     })
   }, [])
 
@@ -36,43 +32,24 @@ export default function OnboardingPage() {
 
     const { data: authData, error: authError } = await supabase.auth.getUser()
     if (authError || !authData.user) {
-      setError('Please log in again to continue onboarding.')
+      setError('Session expired. Please log in again.')
       setLoading(false)
       return
     }
 
-    const userId = authData.user.id
-    const { data: existingSubjects } = await supabase
-      .from('student_subjects')
-      .select('subject_id')
-      .eq('student_id', userId)
-
-    const existingIds = new Set(existingSubjects?.map((s) => s.subject_id) ?? [])
-    const toInsert = selected.filter((id) => !existingIds.has(id)).map((id) => ({ student_id: userId, subject_id: id }))
-    const toDelete = [...existingIds].filter((id) => !selectedSet.has(id))
-
-    if (toInsert.length > 0) {
-      const { error: insertError } = await supabase.from('student_subjects').insert(toInsert)
-      if (insertError) {
-        setError(insertError.message)
-        setLoading(false)
-        return
-      }
-    }
-
-    if (toDelete.length > 0) {
-      const { error: deleteError } = await supabase.from('student_subjects').delete().eq('student_id', userId).in('subject_id', toDelete)
-      if (deleteError) {
-        setError(deleteError.message)
-        setLoading(false)
-        return
-      }
-    }
-
     const { error: profileError } = await supabase
       .from('profiles')
-      .update({ grade_level: gradeLevel, onboarding_completed: true })
-      .eq('id', userId)
+      .upsert({
+        id: authData.user.id,
+        email: authData.user.email,
+        myp_year: Number(mypYear),
+        school,
+        selected_subject_ids: chosenSubjects,
+        practice_focus: practiceFocus,
+        preferred_session: preferredSession || null,
+        preferred_year: preferredYear ? Number(preferredYear) : null,
+        onboarding_completed: true,
+      })
 
     if (profileError) {
       setError(profileError.message)
@@ -84,29 +61,46 @@ export default function OnboardingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#fbf9f4] text-[#1b1c19] flex items-center justify-center p-6 md:p-12 lg:p-24">
-      <div className="max-w-4xl w-full grid lg:grid-cols-12 gap-12 lg:gap-24">
-        <div className="lg:col-span-5">
-          <h1 className="font-headline text-5xl md:text-6xl text-[#00152a]">Welcome to MYP Atlas.</h1>
-          <p className="font-body text-lg text-[#43474d] mt-4">Select your year and disciplines to tailor your workspace.</p>
+    <main className="min-h-screen bg-[#fbf9f4] text-[#1b1c19] flex items-center justify-center p-6 md:p-12">
+      <div className="max-w-3xl w-full bg-white border border-[#c3c6ce66] p-8 md:p-12 rounded-md space-y-8">
+        <div>
+          <h1 className="font-headline text-5xl text-[#00152a]">Set up your paper archive workspace</h1>
+          <p className="font-body text-lg text-[#43474d] mt-3">Tell us what you want to practice so your dashboard shows relevant MYP eAssessment papers first.</p>
         </div>
-        <div className="lg:col-span-7 space-y-10">
-          <section>
-            <h2 className="font-headline text-2xl text-[#00152a] mb-4">Academic Year</h2>
-            <div className="grid sm:grid-cols-2 gap-4">
-              {[4, 5].map((level) => <button key={level} onClick={() => setGradeLevel(level)} className={`p-6 border text-left ${gradeLevel === level ? 'bg-[#d1e4ff] border-[#d1e4ff]' : 'bg-white border-[#c3c6ce66]'}`}>MYP {level}</button>)}
-            </div>
-          </section>
-          <section>
-            <div className="flex justify-between items-baseline mb-4"><h2 className="font-headline text-2xl text-[#00152a]">Disciplines</h2><span className="font-label text-sm uppercase text-[#43474d]">Select Multiple</span></div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">{subjects.map((subject) => {
-              const active = selectedSet.has(subject.id)
-              return <button key={subject.id} onClick={() => setSelected((prev) => prev.includes(subject.id) ? prev.filter((s) => s !== subject.id) : [...prev, subject.id])} className={`h-32 p-4 border rounded-lg flex flex-col items-center justify-center gap-3 ${active ? 'bg-[#f5f3ee] border-[#00152a]' : 'bg-white border-[#c3c6ce66]'}`}><AppIcon name={subject.icon || 'menu_book'} className="size-7 text-[#00152a]" /><span className="font-body text-sm text-center">{subject.name}</span></button>
-            })}</div>
-          </section>
-          {error && <p className="text-sm text-red-700">{error}</p>}
-          <div className="flex justify-end"><button className="bg-[#00152a] text-white px-8 py-3" disabled={loading || selected.length === 0} onClick={saveOnboarding}>{loading ? 'Saving...' : 'Continue'}</button></div>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">MYP year</label><select className="tsm-input" value={mypYear} onChange={(e) => setMypYear(e.target.value)}><option value="4">MYP 4</option><option value="5">MYP 5</option></select></div>
+          <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">School</label><input className="tsm-input" value={school} onChange={(e) => setSchool(e.target.value)} placeholder="Your school" required /></div>
         </div>
+
+        <div>
+          <label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Chosen subjects</label>
+          <div className="grid sm:grid-cols-2 gap-3 mt-3">
+            {subjects.map((subject) => {
+              const active = chosenSubjects.includes(subject.id)
+              return (
+                <button
+                  key={subject.id}
+                  type="button"
+                  onClick={() => setChosenSubjects((prev) => prev.includes(subject.id) ? prev.filter((id) => id !== subject.id) : [...prev, subject.id])}
+                  className={`text-left px-4 py-3 border rounded-md ${active ? 'border-[#00152a] bg-[#f5f3ee]' : 'border-[#c3c6ce66] bg-white'}`}
+                >
+                  {subject.name}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">What do you want to practice?</label><textarea className="tsm-input min-h-28" value={practiceFocus} onChange={(e) => setPracticeFocus(e.target.value)} placeholder="Examples: May sessions first, Algebra-heavy papers, command terms in sciences" /></div>
+
+        <div className="grid md:grid-cols-2 gap-6">
+          <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Preferred session (optional)</label><select className="tsm-input" value={preferredSession} onChange={(e) => setPreferredSession(e.target.value as 'May' | 'November' | '')}><option value="">No preference</option><option value="May">May</option><option value="November">November</option></select></div>
+          <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Preferred year (optional)</label><input className="tsm-input" type="number" min={2016} max={2025} value={preferredYear} onChange={(e) => setPreferredYear(e.target.value)} placeholder="2016 to 2025" /></div>
+        </div>
+
+        {error && <p className="text-sm text-red-700">{error}</p>}
+        <div className="flex justify-end"><button className="bg-[#00152a] text-white px-8 py-3 rounded-sm" disabled={loading || !school || chosenSubjects.length === 0} onClick={saveOnboarding}>{loading ? 'Saving...' : 'Finish onboarding'}</button></div>
       </div>
     </main>
   )
