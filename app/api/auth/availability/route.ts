@@ -3,26 +3,46 @@ import { createClient } from '@/lib/supabase/server'
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,24}$/
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+type AvailabilityStatus = 'available' | 'unavailable' | 'invalid' | 'error'
+
+function jsonResponse(
+  status: AvailabilityStatus,
+  available: boolean,
+  reason: string,
+  init?: { status?: number },
+) {
+  return NextResponse.json(
+    {
+      status,
+      available,
+      reason,
+      message: reason,
+    },
+    init,
+  )
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const type = searchParams.get('type')
-  const value = searchParams.get('value')?.trim() ?? ''
+  const rawType = searchParams.get('type') ?? searchParams.get('field')
+  const rawValue = searchParams.get('value') ?? searchParams.get('query')
+  const type = rawType === 'username' || rawType === 'email' ? rawType : null
+  const value = rawValue?.trim() ?? ''
 
-  if (type !== 'username' && type !== 'email') {
-    return NextResponse.json({ message: 'Invalid check type.' }, { status: 400 })
+  if (!type) {
+    return jsonResponse('error', false, 'Invalid check type. Use type=username or type=email.', { status: 400 })
   }
 
   if (!value) {
-    return NextResponse.json({ message: 'Value is required.' }, { status: 400 })
+    return jsonResponse('error', false, 'Value is required.', { status: 400 })
   }
 
   if (type === 'username' && !USERNAME_PATTERN.test(value)) {
-    return NextResponse.json({ available: false, message: 'Use 3-24 characters: letters, numbers, or underscore.' })
+    return jsonResponse('invalid', false, 'Use 3-24 characters: letters, numbers, or underscore.')
   }
 
   if (type === 'email' && !EMAIL_PATTERN.test(value)) {
-    return NextResponse.json({ available: false, message: 'Enter a valid email address.' })
+    return jsonResponse('invalid', false, 'Enter a valid email address.')
   }
 
   const supabase = await createClient()
@@ -33,14 +53,15 @@ export async function GET(request: Request) {
     })
 
     if (error) {
-      return NextResponse.json({ message: 'Could not validate username right now.' }, { status: 500 })
+      return jsonResponse('error', false, 'Could not validate username right now.', { status: 500 })
     }
 
     const available = Boolean(data)
-    return NextResponse.json({
+    return jsonResponse(
+      available ? 'available' : 'unavailable',
       available,
-      message: available ? 'Username is available.' : 'That username is already taken.',
-    })
+      available ? 'Username is available.' : 'That username is already taken.',
+    )
   }
 
   const { data, error } = await supabase.rpc('is_email_available', {
@@ -48,12 +69,13 @@ export async function GET(request: Request) {
   })
 
   if (error) {
-    return NextResponse.json({ message: 'Could not validate email right now.' }, { status: 500 })
+    return jsonResponse('error', false, 'Could not validate email right now.', { status: 500 })
   }
 
   const available = Boolean(data)
-  return NextResponse.json({
+  return jsonResponse(
+    available ? 'available' : 'unavailable',
     available,
-    message: available ? 'Email can be used for sign-up.' : 'That email is already registered.',
-  })
+    available ? 'Email can be used for sign-up.' : 'That email is already registered.',
+  )
 }
