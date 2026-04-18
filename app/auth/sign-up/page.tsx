@@ -48,14 +48,14 @@ export default function SignUpPage() {
   return (
     <AuthShell
       eyebrow="Create account"
-      title="Start with verification, then set your password."
-      description="Step 1: enter your details. Step 2: verify the email code. Step 3: set your password and continue to onboarding."
-      quote="When revision time is limited, finding the right paper question quickly matters."
-      attribution="MYP Atlas onboarding"
+      title="Set up your account in a few calm steps."
+      description="Enter your details, verify your email, then continue to a tailored onboarding flow."
+      quote="The goal of education is not to increase the amount of knowledge but to create the possibilities for a child to invent and discover."
+      attribution="Jean Piaget"
       backToHome
     >
       <h1 className="font-headline text-4xl text-[#00152a]">Create account</h1>
-      <p className="mt-3 font-body text-[#43474d]">Sign up for real MYP eAssessment archive access.</p>
+      <p className="mt-3 font-body text-[#43474d]">Create your account to start structured, source-based revision.</p>
       <form onSubmit={handleSubmit} className="mt-8 space-y-6">
         <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Username</label><input className="tsm-input" value={username} onChange={(e) => setUsername(e.target.value)} required /></div>
         <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Full name</label><input className="tsm-input" value={fullName} onChange={(e) => setFullName(e.target.value)} required /></div>

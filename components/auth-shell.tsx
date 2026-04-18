@@ -24,10 +24,12 @@ export function AuthShell({ eyebrow, title, description, quote, attribution, chi
               <h2 className="mt-4 max-w-xl font-headline text-5xl leading-[1.08] text-[#00152a]">{title}</h2>
               <p className="mt-6 max-w-xl font-body text-lg leading-relaxed text-[#43474d]">{description}</p>
             </div>
-            <div className="rounded-md border border-[#c3c6ce66] bg-white/70 p-7 backdrop-blur-sm">
-              <p className="font-headline text-2xl leading-snug text-[#00152a]">“{quote ?? 'Revision improves when you can find the exact question you need, not just the next random PDF.'}”</p>
-              <p className="mt-4 font-body text-sm text-[#43474d]">{attribution ?? 'MYP Atlas editorial notes'}</p>
-            </div>
+            {quote && attribution ? (
+              <div className="rounded-md border border-[#c3c6ce66] bg-white/70 p-7 backdrop-blur-sm">
+                <p className="font-headline text-2xl leading-snug text-[#00152a]">“{quote}”</p>
+                <p className="mt-4 font-body text-sm text-[#43474d]">{attribution}</p>
+              </div>
+            ) : null}
           </div>
         </aside>
 
