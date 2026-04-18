@@ -28,6 +28,9 @@ import {
 } from 'lucide-react'
 
 const iconMap = {
+  dashboard: Home,
+  description: FileText,
+  category: Compass,
   menu: Menu,
   menu_book: BookOpen,
   local_library: Library,
