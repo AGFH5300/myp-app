@@ -1,9 +1,9 @@
 "use client"
 
-import { CheckCircle2 } from 'lucide-react'
+import { AlertCircle, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AuthShell } from '@/components/auth-shell'
 import { Spinner } from '@/components/ui/spinner'
 import { createClient } from '@/lib/supabase/client'
@@ -11,6 +11,12 @@ import { createClient } from '@/lib/supabase/client'
 type Availability = {
   status: 'idle' | 'checking' | 'available' | 'invalid' | 'unavailable' | 'error'
   message: string | null
+}
+type AvailabilityResponse = {
+  status?: Availability['status']
+  available?: boolean
+  reason?: string
+  message?: string
 }
 
 const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
@@ -34,6 +40,8 @@ export default function SignUpPage() {
   const [emailAvailability, setEmailAvailability] = useState<Availability>({ status: 'idle', message: null })
   const [hasUsernameInput, setHasUsernameInput] = useState(false)
   const [hasEmailInput, setHasEmailInput] = useState(false)
+  const usernameRequestId = useRef(0)
+  const emailRequestId = useRef(0)
 
   const normalizedUsername = username.trim()
   const normalizedFullName = fullName.trim()
@@ -71,6 +79,8 @@ export default function SignUpPage() {
     }
 
     const controller = new AbortController()
+    usernameRequestId.current += 1
+    const currentRequestId = usernameRequestId.current
     setUsernameAvailability({ status: 'checking', message: null })
 
     const timeoutId = window.setTimeout(async () => {
@@ -79,19 +89,29 @@ export default function SignUpPage() {
           signal: controller.signal,
         })
 
-        const payload = (await response.json()) as { available?: boolean; message?: string }
+        const payload = (await response.json()) as AvailabilityResponse
+        const reason = payload.reason ?? payload.message ?? 'Could not validate username right now.'
+        const payloadStatus = payload.status
 
+        if (currentRequestId !== usernameRequestId.current) {
+          return
+        }
         if (!response.ok) {
-          setUsernameAvailability({ status: 'error', message: payload.message ?? 'Could not validate username right now.' })
+          setUsernameAvailability({ status: 'error', message: reason })
+          return
+        }
+
+        if (payloadStatus === 'invalid') {
+          setUsernameAvailability({ status: 'invalid', message: reason })
           return
         }
 
         if (payload.available) {
-          setUsernameAvailability({ status: 'available', message: 'Username is available.' })
+          setUsernameAvailability({ status: 'available', message: reason })
           return
         }
 
-        setUsernameAvailability({ status: 'unavailable', message: payload.message ?? 'That username is already taken.' })
+        setUsernameAvailability({ status: 'unavailable', message: reason || 'That username is already taken.' })
       } catch {
         if (controller.signal.aborted) {
           return
@@ -118,6 +138,8 @@ export default function SignUpPage() {
     }
 
     const controller = new AbortController()
+    emailRequestId.current += 1
+    const currentRequestId = emailRequestId.current
     setEmailAvailability({ status: 'checking', message: null })
 
     const timeoutId = window.setTimeout(async () => {
@@ -126,19 +148,29 @@ export default function SignUpPage() {
           signal: controller.signal,
         })
 
-        const payload = (await response.json()) as { available?: boolean; message?: string }
+        const payload = (await response.json()) as AvailabilityResponse
+        const reason = payload.reason ?? payload.message ?? 'Could not validate email right now.'
+        const payloadStatus = payload.status
 
+        if (currentRequestId !== emailRequestId.current) {
+          return
+        }
         if (!response.ok) {
-          setEmailAvailability({ status: 'error', message: payload.message ?? 'Could not validate email right now.' })
+          setEmailAvailability({ status: 'error', message: reason })
+          return
+        }
+
+        if (payloadStatus === 'invalid') {
+          setEmailAvailability({ status: 'invalid', message: reason })
           return
         }
 
         if (payload.available) {
-          setEmailAvailability({ status: 'available', message: 'Email can be used for sign-up.' })
+          setEmailAvailability({ status: 'available', message: reason })
           return
         }
 
-        setEmailAvailability({ status: 'unavailable', message: payload.message ?? 'That email is already registered.' })
+        setEmailAvailability({ status: 'unavailable', message: reason || 'That email is already registered.' })
       } catch {
         if (controller.signal.aborted) {
           return
@@ -253,6 +285,9 @@ export default function SignUpPage() {
             <div className="pointer-events-none absolute right-2 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center">
               {usernameAvailability.status === 'checking' && <Spinner className="size-4 text-[#00152a]" />}
               {usernameAvailability.status === 'available' && <CheckCircle2 className="size-4 text-[#0c7a43]" />}
+              {(usernameAvailability.status === 'invalid' ||
+                usernameAvailability.status === 'unavailable' ||
+                usernameAvailability.status === 'error') && <AlertCircle className="size-4 text-red-600" />}
             </div>
           </div>
           {hasUsernameInput && usernameAvailability.message && usernameAvailability.status !== 'available' ? (
@@ -290,6 +325,9 @@ export default function SignUpPage() {
             <div className="pointer-events-none absolute right-2 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center">
               {emailAvailability.status === 'checking' && <Spinner className="size-4 text-[#00152a]" />}
               {emailAvailability.status === 'available' && <CheckCircle2 className="size-4 text-[#0c7a43]" />}
+              {(emailAvailability.status === 'invalid' ||
+                emailAvailability.status === 'unavailable' ||
+                emailAvailability.status === 'error') && <AlertCircle className="size-4 text-red-600" />}
             </div>
           </div>
           {hasEmailInput && emailAvailability.message && emailAvailability.status !== 'available' ? (
