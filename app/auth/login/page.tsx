@@ -30,10 +30,10 @@ export default function LoginPage() {
   return (
     <AuthShell
       eyebrow="Sign in"
-      title="Return to your paper archive."
-      description="Continue your targeted revision with saved bookmarks, recent papers, and subject-focused browsing."
-      quote="Structured access beats endless scrolling through folders."
-      attribution="MYP Atlas"
+      title="Pick up exactly where you left off."
+      description="Open your saved questions, recent papers, and filtered archive views in one place."
+      quote="We do not learn from experience... we learn from reflecting on experience."
+      attribution="John Dewey"
       backToHome
     >
       <h1 className="font-headline text-4xl text-[#00152a]">Log in</h1>
