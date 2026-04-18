@@ -3,7 +3,7 @@
 import { AlertCircle, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthShell } from '@/components/auth-shell'
 import { Spinner } from '@/components/ui/spinner'
 import { createClient } from '@/lib/supabase/client'
@@ -17,11 +17,13 @@ type AvailabilityResponse = {
   available?: boolean
   reason?: string
   message?: string
+  debug?: Record<string, unknown>
 }
 
 const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,24}$/
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const DEBUG_FLAG = process.env.NEXT_PUBLIC_SIGNUP_DEBUG === 'true'
 
 function fieldStatusClass(status: Availability['status']) {
   if (status === 'available') return 'border-b-[#0c7a43]'
@@ -40,12 +42,33 @@ export default function SignUpPage() {
   const [emailAvailability, setEmailAvailability] = useState<Availability>({ status: 'idle', message: null })
   const [hasUsernameInput, setHasUsernameInput] = useState(false)
   const [hasEmailInput, setHasEmailInput] = useState(false)
+  const [lastUsernameAvailabilityResponse, setLastUsernameAvailabilityResponse] = useState<AvailabilityResponse | null>(null)
+  const [lastEmailAvailabilityResponse, setLastEmailAvailabilityResponse] = useState<AvailabilityResponse | null>(null)
   const usernameRequestId = useRef(0)
   const emailRequestId = useRef(0)
+  const signupDebugEnabled = process.env.NODE_ENV === 'development' || DEBUG_FLAG
 
   const normalizedUsername = username.trim()
   const normalizedFullName = fullName.trim()
   const normalizedEmail = email.trim().toLowerCase()
+  const isUsernameFormatValid = USERNAME_PATTERN.test(normalizedUsername)
+  const isFullNameValid = normalizedFullName.length > 0
+  const isEmailFormatValid = EMAIL_PATTERN.test(normalizedEmail)
+
+  const logSignupDebug = useCallback((event: string, payload: Record<string, unknown>) => {
+    if (!signupDebugEnabled) return
+    console.log(`[signup-debug] ${event}`, payload)
+  }, [signupDebugEnabled])
+
+  const logAvailabilityDebug = useCallback((event: string, payload: Record<string, unknown>) => {
+    if (!signupDebugEnabled) return
+    console.log(`[availability-debug] ${event}`, payload)
+  }, [signupDebugEnabled])
+
+  const logSubmitDebug = useCallback((event: string, payload: Record<string, unknown>) => {
+    if (!signupDebugEnabled) return
+    console.log(`[submit-debug] ${event}`, payload)
+  }, [signupDebugEnabled])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -62,18 +85,30 @@ export default function SignUpPage() {
     setUsername(initialUsername || cached?.username || '')
     setFullName(initialFullName || cached?.fullName || '')
     setEmail(initialEmail || cached?.email || '')
+    logSignupDebug('hydrated-initial-values', {
+      initialUsername,
+      initialFullName,
+      initialEmail,
+      cached,
+    })
   }, [])
 
   useEffect(() => {
     if (!normalizedUsername) {
       setUsernameAvailability({ status: 'idle', message: null })
+      setLastUsernameAvailabilityResponse(null)
       return
     }
 
-    if (!USERNAME_PATTERN.test(normalizedUsername)) {
+    if (!isUsernameFormatValid) {
       setUsernameAvailability({
         status: 'invalid',
         message: 'Use 3-24 characters: letters, numbers, or underscore.',
+      })
+      setLastUsernameAvailabilityResponse({
+        status: 'invalid',
+        available: false,
+        reason: 'Client-side username format validation failed.',
       })
       return
     }
@@ -84,39 +119,66 @@ export default function SignUpPage() {
     setUsernameAvailability({ status: 'checking', message: null })
 
     const timeoutId = window.setTimeout(async () => {
+      const requestPath = `/api/auth/availability?type=username&value=${encodeURIComponent(normalizedUsername)}`
+      logAvailabilityDebug('username-request-start', {
+        requestId: currentRequestId,
+        type: 'username',
+        value: normalizedUsername,
+        requestPath,
+      })
       try {
-        const response = await fetch(`/api/auth/availability?type=username&value=${encodeURIComponent(normalizedUsername)}`, {
+        const response = await fetch(requestPath, {
           signal: controller.signal,
         })
 
         const payload = (await response.json()) as AvailabilityResponse
+        setLastUsernameAvailabilityResponse(payload)
+        logAvailabilityDebug('username-response', {
+          requestId: currentRequestId,
+          statusCode: response.status,
+          ok: response.ok,
+          payload,
+        })
         const reason = payload.reason ?? payload.message ?? 'Could not validate username right now.'
         const payloadStatus = payload.status
 
         if (currentRequestId !== usernameRequestId.current) {
+          logAvailabilityDebug('username-response-ignored-stale', {
+            requestId: currentRequestId,
+            latestRequestId: usernameRequestId.current,
+          })
           return
         }
         if (!response.ok) {
           setUsernameAvailability({ status: 'error', message: reason })
+          logAvailabilityDebug('username-state-updated', { nextStatus: 'error', reason })
           return
         }
 
         if (payloadStatus === 'invalid') {
           setUsernameAvailability({ status: 'invalid', message: reason })
+          logAvailabilityDebug('username-state-updated', { nextStatus: 'invalid', reason })
           return
         }
 
         if (payload.available) {
           setUsernameAvailability({ status: 'available', message: reason })
+          logAvailabilityDebug('username-state-updated', { nextStatus: 'available', reason })
           return
         }
 
         setUsernameAvailability({ status: 'unavailable', message: reason || 'That username is already taken.' })
-      } catch {
+        logAvailabilityDebug('username-state-updated', { nextStatus: 'unavailable', reason })
+      } catch (availabilityError) {
         if (controller.signal.aborted) {
+          logAvailabilityDebug('username-request-aborted', { requestId: currentRequestId })
           return
         }
         setUsernameAvailability({ status: 'error', message: 'Could not validate username right now.' })
+        logAvailabilityDebug('username-request-failed', {
+          requestId: currentRequestId,
+          error: availabilityError instanceof Error ? availabilityError.message : String(availabilityError),
+        })
       }
     }, 450)
 
@@ -124,16 +186,22 @@ export default function SignUpPage() {
       controller.abort()
       window.clearTimeout(timeoutId)
     }
-  }, [normalizedUsername])
+  }, [isUsernameFormatValid, normalizedUsername])
 
   useEffect(() => {
     if (!normalizedEmail) {
       setEmailAvailability({ status: 'idle', message: null })
+      setLastEmailAvailabilityResponse(null)
       return
     }
 
-    if (!EMAIL_PATTERN.test(normalizedEmail)) {
+    if (!isEmailFormatValid) {
       setEmailAvailability({ status: 'invalid', message: 'Enter a valid email address.' })
+      setLastEmailAvailabilityResponse({
+        status: 'invalid',
+        available: false,
+        reason: 'Client-side email format validation failed.',
+      })
       return
     }
 
@@ -143,39 +211,66 @@ export default function SignUpPage() {
     setEmailAvailability({ status: 'checking', message: null })
 
     const timeoutId = window.setTimeout(async () => {
+      const requestPath = `/api/auth/availability?type=email&value=${encodeURIComponent(normalizedEmail)}`
+      logAvailabilityDebug('email-request-start', {
+        requestId: currentRequestId,
+        type: 'email',
+        value: normalizedEmail,
+        requestPath,
+      })
       try {
-        const response = await fetch(`/api/auth/availability?type=email&value=${encodeURIComponent(normalizedEmail)}`, {
+        const response = await fetch(requestPath, {
           signal: controller.signal,
         })
 
         const payload = (await response.json()) as AvailabilityResponse
+        setLastEmailAvailabilityResponse(payload)
+        logAvailabilityDebug('email-response', {
+          requestId: currentRequestId,
+          statusCode: response.status,
+          ok: response.ok,
+          payload,
+        })
         const reason = payload.reason ?? payload.message ?? 'Could not validate email right now.'
         const payloadStatus = payload.status
 
         if (currentRequestId !== emailRequestId.current) {
+          logAvailabilityDebug('email-response-ignored-stale', {
+            requestId: currentRequestId,
+            latestRequestId: emailRequestId.current,
+          })
           return
         }
         if (!response.ok) {
           setEmailAvailability({ status: 'error', message: reason })
+          logAvailabilityDebug('email-state-updated', { nextStatus: 'error', reason })
           return
         }
 
         if (payloadStatus === 'invalid') {
           setEmailAvailability({ status: 'invalid', message: reason })
+          logAvailabilityDebug('email-state-updated', { nextStatus: 'invalid', reason })
           return
         }
 
         if (payload.available) {
           setEmailAvailability({ status: 'available', message: reason })
+          logAvailabilityDebug('email-state-updated', { nextStatus: 'available', reason })
           return
         }
 
         setEmailAvailability({ status: 'unavailable', message: reason || 'That email is already registered.' })
-      } catch {
+        logAvailabilityDebug('email-state-updated', { nextStatus: 'unavailable', reason })
+      } catch (availabilityError) {
         if (controller.signal.aborted) {
+          logAvailabilityDebug('email-request-aborted', { requestId: currentRequestId })
           return
         }
         setEmailAvailability({ status: 'error', message: 'Could not validate email right now.' })
+        logAvailabilityDebug('email-request-failed', {
+          requestId: currentRequestId,
+          error: availabilityError instanceof Error ? availabilityError.message : String(availabilityError),
+        })
       }
     }, 450)
 
@@ -183,28 +278,110 @@ export default function SignUpPage() {
       controller.abort()
       window.clearTimeout(timeoutId)
     }
-  }, [normalizedEmail])
+  }, [isEmailFormatValid, normalizedEmail])
+
+  useEffect(() => {
+    logSignupDebug('field-values-updated', {
+      username,
+      fullName,
+      email,
+      normalizedUsername,
+      normalizedFullName,
+      normalizedEmail,
+    })
+  }, [email, fullName, logSignupDebug, normalizedEmail, normalizedFullName, normalizedUsername, username])
+
+  useEffect(() => {
+    logSignupDebug('sync-validation-state', {
+      isUsernameFormatValid,
+      isFullNameValid,
+      isEmailFormatValid,
+    })
+  }, [isEmailFormatValid, isFullNameValid, isUsernameFormatValid])
+
+  useEffect(() => {
+    logAvailabilityDebug('username-status-transition', {
+      status: usernameAvailability.status,
+      message: usernameAvailability.message,
+    })
+  }, [usernameAvailability.message, usernameAvailability.status])
+
+  useEffect(() => {
+    logAvailabilityDebug('email-status-transition', {
+      status: emailAvailability.status,
+      message: emailAvailability.message,
+    })
+  }, [emailAvailability.message, emailAvailability.status])
 
   const isUsernameReady = usernameAvailability.status === 'available'
   const isEmailReady = emailAvailability.status === 'available'
 
-  const canSubmit = useMemo(() => {
-    return (
-      normalizedUsername.length > 0 &&
-      normalizedFullName.length > 0 &&
-      normalizedEmail.length > 0 &&
-      USERNAME_PATTERN.test(normalizedUsername) &&
-      EMAIL_PATTERN.test(normalizedEmail) &&
-      isUsernameReady &&
-      isEmailReady &&
-      !isSubmitting
-    )
-  }, [isEmailReady, isSubmitting, isUsernameReady, normalizedEmail, normalizedFullName.length, normalizedUsername])
+  const disabledReason = useMemo(() => {
+    if (isSubmitting) return 'submission in progress'
+    if (normalizedUsername.length === 0) return 'username empty'
+    if (normalizedFullName.length === 0) return 'full name empty'
+    if (normalizedEmail.length === 0) return 'email empty'
+    if (!isUsernameFormatValid) return 'username invalid'
+    if (!isEmailFormatValid) return 'email invalid'
+    if (usernameAvailability.status === 'checking') return 'username availability still checking'
+    if (emailAvailability.status === 'checking') return 'email availability still checking'
+    if (usernameAvailability.status === 'unavailable') return 'username unavailable'
+    if (emailAvailability.status === 'unavailable') return 'email unavailable'
+    if (usernameAvailability.status === 'error') return 'username availability error'
+    if (emailAvailability.status === 'error') return 'email availability error'
+    if (!isUsernameReady) return 'username not ready'
+    if (!isEmailReady) return 'email not ready'
+    return 'ready'
+  }, [
+    emailAvailability.status,
+    isEmailFormatValid,
+    isEmailReady,
+    isSubmitting,
+    isUsernameFormatValid,
+    isUsernameReady,
+    normalizedEmail.length,
+    normalizedFullName.length,
+    normalizedUsername.length,
+    usernameAvailability.status,
+  ])
+
+  const canSubmit = disabledReason === 'ready'
+
+  useEffect(() => {
+    logSubmitDebug('submit-state-evaluated', {
+      canSubmit,
+      isSubmitting,
+      disabledReason,
+      isUsernameReady,
+      isEmailReady,
+      usernameStatus: usernameAvailability.status,
+      emailStatus: emailAvailability.status,
+    })
+  }, [
+    canSubmit,
+    disabledReason,
+    emailAvailability.status,
+    isEmailReady,
+    isSubmitting,
+    isUsernameReady,
+    usernameAvailability.status,
+  ])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    logSubmitDebug('submit-attempt', {
+      canSubmit,
+      disabledReason,
+      isSubmitting,
+      payload: {
+        username: normalizedUsername,
+        fullName: normalizedFullName,
+        email: normalizedEmail,
+      },
+    })
 
     if (!canSubmit) {
+      logSubmitDebug('submit-blocked', { disabledReason })
       return
     }
 
@@ -218,6 +395,7 @@ export default function SignUpPage() {
         fullName: normalizedFullName,
         email: normalizedEmail,
       }
+      logSubmitDebug('submission-started', payload)
 
       const { error: signUpError } = await supabase.auth.signInWithOtp({
         email: payload.email,
@@ -232,9 +410,15 @@ export default function SignUpPage() {
       })
 
       if (signUpError) {
+        logSubmitDebug('submission-failed', {
+          message: signUpError.message,
+          code: signUpError.code,
+          name: signUpError.name,
+        })
         setError(signUpError.message)
         return
       }
+      logSubmitDebug('submission-succeeded', { email: payload.email, username: payload.username })
 
       if (typeof window !== 'undefined') {
         window.sessionStorage.setItem(SIGNUP_DRAFT_KEY, JSON.stringify(payload))
@@ -248,7 +432,11 @@ export default function SignUpPage() {
       })
 
       router.push(`/auth/verify-otp?${query.toString()}`)
-    } catch {
+      logSubmitDebug('submission-navigation', { destination: `/auth/verify-otp?${query.toString()}` })
+    } catch (submitError) {
+      logSubmitDebug('submission-exception', {
+        error: submitError instanceof Error ? submitError.message : String(submitError),
+      })
       setError('Something went wrong while creating your account. Please try again.')
     } finally {
       setIsSubmitting(false)
@@ -353,6 +541,33 @@ export default function SignUpPage() {
           )}
         </button>
       </form>
+
+      {signupDebugEnabled ? (
+        <details className="mt-6 rounded-sm border border-[#c3c6ce] bg-[#f8fafc] p-4">
+          <summary className="cursor-pointer font-label text-xs uppercase tracking-widest text-[#00152a]">
+            Temporary sign-up debug panel (dev-only)
+          </summary>
+          <div className="mt-4 space-y-3 text-xs text-[#1f2937]">
+            <p><strong>username value:</strong> {JSON.stringify(username)}</p>
+            <p><strong>fullName value:</strong> {JSON.stringify(fullName)}</p>
+            <p><strong>email value:</strong> {JSON.stringify(email)}</p>
+            <p><strong>username format valid:</strong> {String(isUsernameFormatValid)}</p>
+            <p><strong>fullName valid:</strong> {String(isFullNameValid)}</p>
+            <p><strong>email format valid:</strong> {String(isEmailFormatValid)}</p>
+            <p><strong>usernameStatus:</strong> {usernameAvailability.status}</p>
+            <p><strong>emailStatus:</strong> {emailAvailability.status}</p>
+            <p><strong>usernameError:</strong> {usernameAvailability.message ?? 'null'}</p>
+            <p><strong>emailError:</strong> {emailAvailability.message ?? 'null'}</p>
+            <p><strong>canSubmit:</strong> {String(canSubmit)}</p>
+            <p><strong>isSubmitting:</strong> {String(isSubmitting)}</p>
+            <p><strong>disabledReason:</strong> {disabledReason}</p>
+            <p className="font-semibold">last username availability response</p>
+            <pre className="overflow-x-auto rounded bg-white p-2">{JSON.stringify(lastUsernameAvailabilityResponse, null, 2)}</pre>
+            <p className="font-semibold">last email availability response</p>
+            <pre className="overflow-x-auto rounded bg-white p-2">{JSON.stringify(lastEmailAvailabilityResponse, null, 2)}</pre>
+          </div>
+        </details>
+      ) : null}
 
       <p className="mt-8 border-t border-[#c3c6ce55] pt-6 text-center font-body text-sm text-[#43474d]">
         Already have an account?
