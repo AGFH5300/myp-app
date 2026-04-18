@@ -9,7 +9,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { createClient } from '@/lib/supabase/client'
 
 type Availability = {
-  status: 'idle' | 'checking' | 'available' | 'invalid' | 'unavailable'
+  status: 'idle' | 'checking' | 'available' | 'invalid' | 'unavailable' | 'error'
   message: string | null
 }
 
@@ -19,7 +19,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function fieldStatusClass(status: Availability['status']) {
   if (status === 'available') return 'border-b-[#0c7a43]'
-  if (status === 'invalid' || status === 'unavailable') return 'border-b-red-600'
+  if (status === 'invalid' || status === 'unavailable' || status === 'error') return 'border-b-red-600'
   return ''
 }
 
@@ -32,6 +32,8 @@ export default function SignUpPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [usernameAvailability, setUsernameAvailability] = useState<Availability>({ status: 'idle', message: null })
   const [emailAvailability, setEmailAvailability] = useState<Availability>({ status: 'idle', message: null })
+  const [hasUsernameInput, setHasUsernameInput] = useState(false)
+  const [hasEmailInput, setHasEmailInput] = useState(false)
 
   const normalizedUsername = username.trim()
   const normalizedFullName = fullName.trim()
@@ -80,7 +82,7 @@ export default function SignUpPage() {
         const payload = (await response.json()) as { available?: boolean; message?: string }
 
         if (!response.ok) {
-          setUsernameAvailability({ status: 'unavailable', message: payload.message ?? 'Could not validate username right now.' })
+          setUsernameAvailability({ status: 'error', message: payload.message ?? 'Could not validate username right now.' })
           return
         }
 
@@ -94,7 +96,7 @@ export default function SignUpPage() {
         if (controller.signal.aborted) {
           return
         }
-        setUsernameAvailability({ status: 'unavailable', message: 'Could not validate username right now.' })
+        setUsernameAvailability({ status: 'error', message: 'Could not validate username right now.' })
       }
     }, 450)
 
@@ -127,7 +129,7 @@ export default function SignUpPage() {
         const payload = (await response.json()) as { available?: boolean; message?: string }
 
         if (!response.ok) {
-          setEmailAvailability({ status: 'unavailable', message: payload.message ?? 'Could not validate email right now.' })
+          setEmailAvailability({ status: 'error', message: payload.message ?? 'Could not validate email right now.' })
           return
         }
 
@@ -141,7 +143,7 @@ export default function SignUpPage() {
         if (controller.signal.aborted) {
           return
         }
-        setEmailAvailability({ status: 'unavailable', message: 'Could not validate email right now.' })
+        setEmailAvailability({ status: 'error', message: 'Could not validate email right now.' })
       }
     }, 450)
 
@@ -151,16 +153,21 @@ export default function SignUpPage() {
     }
   }, [normalizedEmail])
 
+  const isUsernameReady = usernameAvailability.status === 'available'
+  const isEmailReady = emailAvailability.status === 'available'
+
   const canSubmit = useMemo(() => {
     return (
       normalizedUsername.length > 0 &&
       normalizedFullName.length > 0 &&
       normalizedEmail.length > 0 &&
-      usernameAvailability.status === 'available' &&
-      emailAvailability.status === 'available' &&
+      USERNAME_PATTERN.test(normalizedUsername) &&
+      EMAIL_PATTERN.test(normalizedEmail) &&
+      isUsernameReady &&
+      isEmailReady &&
       !isSubmitting
     )
-  }, [emailAvailability.status, isSubmitting, normalizedEmail.length, normalizedFullName.length, normalizedUsername.length, usernameAvailability.status])
+  }, [isEmailReady, isSubmitting, isUsernameReady, normalizedEmail, normalizedFullName.length, normalizedUsername])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -235,17 +242,20 @@ export default function SignUpPage() {
             <input
               className={`tsm-input pr-10 ${fieldStatusClass(usernameAvailability.status)}`}
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => {
+                setHasUsernameInput(true)
+                setUsername(e.target.value)
+              }}
               required
               disabled={isSubmitting}
               autoComplete="username"
             />
-            <div className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2">
+            <div className="pointer-events-none absolute right-2 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center">
               {usernameAvailability.status === 'checking' && <Spinner className="size-4 text-[#00152a]" />}
               {usernameAvailability.status === 'available' && <CheckCircle2 className="size-4 text-[#0c7a43]" />}
             </div>
           </div>
-          {usernameAvailability.message && usernameAvailability.status !== 'available' ? (
+          {hasUsernameInput && usernameAvailability.message && usernameAvailability.status !== 'available' ? (
             <p className="mt-2 text-sm text-red-700">{usernameAvailability.message}</p>
           ) : null}
         </div>
@@ -269,17 +279,20 @@ export default function SignUpPage() {
               className={`tsm-input pr-10 ${fieldStatusClass(emailAvailability.status)}`}
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setHasEmailInput(true)
+                setEmail(e.target.value)
+              }}
               required
               disabled={isSubmitting}
               autoComplete="email"
             />
-            <div className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2">
+            <div className="pointer-events-none absolute right-2 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center">
               {emailAvailability.status === 'checking' && <Spinner className="size-4 text-[#00152a]" />}
               {emailAvailability.status === 'available' && <CheckCircle2 className="size-4 text-[#0c7a43]" />}
             </div>
           </div>
-          {emailAvailability.message && emailAvailability.status !== 'available' ? (
+          {hasEmailInput && emailAvailability.message && emailAvailability.status !== 'available' ? (
             <p className="mt-2 text-sm text-red-700">{emailAvailability.message}</p>
           ) : null}
         </div>
