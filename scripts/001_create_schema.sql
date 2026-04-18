@@ -164,6 +164,32 @@ begin
 end;
 $$;
 
+create or replace function public.is_username_available(p_username text)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select not exists (
+    select 1
+    from public.profiles
+    where lower(username) = lower(trim(p_username))
+  );
+$$;
+
+create or replace function public.is_email_available(p_email text)
+returns boolean
+language sql
+security definer
+set search_path = public, auth
+as $$
+  select not exists (
+    select 1
+    from auth.users
+    where lower(email) = lower(trim(p_email))
+  );
+$$;
+
 drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at before update on public.profiles for each row execute function public.set_updated_at();
 drop trigger if exists papers_set_updated_at on public.papers;
@@ -246,3 +272,6 @@ create policy "question_topics_admin_write" on public.question_topics
 for all
 using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
 with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+
+grant execute on function public.is_username_available(text) to anon, authenticated;
+grant execute on function public.is_email_available(text) to anon, authenticated;
