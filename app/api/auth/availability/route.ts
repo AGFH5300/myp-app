@@ -13,7 +13,7 @@ function jsonResponse(
   init?: { status?: number; debug?: Record<string, unknown> },
 ) {
   if (availabilityDebugEnabled) {
-    console.log('[availability-debug] response', {
+    console.log('[signup-availability] response', {
       httpStatus: init?.status ?? 200,
       status,
       available,
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
   }
 
   if (availabilityDebugEnabled) {
-    console.log('[availability-debug] request-received', requestMeta)
+    console.log('[signup-availability] request-received', requestMeta)
   }
 
   if (!type) {
