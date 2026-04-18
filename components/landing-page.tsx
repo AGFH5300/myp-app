@@ -2,16 +2,28 @@ import Link from 'next/link'
 import { AppIcon } from '@/components/app-icon'
 import { BrandWordmark } from '@/components/brand-wordmark'
 
-const highlights = [
-  ['calendar_month', '2016–2025 archive', 'Browse a real MYP eAssessment archive by year and session.'],
-  ['menu_book', 'Real papers only', 'Open real paper PDFs, question records, and markschemes.'],
-  ['tune', 'Focused filters', 'Filter by subject, year, session (May/November), and tagged topics.'],
+const pillars = [
+  {
+    title: 'Real eAssessment sources only',
+    copy: 'Every entry is tied to a real past paper, question record, and markscheme reference.',
+    icon: 'menu_book',
+  },
+  {
+    title: 'Structured discovery',
+    copy: 'Find by subject, year, session, topic, and question instead of hunting through folders.',
+    icon: 'explore',
+  },
+  {
+    title: 'Targeted revision workflow',
+    copy: 'Save and revisit specific papers and questions for weak areas and focused practice.',
+    icon: 'target',
+  },
 ] as const
 
 export function LandingPage() {
   return (
     <div className="min-h-screen bg-[#fbf9f4] text-[#1b1c19]">
-      <header className="sticky top-0 z-50 bg-[#fbf9f4] border-b border-[#f0eee9]">
+      <header className="sticky top-0 z-50 border-b border-[#f0eee9] bg-[#fbf9f4]/95 backdrop-blur">
         <div className="tsm-shell flex items-center justify-between py-6">
           <BrandWordmark className="text-2xl" />
           <div className="flex items-center gap-3 font-body text-sm">
@@ -22,40 +34,45 @@ export function LandingPage() {
       </header>
 
       <main>
-        <section className="tsm-shell py-24">
-          <div className="grid lg:grid-cols-12 gap-12 items-center">
+        <section className="tsm-shell py-20 lg:py-24">
+          <div className="grid items-stretch gap-10 lg:grid-cols-12">
             <div className="lg:col-span-7">
-              <span className="font-label text-sm uppercase tracking-[.05em] text-[#43474d] font-semibold">MYP Atlas · Phase 1</span>
-              <h1 className="font-headline mt-6 text-5xl md:text-6xl lg:text-7xl text-[#00152a] leading-[1.1]">MYP eAssessment past papers, not a practice bank.</h1>
-              <p className="font-body text-lg text-[#43474d] mt-8 max-w-2xl">MYP Atlas is built for real eAssessment preparation with real materials only: past papers, real questions, and real markschemes from 2016 to 2025.</p>
-              <div className="mt-10 flex flex-col sm:flex-row gap-4">
-                <Link href="/auth/sign-up" className="tsm-btn-primary inline-flex items-center gap-2">Get Started <AppIcon name="arrow_forward" className="size-4" /></Link>
-                <Link href="/auth/login" className="tsm-btn-secondary inline-flex items-center gap-2">Go to Workspace <AppIcon name="chevron_right" className="size-4" /></Link>
+              <p className="font-label text-xs uppercase tracking-[.16em] text-[#43474d]">MYP Atlas · Real eAssessment Archive</p>
+              <h1 className="mt-6 font-headline text-5xl leading-[1.05] text-[#00152a] md:text-6xl lg:text-7xl">Past paper PDFs are everywhere. Precision search across them is not.</h1>
+              <p className="mt-8 max-w-2xl font-body text-lg leading-relaxed text-[#43474d]">Many students already have paper collections. The real difficulty is locating one specific question for one weak topic at the right level and session. MYP Atlas is a structured archive for real MYP eAssessments from 2016 to 2025, with paper-level and question-level discovery.</p>
+              <div className="mt-10 flex flex-col gap-4 sm:flex-row">
+                <Link href="/auth/sign-up" className="tsm-btn-primary inline-flex items-center gap-2">Start with email verification <AppIcon name="arrow_forward" className="size-4" /></Link>
+                <Link href="/dashboard/papers" className="tsm-btn-secondary inline-flex items-center gap-2">Browse archive <AppIcon name="chevron_right" className="size-4" /></Link>
               </div>
             </div>
-            <div className="lg:col-span-5 rounded-lg border border-[#c3c6ce66] bg-white p-8 shadow-[0_12px_32px_rgba(27,28,25,0.06)]">
-              <h2 className="font-headline text-3xl text-[#00152a]">What you can do now</h2>
-              <ul className="mt-6 space-y-4">
-                {[
-                  'Browse papers by subject, year, and session (May/November).',
-                  'Open paper details, question records, and markscheme links/text.',
-                  'Filter by topic tags when topics are available.',
-                  'Bookmark papers and questions for quick return.',
-                ].map((item) => (
-                  <li key={item} className="font-body text-sm text-[#43474d] flex gap-2"><AppIcon name="check" className="size-4 mt-0.5 text-[#735b2b]" />{item}</li>
-                ))}
-              </ul>
+
+            <div className="relative overflow-hidden rounded-md border border-[#c3c6ce66] bg-white p-8 shadow-[0_20px_44px_rgba(27,28,25,0.08)] lg:col-span-5">
+              <div className="absolute -right-8 -top-10 h-44 w-44 rounded-full bg-[#ece7db]" />
+              <div className="relative">
+                <h2 className="font-headline text-3xl text-[#00152a]">What MYP Atlas solves</h2>
+                <ul className="mt-6 space-y-4">
+                  {[
+                    'Search by subject, year, and May/November sessions.',
+                    'Open real paper records with markscheme links/text.',
+                    'Jump directly into published questions and topic tags.',
+                    'Bookmark exact question records for targeted revision.',
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2 font-body text-sm text-[#43474d]"><AppIcon name="check_circle" className="mt-0.5 size-4 text-[#735b2b]" />{item}</li>
+                  ))}
+                </ul>
+                <blockquote className="mt-8 border-l-2 border-[#735b2b] pl-4 font-headline text-xl leading-snug text-[#00152a]">“Built for finding the right question quickly — not for generating artificial practice content.”</blockquote>
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="bg-[#f5f3ee] py-20">
-          <div className="tsm-shell grid md:grid-cols-3 gap-6">
-            {highlights.map(([icon, title, copy]) => (
-              <article key={title} className="bg-white border border-[#c3c6ce66] p-6 rounded-md">
-                <AppIcon name={icon} className="size-5 text-[#00152a]" />
-                <h3 className="font-headline text-2xl mt-4 text-[#00152a]">{title}</h3>
-                <p className="font-body text-sm mt-3 text-[#43474d]">{copy}</p>
+        <section className="bg-[#f3f0e8] py-16 lg:py-20">
+          <div className="tsm-shell grid gap-6 md:grid-cols-3">
+            {pillars.map((pillar) => (
+              <article key={pillar.title} className="rounded-md border border-[#c3c6ce66] bg-white p-6">
+                <AppIcon name={pillar.icon} className="size-5 text-[#00152a]" />
+                <h3 className="mt-4 font-headline text-2xl text-[#00152a]">{pillar.title}</h3>
+                <p className="mt-3 font-body text-sm leading-relaxed text-[#43474d]">{pillar.copy}</p>
               </article>
             ))}
           </div>
@@ -63,7 +80,7 @@ export function LandingPage() {
       </main>
 
       <footer className="border-t border-[#c3c6ce66] py-12">
-        <div className="tsm-shell flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div className="tsm-shell flex flex-col items-center justify-between gap-4 md:flex-row">
           <BrandWordmark className="text-lg" />
           <p className="font-label text-xs uppercase tracking-widest text-[#00152a]">© 2026 MYP Atlas</p>
         </div>

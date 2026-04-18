@@ -24,10 +24,10 @@ export default async function ProgressPage() {
 
   return (
     <div>
-      <h1 className="font-headline text-4xl text-[#00152a]">Progress Overview</h1>
-      <p className="font-body text-[#43474d] mt-2 mb-8">Track your mastery trajectory across disciplines.</p>
+      <h1 className="font-headline text-4xl text-[#00152a]">Activity overview</h1>
+      <p className="font-body text-[#43474d] mt-2 mb-8">Review answer activity by subject from your saved attempts.</p>
       <div className="space-y-4">
-        {!rows.length && <div className="bg-white border border-[#c3c6ce66] p-6 font-body text-[#43474d] rounded-md">No progress data yet. Complete practice questions to build insights.</div>}
+        {!rows.length && <div className="bg-white border border-[#c3c6ce66] p-6 font-body text-[#43474d] rounded-md">No activity data yet. Save attempts from question practice to populate this view.</div>}
         {rows.map((p) => {
           const accuracy = p.max ? Math.round((p.score / p.max) * 100) : 0
           return (

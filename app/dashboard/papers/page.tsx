@@ -26,11 +26,13 @@ export default async function PapersPage({ searchParams }: { searchParams: Promi
   const papers = fetchedPapers?.filter((paper) => (session ? paper.exam_sessions?.session_month === session : true))
 
   return (
-    <div>
-      <h1 className="font-headline text-4xl text-[#00152a]">Past papers</h1>
-      <p className="font-body text-[#43474d] mt-2 mb-8">Real MYP eAssessment papers (2016–2025), with question-level access and markschemes.</p>
+    <div className="space-y-8">
+      <header className="rounded-md border border-[#c3c6ce66] bg-white p-8">
+        <h1 className="font-headline text-4xl text-[#00152a]">Past paper archive</h1>
+        <p className="mt-2 font-body text-[#43474d]">Browse published real MYP eAssessment papers (2016–2025) and move from paper-level browsing to question-level review.</p>
+      </header>
 
-      <form className="grid md:grid-cols-3 gap-4 mb-8 bg-white border border-[#c3c6ce66] p-4 rounded-md">
+      <form className="grid gap-4 rounded-md border border-[#c3c6ce66] bg-white p-5 md:grid-cols-3">
         <select name="subject" defaultValue={subject} className="tsm-input">
           <option value="">All subjects</option>
           {subjects?.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -48,13 +50,13 @@ export default async function PapersPage({ searchParams }: { searchParams: Promi
       </form>
 
       <div className="space-y-4">
-        {!papers?.length && <div className="bg-white border border-[#c3c6ce66] p-6 font-body text-[#43474d] rounded-md">No papers match these filters.</div>}
+        {!papers?.length && <div className="rounded-md border border-[#c3c6ce66] bg-white p-6 font-body text-[#43474d]">No papers match these filters.</div>}
         {papers?.map((paper) => (
-          <article key={paper.id} className="bg-white border border-[#c3c6ce66] p-6 rounded-md">
+          <article key={paper.id} className="rounded-md border border-[#c3c6ce66] bg-white p-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="font-headline text-2xl text-[#00152a]">{paper.title}</h2>
-                <p className="font-body text-sm text-[#43474d] mt-2">{paper.subjects?.name} · {paper.year} · {paper.exam_sessions?.session_month || ''}</p>
+                <p className="mt-2 font-body text-sm text-[#43474d]">{paper.subjects?.name} · {paper.year} · {paper.exam_sessions?.session_month || ''}</p>
               </div>
               <Link href={`/dashboard/papers/${paper.id}`} className="tsm-btn-secondary">Open paper</Link>
             </div>

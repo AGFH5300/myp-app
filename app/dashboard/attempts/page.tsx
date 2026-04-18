@@ -16,7 +16,7 @@ export default async function AttemptsPage() {
   return (
     <div>
       <h1 className="font-headline text-4xl text-[#00152a]">Saved Attempts</h1>
-      <p className="font-body text-[#43474d] mt-2 mb-8">Review your latest submitted answers and results.</p>
+      <p className="font-body text-[#43474d] mt-2 mb-8">Review your saved response history and reopen related papers.</p>
       <div className="space-y-4">
         {!attempts?.length && <div className="bg-white border border-[#c3c6ce66] p-6 font-body text-[#43474d]">No attempts saved yet.</div>}
         {attempts?.map((attempt) => {

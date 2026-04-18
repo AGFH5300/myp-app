@@ -8,7 +8,7 @@ import { AppIcon } from '@/components/app-icon'
 type Question = {
   id: string
   question_number: string
-  question_text: string
+  prompt_text: string
   answer_mode: string
   marks: number | null
   options_json: string[] | null
@@ -69,7 +69,7 @@ export function PracticeSession({ paper, questions, studentId, bookmarkedQuestio
 
     const { data: attempt, error: attemptError } = await supabase
       .from('attempts')
-      .insert({ student_id: studentId, question_id: q.id, score: null, max_score: q.marks ?? 0 })
+      .insert({ student_id: studentId, question_id: q.id, score: null, max_score: q.marks ?? 0, answer_text: answerText })
       .select('id')
       .single()
 
@@ -79,13 +79,7 @@ export function PracticeSession({ paper, questions, studentId, bookmarkedQuestio
       return
     }
 
-    const { error: answerError } = await supabase.from('attempt_answers').insert({ attempt_id: attempt.id, answer_text: answerText })
-    if (answerError) {
-      setError(answerError.message)
-      setSaving(false)
-      return
-    }
-
+    
     setSaving(false)
     if (index < questions.length - 1) setIndex((v) => v + 1)
     else window.location.href = '/dashboard/attempts'
@@ -101,7 +95,7 @@ export function PracticeSession({ paper, questions, studentId, bookmarkedQuestio
       <div className="grid lg:grid-cols-[1fr_260px] gap-6">
         <article className="bg-white border border-[#c3c6ce66] p-8">
           <div className="flex items-center justify-between gap-3 mb-4"><div className="flex items-center gap-3"><span className="font-label text-xs uppercase tracking-widest text-[#43474d]">Question {q.question_number}</span><span className="font-body text-sm text-[#735b2b]">{q.marks ?? 0} marks</span></div><button className="inline-flex items-center gap-2 text-sm text-[#735b2b]" onClick={toggleBookmark}><AppIcon name="bookmark" className={`size-4 ${bookmarks.has(q.id) ? 'fill-[#735b2b]' : ''}`} />{bookmarks.has(q.id) ? 'Bookmarked' : 'Bookmark'}</button></div>
-          <p className="font-body text-lg text-[#00152a] whitespace-pre-wrap">{q.question_text}</p>
+          <p className="font-body text-lg text-[#00152a] whitespace-pre-wrap">{q.prompt_text}</p>
           {answerField()}
           {error && <p className="text-sm text-red-700 mt-4">{error}</p>}
           <div className="mt-8 flex justify-between">
