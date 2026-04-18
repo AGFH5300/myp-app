@@ -46,6 +46,9 @@ export default function SignUpPage() {
   const [lastEmailAvailabilityResponse, setLastEmailAvailabilityResponse] = useState<AvailabilityResponse | null>(null)
   const usernameRequestId = useRef(0)
   const emailRequestId = useRef(0)
+  const usernameInputRef = useRef<HTMLInputElement>(null)
+  const fullNameInputRef = useRef<HTMLInputElement>(null)
+  const emailInputRef = useRef<HTMLInputElement>(null)
   const signupDebugEnabled = process.env.NODE_ENV === 'development' || DEBUG_FLAG
 
   const normalizedUsername = username.trim()
@@ -91,6 +94,57 @@ export default function SignUpPage() {
       initialEmail,
       cached,
     })
+  }, [])
+
+  const syncAutofilledValues = useCallback(() => {
+    const nextUsername = usernameInputRef.current?.value ?? ''
+    const nextFullName = fullNameInputRef.current?.value ?? ''
+    const nextEmail = emailInputRef.current?.value ?? ''
+
+    if (nextUsername !== username) {
+      setUsername(nextUsername)
+      setHasUsernameInput(nextUsername.length > 0)
+    }
+    if (nextFullName !== fullName) {
+      setFullName(nextFullName)
+    }
+    if (nextEmail !== email) {
+      setEmail(nextEmail)
+      setHasEmailInput(nextEmail.length > 0)
+    }
+  }, [email, fullName, username])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      syncAutofilledValues()
+    }, 0)
+
+    const rafId = window.requestAnimationFrame(() => {
+      syncAutofilledValues()
+    })
+
+    return () => {
+      window.clearTimeout(timeoutId)
+      window.cancelAnimationFrame(rafId)
+    }
+  }, [syncAutofilledValues])
+
+  const handleUsernameInput = useCallback((value: string) => {
+    setHasUsernameInput(value.length > 0)
+    setUsername(value)
+  }, [])
+
+  const handleFullNameInput = useCallback((value: string) => {
+    setFullName(value)
+  }, [])
+
+  const handleEmailInput = useCallback((value: string) => {
+    setHasEmailInput(value.length > 0)
+    setEmail(value)
   }, [])
 
   useEffect(() => {
@@ -460,12 +514,14 @@ export default function SignUpPage() {
           <label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Username</label>
           <div className="relative">
             <input
+              ref={usernameInputRef}
               className={`tsm-input pr-10 ${fieldStatusClass(usernameAvailability.status)}`}
+              type="text"
+              name="username"
               value={username}
-              onChange={(e) => {
-                setHasUsernameInput(true)
-                setUsername(e.target.value)
-              }}
+              onChange={(e) => handleUsernameInput(e.target.value)}
+              onInput={(e) => handleUsernameInput(e.currentTarget.value)}
+              onFocus={syncAutofilledValues}
               required
               disabled={isSubmitting}
               autoComplete="username"
@@ -486,9 +542,14 @@ export default function SignUpPage() {
         <div>
           <label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Full name</label>
           <input
+            ref={fullNameInputRef}
             className="tsm-input"
+            type="text"
+            name="fullName"
             value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
+            onChange={(e) => handleFullNameInput(e.target.value)}
+            onInput={(e) => handleFullNameInput(e.currentTarget.value)}
+            onFocus={syncAutofilledValues}
             required
             disabled={isSubmitting}
             autoComplete="name"
@@ -499,13 +560,14 @@ export default function SignUpPage() {
           <label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Email</label>
           <div className="relative">
             <input
+              ref={emailInputRef}
               className={`tsm-input pr-10 ${fieldStatusClass(emailAvailability.status)}`}
               type="email"
+              name="email"
               value={email}
-              onChange={(e) => {
-                setHasEmailInput(true)
-                setEmail(e.target.value)
-              }}
+              onChange={(e) => handleEmailInput(e.target.value)}
+              onInput={(e) => handleEmailInput(e.currentTarget.value)}
+              onFocus={syncAutofilledValues}
               required
               disabled={isSubmitting}
               autoComplete="email"
