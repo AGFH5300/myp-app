@@ -33,7 +33,14 @@ function fieldStatusClass(status: Availability['status']) {
 
 export default function SignUpPage() {
   const router = useRouter()
-  const [formTick, setFormTick] = useState(0)
+  const [observedValues, setObservedValues] = useState({
+    usernameRaw: '',
+    fullNameRaw: '',
+    emailRaw: '',
+    username: '',
+    fullName: '',
+    email: '',
+  })
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [usernameAvailability, setUsernameAvailability] = useState<Availability>({ status: 'idle', message: null })
@@ -46,30 +53,14 @@ export default function SignUpPage() {
   const fullNameRef = useRef<HTMLInputElement>(null)
   const emailRef = useRef<HTMLInputElement>(null)
   const signupDebugEnabled = process.env.NODE_ENV === 'development' || DEBUG_FLAG
-
-  const readSignupValues = useCallback(() => {
-    const usernameRaw = usernameRef.current?.value ?? ''
-    const fullNameRaw = fullNameRef.current?.value ?? ''
-    const emailRaw = emailRef.current?.value ?? ''
-    return {
-      usernameRaw,
-      fullNameRaw,
-      emailRaw,
-      username: usernameRaw.trim(),
-      fullName: fullNameRaw.trim(),
-      email: emailRaw.trim().toLowerCase(),
-    }
-  }, [])
-
-  const currentValues = readSignupValues()
-  const normalizedUsername = currentValues.username
-  const normalizedFullName = currentValues.fullName
-  const normalizedEmail = currentValues.email
+  const normalizedUsername = observedValues.username
+  const normalizedFullName = observedValues.fullName
+  const normalizedEmail = observedValues.email
   const isUsernameFormatValid = USERNAME_PATTERN.test(normalizedUsername)
   const isFullNameValid = normalizedFullName.length > 0
   const isEmailFormatValid = EMAIL_PATTERN.test(normalizedEmail)
-  const hasUsernameInputValue = currentValues.usernameRaw.length > 0
-  const hasEmailInputValue = currentValues.emailRaw.length > 0
+  const hasUsernameInputValue = observedValues.usernameRaw.length > 0
+  const hasEmailInputValue = observedValues.emailRaw.length > 0
 
   const logSignupDebug = useCallback((event: string, payload: Record<string, unknown>) => {
     if (!signupDebugEnabled) return
@@ -81,13 +72,30 @@ export default function SignUpPage() {
     console.log(`[signup-input] ${event}`, payload)
   }, [signupDebugEnabled])
 
-  const bumpFormTick = useCallback((source: string) => {
-    setFormTick((previous) => previous + 1)
-    logInputDebug('form-tick-bumped', {
-      source,
-      nextValues: readSignupValues(),
+  const syncFromDom = useCallback((source: string) => {
+    const usernameRaw = usernameRef.current?.value ?? ''
+    const fullNameRaw = fullNameRef.current?.value ?? ''
+    const emailRaw = emailRef.current?.value ?? ''
+    const nextValues = {
+      usernameRaw,
+      fullNameRaw,
+      emailRaw,
+      username: usernameRaw.trim(),
+      fullName: fullNameRaw.trim(),
+      email: emailRaw.trim().toLowerCase(),
+    }
+    setObservedValues((previous) => {
+      if (
+        previous.usernameRaw === nextValues.usernameRaw &&
+        previous.fullNameRaw === nextValues.fullNameRaw &&
+        previous.emailRaw === nextValues.emailRaw
+      ) {
+        return previous
+      }
+      return nextValues
     })
-  }, [logInputDebug, readSignupValues])
+    logInputDebug('sync-from-dom', { source, nextValues })
+  }, [logInputDebug])
 
   const logAvailabilityDebug = useCallback((event: string, payload: Record<string, unknown>) => {
     if (!signupDebugEnabled) return
@@ -119,7 +127,7 @@ export default function SignUpPage() {
     if (usernameRef.current) usernameRef.current.value = hydratedValues.username
     if (fullNameRef.current) fullNameRef.current.value = hydratedValues.fullName
     if (emailRef.current) emailRef.current.value = hydratedValues.email
-    setFormTick((previous) => previous + 1)
+    syncFromDom('mount-hydration')
     logSignupDebug('hydrated-initial-values', {
       initialUsername,
       initialFullName,
@@ -127,7 +135,18 @@ export default function SignUpPage() {
       cached,
       hydratedValues,
     })
-  }, [logSignupDebug])
+  }, [logSignupDebug, syncFromDom])
+
+  useEffect(() => {
+    syncFromDom('mount')
+    const intervalId = window.setInterval(() => {
+      syncFromDom('autofill-interval')
+    }, 300)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [syncFromDom])
 
   useEffect(() => {
     if (!normalizedUsername) {
@@ -318,13 +337,12 @@ export default function SignUpPage() {
 
   useEffect(() => {
     logSignupDebug('field-values-updated', {
-      tick: formTick,
-      ...currentValues,
+      ...observedValues,
       normalizedUsername,
       normalizedFullName,
       normalizedEmail,
     })
-  }, [currentValues, formTick, logSignupDebug, normalizedEmail, normalizedFullName, normalizedUsername])
+  }, [logSignupDebug, normalizedEmail, normalizedFullName, normalizedUsername, observedValues])
 
   useEffect(() => {
     logSignupDebug('sync-validation-state', {
@@ -420,7 +438,7 @@ export default function SignUpPage() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const submitValues = readSignupValues()
+    const submitValues = observedValues
     logSubmitDebug('submit-attempt', {
       canSubmit,
       disabledReason,
@@ -520,11 +538,14 @@ export default function SignUpPage() {
               name="signup_username_input"
               onChange={(e) => {
                 logInputDebug('react-onChange-fired', { field: 'username', value: e.target.value })
-                bumpFormTick('username-onChange')
+                syncFromDom('username-onChange')
               }}
               onInput={(e) => {
                 logInputDebug('react-onInput-fired', { field: 'username', value: e.currentTarget.value })
-                bumpFormTick('username-onInput')
+                syncFromDom('username-onInput')
+              }}
+              onFocus={() => {
+                syncFromDom('username-onFocus')
               }}
               required
               disabled={isSubmitting}
@@ -540,7 +561,7 @@ export default function SignUpPage() {
           </div>
           {signupDebugEnabled ? (
             <p className="mt-1 text-[11px] text-[#6b7280]">
-              dom: {JSON.stringify(usernameRef.current?.value ?? '')} | computed: {JSON.stringify(currentValues.username)}
+              dom: {JSON.stringify(usernameRef.current?.value ?? '')} | computed: {JSON.stringify(observedValues.username)}
             </p>
           ) : null}
           {hasUsernameInputValue && usernameAvailability.message && usernameAvailability.status !== 'available' ? (
@@ -557,11 +578,14 @@ export default function SignUpPage() {
             name="signup_full_name_input"
             onChange={(e) => {
               logInputDebug('react-onChange-fired', { field: 'fullName', value: e.target.value })
-              bumpFormTick('fullName-onChange')
+              syncFromDom('fullName-onChange')
             }}
             onInput={(e) => {
               logInputDebug('react-onInput-fired', { field: 'fullName', value: e.currentTarget.value })
-              bumpFormTick('fullName-onInput')
+              syncFromDom('fullName-onInput')
+            }}
+            onFocus={() => {
+              syncFromDom('fullName-onFocus')
             }}
             required
             disabled={isSubmitting}
@@ -569,7 +593,7 @@ export default function SignUpPage() {
           />
           {signupDebugEnabled ? (
             <p className="mt-1 text-[11px] text-[#6b7280]">
-              dom: {JSON.stringify(fullNameRef.current?.value ?? '')} | computed: {JSON.stringify(currentValues.fullName)}
+              dom: {JSON.stringify(fullNameRef.current?.value ?? '')} | computed: {JSON.stringify(observedValues.fullName)}
             </p>
           ) : null}
         </div>
@@ -584,11 +608,14 @@ export default function SignUpPage() {
               name="signup_email_input"
               onChange={(e) => {
                 logInputDebug('react-onChange-fired', { field: 'email', value: e.target.value })
-                bumpFormTick('email-onChange')
+                syncFromDom('email-onChange')
               }}
               onInput={(e) => {
                 logInputDebug('react-onInput-fired', { field: 'email', value: e.currentTarget.value })
-                bumpFormTick('email-onInput')
+                syncFromDom('email-onInput')
+              }}
+              onFocus={() => {
+                syncFromDom('email-onFocus')
               }}
               required
               disabled={isSubmitting}
@@ -604,7 +631,7 @@ export default function SignUpPage() {
           </div>
           {signupDebugEnabled ? (
             <p className="mt-1 text-[11px] text-[#6b7280]">
-              dom: {JSON.stringify(emailRef.current?.value ?? '')} | computed: {JSON.stringify(currentValues.email)}
+              dom: {JSON.stringify(emailRef.current?.value ?? '')} | computed: {JSON.stringify(observedValues.email)}
             </p>
           ) : null}
           {hasEmailInputValue && emailAvailability.message && emailAvailability.status !== 'available' ? (
@@ -637,10 +664,12 @@ export default function SignUpPage() {
             Temporary sign-up debug panel (dev-only)
           </summary>
           <div className="mt-4 space-y-3 text-xs text-[#1f2937]">
-            <p><strong>formTick:</strong> {formTick}</p>
-            <p><strong>username value:</strong> {JSON.stringify(currentValues.username)}</p>
-            <p><strong>fullName value:</strong> {JSON.stringify(currentValues.fullName)}</p>
-            <p><strong>email value:</strong> {JSON.stringify(currentValues.email)}</p>
+            <p><strong>username value:</strong> {JSON.stringify(observedValues.username)}</p>
+            <p><strong>fullName value:</strong> {JSON.stringify(observedValues.fullName)}</p>
+            <p><strong>email value:</strong> {JSON.stringify(observedValues.email)}</p>
+            <p><strong>username raw:</strong> {JSON.stringify(observedValues.usernameRaw)}</p>
+            <p><strong>fullName raw:</strong> {JSON.stringify(observedValues.fullNameRaw)}</p>
+            <p><strong>email raw:</strong> {JSON.stringify(observedValues.emailRaw)}</p>
             <p><strong>username dom:</strong> {JSON.stringify(usernameRef.current?.value ?? '')}</p>
             <p><strong>fullName dom:</strong> {JSON.stringify(fullNameRef.current?.value ?? '')}</p>
             <p><strong>email dom:</strong> {JSON.stringify(emailRef.current?.value ?? '')}</p>
