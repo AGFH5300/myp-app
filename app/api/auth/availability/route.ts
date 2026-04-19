@@ -50,6 +50,13 @@ export async function GET(request: Request) {
     console.log('[signup-availability] request-received', requestMeta)
   }
 
+  if (!rawType && !rawValue) {
+    return jsonResponse('error', false, 'Availability check requires both type and value query params.', {
+      status: 200,
+      debug: { ...requestMeta, validationPath: 'empty_query_params' },
+    })
+  }
+
   if (!type) {
     return jsonResponse('error', false, 'Invalid check type. Use type=username or type=email.', {
       status: 400,

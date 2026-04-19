@@ -20,6 +20,8 @@ type AvailabilityResponse = {
   debug?: Record<string, unknown>
 }
 
+type SignupField = 'username' | 'fullName' | 'email'
+
 const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,24}$/
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -83,7 +85,19 @@ export default function SignUpPage() {
     console.log(`[signup-submit] ${event}`, payload)
   }, [signupDebugEnabled])
 
-  const updateField = useCallback((field: 'username' | 'fullName' | 'email', rawValue: string, source: string) => {
+  const getInputDomValue = useCallback((field: SignupField) => {
+    if (field === 'username') return usernameInputRef.current?.value ?? ''
+    if (field === 'fullName') return fullNameInputRef.current?.value ?? ''
+    return emailInputRef.current?.value ?? ''
+  }, [])
+
+  const logFieldDebug = useCallback((field: SignupField, source: string, stateValue: string, domValue?: string) => {
+    const currentDomValue = domValue ?? getInputDomValue(field)
+    if (!signupDebugEnabled) return
+    console.log(`[signup-debug] field=${field} source=${source} domValue=${JSON.stringify(currentDomValue)} stateValue=${JSON.stringify(stateValue)}`)
+  }, [getInputDomValue, signupDebugEnabled])
+
+  const updateField = useCallback((field: SignupField, rawValue: string, source: string) => {
     setFormValues((prev) => {
       const next = { ...prev, [field]: rawValue }
       logInputDebug('field-update', {
@@ -93,6 +107,7 @@ export default function SignUpPage() {
         prevValue: prev[field],
         nextValue: next[field],
       })
+      logFieldDebug(field, source, next[field], rawValue)
       return next
     })
 
@@ -102,7 +117,7 @@ export default function SignUpPage() {
     if (field === 'email') {
       setHasEmailInput(rawValue.length > 0)
     }
-  }, [logInputDebug])
+  }, [logFieldDebug, logInputDebug])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -138,7 +153,7 @@ export default function SignUpPage() {
     const nextUsername = usernameInputRef.current?.value ?? ''
     const nextFullName = fullNameInputRef.current?.value ?? ''
     const nextEmail = emailInputRef.current?.value ?? ''
-    logInputDebug('autofill-dom-scan', {
+    logInputDebug('autofill-sync-fired', {
       reason,
       domValues: {
         username: nextUsername,
@@ -152,6 +167,10 @@ export default function SignUpPage() {
       },
     })
 
+    logFieldDebug('username', `autofill-scan:${reason}`, username, nextUsername)
+    logFieldDebug('fullName', `autofill-scan:${reason}`, fullName, nextFullName)
+    logFieldDebug('email', `autofill-scan:${reason}`, email, nextEmail)
+
     if (nextUsername !== username) {
       updateField('username', nextUsername, `autofill-sync:${reason}`)
     }
@@ -161,7 +180,7 @@ export default function SignUpPage() {
     if (nextEmail !== email) {
       updateField('email', nextEmail, `autofill-sync:${reason}`)
     }
-  }, [email, fullName, logInputDebug, updateField, username])
+  }, [email, fullName, logFieldDebug, logInputDebug, updateField, username])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -180,10 +199,20 @@ export default function SignUpPage() {
       syncAutofilledValues('timeout-750')
     }, 750)
 
+    let pollRuns = 0
+    const pollIntervalId = window.setInterval(() => {
+      pollRuns += 1
+      syncAutofilledValues(`poll-${pollRuns}`)
+      if (pollRuns >= 8) {
+        window.clearInterval(pollIntervalId)
+      }
+    }, 250)
+
     return () => {
       window.clearTimeout(timeoutId)
       window.clearTimeout(delayedTimeoutId)
       window.cancelAnimationFrame(rafId)
+      window.clearInterval(pollIntervalId)
     }
   }, [syncAutofilledValues])
 
@@ -204,19 +233,26 @@ export default function SignUpPage() {
       const handleNativeChange = () => {
         updateField(field, element.value, 'native-change-listener')
       }
+      const handleAnimationStart = (event: AnimationEvent) => {
+        if (event.animationName !== 'tsm-autofill-start') return
+        logInputDebug('autofill-animationstart', { field, value: element.value })
+        updateField(field, element.value, 'autofill-animationstart')
+      }
 
       element.addEventListener('input', handleNativeInput)
       element.addEventListener('change', handleNativeChange)
+      element.addEventListener('animationstart', handleAnimationStart)
       return () => {
         element.removeEventListener('input', handleNativeInput)
         element.removeEventListener('change', handleNativeChange)
+        element.removeEventListener('animationstart', handleAnimationStart)
       }
     })
 
     return () => {
       detachListeners.forEach((detach) => detach())
     }
-  }, [updateField])
+  }, [logInputDebug, updateField])
 
   useEffect(() => {
     if (!normalizedUsername) {
@@ -417,6 +453,12 @@ export default function SignUpPage() {
   }, [email, fullName, logSignupDebug, normalizedEmail, normalizedFullName, normalizedUsername, username])
 
   useEffect(() => {
+    logFieldDebug('username', 'state-change', username)
+    logFieldDebug('fullName', 'state-change', fullName)
+    logFieldDebug('email', 'state-change', email)
+  }, [email, fullName, logFieldDebug, username])
+
+  useEffect(() => {
     logSignupDebug('sync-validation-state', {
       isUsernameFormatValid,
       isFullNameValid,
@@ -471,6 +513,10 @@ export default function SignUpPage() {
   ])
 
   const canSubmit = disabledReason === 'ready'
+
+  useEffect(() => {
+    logSubmitDebug('canSubmit-recalculated', { canSubmit, disabledReason })
+  }, [canSubmit, disabledReason, logSubmitDebug])
 
   useEffect(() => {
     logSubmitDebug('submit-state-evaluated', {
@@ -602,8 +648,14 @@ export default function SignUpPage() {
               type="text"
               name="username"
               value={username}
-              onChange={(e) => updateField('username', e.target.value, 'react-onChange')}
-              onInput={(e) => updateField('username', e.currentTarget.value, 'react-onInput')}
+              onChange={(e) => {
+                logInputDebug('react-onChange-fired', { field: 'username', value: e.target.value })
+                updateField('username', e.target.value, 'react-onChange')
+              }}
+              onInput={(e) => {
+                logInputDebug('react-onInput-fired', { field: 'username', value: e.currentTarget.value })
+                updateField('username', e.currentTarget.value, 'react-onInput')
+              }}
               onFocus={() => syncAutofilledValues('username-focus')}
               required
               disabled={isSubmitting}
@@ -617,6 +669,11 @@ export default function SignUpPage() {
                 usernameAvailability.status === 'error') && <AlertCircle className="size-4 text-red-600" />}
             </div>
           </div>
+          {signupDebugEnabled ? (
+            <p className="mt-1 text-[11px] text-[#6b7280]">
+              dom: {JSON.stringify(usernameInputRef.current?.value ?? '')} | state: {JSON.stringify(username)}
+            </p>
+          ) : null}
           {hasUsernameInput && usernameAvailability.message && usernameAvailability.status !== 'available' ? (
             <p className="mt-2 text-sm text-red-700">{usernameAvailability.message}</p>
           ) : null}
@@ -630,13 +687,24 @@ export default function SignUpPage() {
             type="text"
             name="fullName"
             value={fullName}
-            onChange={(e) => updateField('fullName', e.target.value, 'react-onChange')}
-            onInput={(e) => updateField('fullName', e.currentTarget.value, 'react-onInput')}
+            onChange={(e) => {
+              logInputDebug('react-onChange-fired', { field: 'fullName', value: e.target.value })
+              updateField('fullName', e.target.value, 'react-onChange')
+            }}
+            onInput={(e) => {
+              logInputDebug('react-onInput-fired', { field: 'fullName', value: e.currentTarget.value })
+              updateField('fullName', e.currentTarget.value, 'react-onInput')
+            }}
             onFocus={() => syncAutofilledValues('fullName-focus')}
             required
             disabled={isSubmitting}
             autoComplete="name"
           />
+          {signupDebugEnabled ? (
+            <p className="mt-1 text-[11px] text-[#6b7280]">
+              dom: {JSON.stringify(fullNameInputRef.current?.value ?? '')} | state: {JSON.stringify(fullName)}
+            </p>
+          ) : null}
         </div>
 
         <div>
@@ -648,8 +716,14 @@ export default function SignUpPage() {
               type="email"
               name="email"
               value={email}
-              onChange={(e) => updateField('email', e.target.value, 'react-onChange')}
-              onInput={(e) => updateField('email', e.currentTarget.value, 'react-onInput')}
+              onChange={(e) => {
+                logInputDebug('react-onChange-fired', { field: 'email', value: e.target.value })
+                updateField('email', e.target.value, 'react-onChange')
+              }}
+              onInput={(e) => {
+                logInputDebug('react-onInput-fired', { field: 'email', value: e.currentTarget.value })
+                updateField('email', e.currentTarget.value, 'react-onInput')
+              }}
               onFocus={() => syncAutofilledValues('email-focus')}
               required
               disabled={isSubmitting}
@@ -663,6 +737,11 @@ export default function SignUpPage() {
                 emailAvailability.status === 'error') && <AlertCircle className="size-4 text-red-600" />}
             </div>
           </div>
+          {signupDebugEnabled ? (
+            <p className="mt-1 text-[11px] text-[#6b7280]">
+              dom: {JSON.stringify(emailInputRef.current?.value ?? '')} | state: {JSON.stringify(email)}
+            </p>
+          ) : null}
           {hasEmailInput && emailAvailability.message && emailAvailability.status !== 'available' ? (
             <p className="mt-2 text-sm text-red-700">{emailAvailability.message}</p>
           ) : null}
