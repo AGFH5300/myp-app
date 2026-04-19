@@ -33,9 +33,11 @@ function fieldStatusClass(status: Availability['status']) {
 
 export default function SignUpPage() {
   const router = useRouter()
-  const [username, setUsername] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [email, setEmail] = useState('')
+  const [formValues, setFormValues] = useState({
+    username: '',
+    fullName: '',
+    email: '',
+  })
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [usernameAvailability, setUsernameAvailability] = useState<Availability>({ status: 'idle', message: null })
@@ -50,6 +52,9 @@ export default function SignUpPage() {
   const fullNameInputRef = useRef<HTMLInputElement>(null)
   const emailInputRef = useRef<HTMLInputElement>(null)
   const signupDebugEnabled = process.env.NODE_ENV === 'development' || DEBUG_FLAG
+  const username = formValues.username
+  const fullName = formValues.fullName
+  const email = formValues.email
 
   const normalizedUsername = username.trim()
   const normalizedFullName = fullName.trim()
@@ -63,15 +68,41 @@ export default function SignUpPage() {
     console.log(`[signup-debug] ${event}`, payload)
   }, [signupDebugEnabled])
 
+  const logInputDebug = useCallback((event: string, payload: Record<string, unknown>) => {
+    if (!signupDebugEnabled) return
+    console.log(`[signup-input] ${event}`, payload)
+  }, [signupDebugEnabled])
+
   const logAvailabilityDebug = useCallback((event: string, payload: Record<string, unknown>) => {
     if (!signupDebugEnabled) return
-    console.log(`[availability-debug] ${event}`, payload)
+    console.log(`[signup-availability] ${event}`, payload)
   }, [signupDebugEnabled])
 
   const logSubmitDebug = useCallback((event: string, payload: Record<string, unknown>) => {
     if (!signupDebugEnabled) return
-    console.log(`[submit-debug] ${event}`, payload)
+    console.log(`[signup-submit] ${event}`, payload)
   }, [signupDebugEnabled])
+
+  const updateField = useCallback((field: 'username' | 'fullName' | 'email', rawValue: string, source: string) => {
+    setFormValues((prev) => {
+      const next = { ...prev, [field]: rawValue }
+      logInputDebug('field-update', {
+        source,
+        field,
+        domValue: rawValue,
+        prevValue: prev[field],
+        nextValue: next[field],
+      })
+      return next
+    })
+
+    if (field === 'username') {
+      setHasUsernameInput(rawValue.length > 0)
+    }
+    if (field === 'email') {
+      setHasEmailInput(rawValue.length > 0)
+    }
+  }, [logInputDebug])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -85,34 +116,52 @@ export default function SignUpPage() {
     const cachedRaw = window.sessionStorage.getItem(SIGNUP_DRAFT_KEY)
     const cached = cachedRaw ? JSON.parse(cachedRaw) : null
 
-    setUsername(initialUsername || cached?.username || '')
-    setFullName(initialFullName || cached?.fullName || '')
-    setEmail(initialEmail || cached?.email || '')
+    const nextFormValues = {
+      username: initialUsername || cached?.username || '',
+      fullName: initialFullName || cached?.fullName || '',
+      email: initialEmail || cached?.email || '',
+    }
+
+    setFormValues(nextFormValues)
+    setHasUsernameInput(nextFormValues.username.length > 0)
+    setHasEmailInput(nextFormValues.email.length > 0)
     logSignupDebug('hydrated-initial-values', {
       initialUsername,
       initialFullName,
       initialEmail,
       cached,
+      nextFormValues,
     })
-  }, [])
+  }, [logSignupDebug])
 
-  const syncAutofilledValues = useCallback(() => {
+  const syncAutofilledValues = useCallback((reason: string) => {
     const nextUsername = usernameInputRef.current?.value ?? ''
     const nextFullName = fullNameInputRef.current?.value ?? ''
     const nextEmail = emailInputRef.current?.value ?? ''
+    logInputDebug('autofill-dom-scan', {
+      reason,
+      domValues: {
+        username: nextUsername,
+        fullName: nextFullName,
+        email: nextEmail,
+      },
+      reactValues: {
+        username,
+        fullName,
+        email,
+      },
+    })
 
     if (nextUsername !== username) {
-      setUsername(nextUsername)
-      setHasUsernameInput(nextUsername.length > 0)
+      updateField('username', nextUsername, `autofill-sync:${reason}`)
     }
     if (nextFullName !== fullName) {
-      setFullName(nextFullName)
+      updateField('fullName', nextFullName, `autofill-sync:${reason}`)
     }
     if (nextEmail !== email) {
-      setEmail(nextEmail)
-      setHasEmailInput(nextEmail.length > 0)
+      updateField('email', nextEmail, `autofill-sync:${reason}`)
     }
-  }, [email, fullName, username])
+  }, [email, fullName, logInputDebug, updateField, username])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -120,32 +169,54 @@ export default function SignUpPage() {
     }
 
     const timeoutId = window.setTimeout(() => {
-      syncAutofilledValues()
+      syncAutofilledValues('timeout-0')
     }, 0)
 
     const rafId = window.requestAnimationFrame(() => {
-      syncAutofilledValues()
+      syncAutofilledValues('raf')
     })
+
+    const delayedTimeoutId = window.setTimeout(() => {
+      syncAutofilledValues('timeout-750')
+    }, 750)
 
     return () => {
       window.clearTimeout(timeoutId)
+      window.clearTimeout(delayedTimeoutId)
       window.cancelAnimationFrame(rafId)
     }
   }, [syncAutofilledValues])
 
-  const handleUsernameInput = useCallback((value: string) => {
-    setHasUsernameInput(value.length > 0)
-    setUsername(value)
-  }, [])
+  useEffect(() => {
+    const inputs = [
+      { field: 'username' as const, ref: usernameInputRef },
+      { field: 'fullName' as const, ref: fullNameInputRef },
+      { field: 'email' as const, ref: emailInputRef },
+    ]
 
-  const handleFullNameInput = useCallback((value: string) => {
-    setFullName(value)
-  }, [])
+    const detachListeners = inputs.map(({ field, ref }) => {
+      const element = ref.current
+      if (!element) return () => undefined
 
-  const handleEmailInput = useCallback((value: string) => {
-    setHasEmailInput(value.length > 0)
-    setEmail(value)
-  }, [])
+      const handleNativeInput = () => {
+        updateField(field, element.value, 'native-input-listener')
+      }
+      const handleNativeChange = () => {
+        updateField(field, element.value, 'native-change-listener')
+      }
+
+      element.addEventListener('input', handleNativeInput)
+      element.addEventListener('change', handleNativeChange)
+      return () => {
+        element.removeEventListener('input', handleNativeInput)
+        element.removeEventListener('change', handleNativeChange)
+      }
+    })
+
+    return () => {
+      detachListeners.forEach((detach) => detach())
+    }
+  }, [updateField])
 
   useEffect(() => {
     if (!normalizedUsername) {
@@ -410,14 +481,26 @@ export default function SignUpPage() {
       isEmailReady,
       usernameStatus: usernameAvailability.status,
       emailStatus: emailAvailability.status,
+      username: normalizedUsername,
+      fullName: normalizedFullName,
+      email: normalizedEmail,
+      isUsernameFormatValid,
+      isFullNameValid,
+      isEmailFormatValid,
     })
   }, [
     canSubmit,
     disabledReason,
     emailAvailability.status,
+    isEmailFormatValid,
+    isFullNameValid,
     isEmailReady,
     isSubmitting,
+    isUsernameFormatValid,
     isUsernameReady,
+    normalizedEmail,
+    normalizedFullName,
+    normalizedUsername,
     usernameAvailability.status,
   ])
 
@@ -519,9 +602,9 @@ export default function SignUpPage() {
               type="text"
               name="username"
               value={username}
-              onChange={(e) => handleUsernameInput(e.target.value)}
-              onInput={(e) => handleUsernameInput(e.currentTarget.value)}
-              onFocus={syncAutofilledValues}
+              onChange={(e) => updateField('username', e.target.value, 'react-onChange')}
+              onInput={(e) => updateField('username', e.currentTarget.value, 'react-onInput')}
+              onFocus={() => syncAutofilledValues('username-focus')}
               required
               disabled={isSubmitting}
               autoComplete="username"
@@ -547,9 +630,9 @@ export default function SignUpPage() {
             type="text"
             name="fullName"
             value={fullName}
-            onChange={(e) => handleFullNameInput(e.target.value)}
-            onInput={(e) => handleFullNameInput(e.currentTarget.value)}
-            onFocus={syncAutofilledValues}
+            onChange={(e) => updateField('fullName', e.target.value, 'react-onChange')}
+            onInput={(e) => updateField('fullName', e.currentTarget.value, 'react-onInput')}
+            onFocus={() => syncAutofilledValues('fullName-focus')}
             required
             disabled={isSubmitting}
             autoComplete="name"
@@ -565,9 +648,9 @@ export default function SignUpPage() {
               type="email"
               name="email"
               value={email}
-              onChange={(e) => handleEmailInput(e.target.value)}
-              onInput={(e) => handleEmailInput(e.currentTarget.value)}
-              onFocus={syncAutofilledValues}
+              onChange={(e) => updateField('email', e.target.value, 'react-onChange')}
+              onInput={(e) => updateField('email', e.currentTarget.value, 'react-onInput')}
+              onFocus={() => syncAutofilledValues('email-focus')}
               required
               disabled={isSubmitting}
               autoComplete="email"
