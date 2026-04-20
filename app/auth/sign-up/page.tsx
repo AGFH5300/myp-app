@@ -8,27 +8,54 @@ import { AuthShell } from '@/components/auth-shell'
 import { Spinner } from '@/components/ui/spinner'
 import { createClient } from '@/lib/supabase/client'
 
-type Availability = {
-  status: 'idle' | 'checking' | 'available' | 'invalid' | 'unavailable' | 'error'
-  message: string | null
-}
 type AvailabilityResponse = {
-  status?: Availability['status']
+  status?: 'idle' | 'checking' | 'available' | 'invalid' | 'unavailable' | 'error'
   available?: boolean
   reason?: string
   message?: string
-  debug?: Record<string, unknown>
+}
+
+type FieldStatus = 'untouched' | 'typing' | 'validating' | 'valid' | 'invalid'
+
+type FieldState = {
+  touched: boolean
+  dirty: boolean
+  blurred: boolean
+  status: FieldStatus
+  error: string | null
+  lastValidatedValue: string
+}
+
+type AvailabilityFieldState = FieldState & {
+  isChecking: boolean
+  isAvailable: boolean | null
 }
 
 const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,24}$/
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const DEBUG_FLAG = process.env.NEXT_PUBLIC_SIGNUP_DEBUG === 'true'
+const VALIDATION_DEBOUNCE_MS = 600
 
-function fieldStatusClass(status: Availability['status']) {
-  if (status === 'available') return 'border-b-[#0c7a43]'
-  if (status === 'invalid' || status === 'unavailable' || status === 'error') return 'border-b-red-600'
+function fieldStatusClass({ status, isChecking, isAvailable }: { status: FieldStatus; isChecking?: boolean; isAvailable?: boolean | null }) {
+  if (isChecking || status === 'validating') return ''
+  if (status === 'valid' && isAvailable !== false) return 'border-b-[#0c7a43]'
+  if (status === 'invalid') return 'border-b-red-600'
   return ''
+}
+
+const INITIAL_FIELD_STATE: FieldState = {
+  touched: false,
+  dirty: false,
+  blurred: false,
+  status: 'untouched',
+  error: null,
+  lastValidatedValue: '',
+}
+
+const INITIAL_AVAILABILITY_FIELD_STATE: AvailabilityFieldState = {
+  ...INITIAL_FIELD_STATE,
+  isChecking: false,
+  isAvailable: null,
 }
 
 export default function SignUpPage() {
@@ -43,37 +70,22 @@ export default function SignUpPage() {
   })
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [hydrated, setHydrated] = useState(false)
-  const [usernameAvailability, setUsernameAvailability] = useState<Availability>({ status: 'idle', message: null })
-  const [emailAvailability, setEmailAvailability] = useState<Availability>({ status: 'idle', message: null })
-  const [lastUsernameAvailabilityResponse, setLastUsernameAvailabilityResponse] = useState<AvailabilityResponse | null>(null)
-  const [lastEmailAvailabilityResponse, setLastEmailAvailabilityResponse] = useState<AvailabilityResponse | null>(null)
+  const [submitAttempted, setSubmitAttempted] = useState(false)
+  const [usernameField, setUsernameField] = useState<AvailabilityFieldState>(INITIAL_AVAILABILITY_FIELD_STATE)
+  const [fullNameField, setFullNameField] = useState<FieldState>(INITIAL_FIELD_STATE)
+  const [emailField, setEmailField] = useState<AvailabilityFieldState>(INITIAL_AVAILABILITY_FIELD_STATE)
+
   const usernameRequestId = useRef(0)
   const emailRequestId = useRef(0)
   const usernameRef = useRef<HTMLInputElement>(null)
   const fullNameRef = useRef<HTMLInputElement>(null)
   const emailRef = useRef<HTMLInputElement>(null)
-  const signupDebugEnabled = process.env.NODE_ENV === 'development' || DEBUG_FLAG
+
   const normalizedUsername = observedValues.username
   const normalizedFullName = observedValues.fullName
   const normalizedEmail = observedValues.email
-  const isUsernameFormatValid = USERNAME_PATTERN.test(normalizedUsername)
-  const isFullNameValid = normalizedFullName.length > 0
-  const isEmailFormatValid = EMAIL_PATTERN.test(normalizedEmail)
-  const hasUsernameInputValue = observedValues.usernameRaw.length > 0
-  const hasEmailInputValue = observedValues.emailRaw.length > 0
 
-  const logSignupDebug = useCallback((event: string, payload: Record<string, unknown>) => {
-    if (!signupDebugEnabled) return
-    console.log(`[signup-debug] ${event}`, payload)
-  }, [signupDebugEnabled])
-
-  const logInputDebug = useCallback((event: string, payload: Record<string, unknown>) => {
-    if (!signupDebugEnabled) return
-    console.log(`[signup-input] ${event}`, payload)
-  }, [signupDebugEnabled])
-
-  const syncFromDom = useCallback((source: string) => {
+  const syncFromDom = useCallback(() => {
     const usernameRaw = usernameRef.current?.value ?? ''
     const fullNameRaw = fullNameRef.current?.value ?? ''
     const emailRaw = emailRef.current?.value ?? ''
@@ -85,6 +97,7 @@ export default function SignUpPage() {
       fullName: fullNameRaw.trim(),
       email: emailRaw.trim().toLowerCase(),
     }
+
     setObservedValues((previous) => {
       if (
         previous.usernameRaw === nextValues.usernameRaw &&
@@ -95,22 +108,6 @@ export default function SignUpPage() {
       }
       return nextValues
     })
-    logInputDebug('sync-from-dom', { source, nextValues })
-  }, [logInputDebug])
-
-  const logAvailabilityDebug = useCallback((event: string, payload: Record<string, unknown>) => {
-    if (!signupDebugEnabled) return
-    console.log(`[signup-availability] ${event}`, payload)
-  }, [signupDebugEnabled])
-
-  const logSubmitDebug = useCallback((event: string, payload: Record<string, unknown>) => {
-    if (!signupDebugEnabled) return
-    console.log(`[signup-submit] ${event}`, payload)
-  }, [signupDebugEnabled])
-
-  useEffect(() => {
-    console.log('[signup-debug] client hydrated')
-    setHydrated(true)
   }, [])
 
   useEffect(() => {
@@ -124,363 +121,389 @@ export default function SignUpPage() {
     const initialUsername = params.get('username') ?? ''
     const initialFullName = params.get('fullName') ?? ''
     const initialEmail = params.get('email') ?? ''
-    const shouldUseCachedDraft = shouldRestoreDraft
-    const cachedRaw = shouldUseCachedDraft ? window.sessionStorage.getItem(SIGNUP_DRAFT_KEY) : null
-    const cached = cachedRaw ? JSON.parse(cachedRaw) : null
 
     if (!shouldRestoreDraft && !hasExplicitQueryValues) {
       window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY)
     }
 
-    const hydratedValues = {
-      username: initialUsername || (shouldUseCachedDraft ? cached?.username : '') || '',
-      fullName: initialFullName || (shouldUseCachedDraft ? cached?.fullName : '') || '',
-      email: initialEmail || (shouldUseCachedDraft ? cached?.email : '') || '',
+    let cached: { username?: string; fullName?: string; email?: string } | null = null
+    if (shouldRestoreDraft) {
+      const cachedRaw = window.sessionStorage.getItem(SIGNUP_DRAFT_KEY)
+      if (cachedRaw) {
+        try {
+          cached = JSON.parse(cachedRaw)
+        } catch {
+          cached = null
+        }
+      }
     }
+
+    const hydratedValues = {
+      username: initialUsername || cached?.username || '',
+      fullName: initialFullName || cached?.fullName || '',
+      email: initialEmail || cached?.email || '',
+    }
+
     if (usernameRef.current) usernameRef.current.value = hydratedValues.username
     if (fullNameRef.current) fullNameRef.current.value = hydratedValues.fullName
     if (emailRef.current) emailRef.current.value = hydratedValues.email
-    syncFromDom('mount-hydration')
-    logSignupDebug('hydrated-initial-values', {
-      shouldRestoreDraft,
-      hasExplicitQueryValues,
-      initialUsername,
-      initialFullName,
-      initialEmail,
-      cached,
-      hydratedValues,
-    })
-  }, [logSignupDebug, syncFromDom])
 
-  useEffect(() => {
-    syncFromDom('mount')
-    const intervalId = window.setInterval(() => {
-      syncFromDom('autofill-interval')
-    }, 300)
-
-    return () => {
-      window.clearInterval(intervalId)
-    }
+    syncFromDom()
   }, [syncFromDom])
 
-  useEffect(() => {
-    if (!normalizedUsername) {
-      setUsernameAvailability({ status: 'idle', message: null })
-      setLastUsernameAvailabilityResponse(null)
-      return
+  const validateFullNameField = useCallback((value: string) => {
+    const trimmed = value.trim()
+    if (!trimmed) {
+      setFullNameField((previous) => ({
+        ...previous,
+        status: 'invalid',
+        error: 'Enter your full name.',
+        lastValidatedValue: trimmed,
+      }))
+      return false
     }
 
-    if (!isUsernameFormatValid) {
-      setUsernameAvailability({
+    setFullNameField((previous) => ({
+      ...previous,
+      status: 'valid',
+      error: null,
+      lastValidatedValue: trimmed,
+    }))
+    return true
+  }, [])
+
+  const validateUsernameField = useCallback(async (value: string, trigger: 'blur' | 'debounce' | 'submit') => {
+    const trimmed = value.trim()
+
+    if (!trimmed) {
+      setUsernameField((previous) => ({
+        ...previous,
         status: 'invalid',
-        message: 'Use 3-24 characters: letters, numbers, or underscore.',
-      })
-      setLastUsernameAvailabilityResponse({
-        status: 'invalid',
-        available: false,
-        reason: 'Client-side username format validation failed.',
-      })
-      return
+        error: 'Enter a username.',
+        isChecking: false,
+        isAvailable: null,
+        lastValidatedValue: trimmed,
+      }))
+      return false
     }
 
-    const controller = new AbortController()
+    if (!USERNAME_PATTERN.test(trimmed)) {
+      setUsernameField((previous) => ({
+        ...previous,
+        status: 'invalid',
+        error: 'Use 3-24 characters: letters, numbers, or underscore.',
+        isChecking: false,
+        isAvailable: null,
+        lastValidatedValue: trimmed,
+      }))
+      return false
+    }
+
     usernameRequestId.current += 1
     const currentRequestId = usernameRequestId.current
-    setUsernameAvailability({ status: 'checking', message: null })
+    setUsernameField((previous) => ({
+      ...previous,
+      status: 'validating',
+      error: null,
+      isChecking: true,
+      isAvailable: null,
+    }))
 
-    const timeoutId = window.setTimeout(async () => {
-      const requestPath = `/api/auth/availability?type=username&value=${encodeURIComponent(normalizedUsername)}`
-      logAvailabilityDebug('username-request-start', {
-        requestId: currentRequestId,
-        type: 'username',
-        value: normalizedUsername,
-        requestPath,
-      })
-      try {
-        const response = await fetch(requestPath, {
-          signal: controller.signal,
-        })
+    const requestPath = `/api/auth/availability?type=username&value=${encodeURIComponent(trimmed)}`
 
-        const payload = (await response.json()) as AvailabilityResponse
-        setLastUsernameAvailabilityResponse(payload)
-        logAvailabilityDebug('username-response', {
-          requestId: currentRequestId,
-          statusCode: response.status,
-          ok: response.ok,
-          payload,
-        })
-        const reason = payload.reason ?? payload.message ?? 'Could not validate username right now.'
-        const payloadStatus = payload.status
+    try {
+      const response = await fetch(requestPath)
+      const payload = (await response.json()) as AvailabilityResponse
+      const reason = payload.reason ?? payload.message ?? 'Could not validate username right now.'
 
-        if (currentRequestId !== usernameRequestId.current) {
-          logAvailabilityDebug('username-response-ignored-stale', {
-            requestId: currentRequestId,
-            latestRequestId: usernameRequestId.current,
-          })
-          return
-        }
-        if (!response.ok) {
-          setUsernameAvailability({ status: 'error', message: reason })
-          logAvailabilityDebug('username-state-updated', { nextStatus: 'error', reason })
-          return
-        }
-
-        if (payloadStatus === 'invalid') {
-          setUsernameAvailability({ status: 'invalid', message: reason })
-          logAvailabilityDebug('username-state-updated', { nextStatus: 'invalid', reason })
-          return
-        }
-
-        if (payload.available) {
-          setUsernameAvailability({ status: 'available', message: reason })
-          logAvailabilityDebug('username-state-updated', { nextStatus: 'available', reason })
-          return
-        }
-
-        setUsernameAvailability({ status: 'unavailable', message: reason || 'That username is already taken.' })
-        logAvailabilityDebug('username-state-updated', { nextStatus: 'unavailable', reason })
-      } catch (availabilityError) {
-        if (controller.signal.aborted) {
-          logAvailabilityDebug('username-request-aborted', { requestId: currentRequestId })
-          return
-        }
-        setUsernameAvailability({ status: 'error', message: 'Could not validate username right now.' })
-        logAvailabilityDebug('username-request-failed', {
-          requestId: currentRequestId,
-          error: availabilityError instanceof Error ? availabilityError.message : String(availabilityError),
-        })
+      if (currentRequestId !== usernameRequestId.current) {
+        return false
       }
-    }, 450)
 
-    return () => {
-      controller.abort()
-      window.clearTimeout(timeoutId)
-    }
-  }, [isUsernameFormatValid, normalizedUsername])
+      if (!response.ok) {
+        setUsernameField((previous) => ({
+          ...previous,
+          status: 'invalid',
+          error: reason,
+          isChecking: false,
+          isAvailable: false,
+          lastValidatedValue: trimmed,
+        }))
+        return false
+      }
 
-  useEffect(() => {
-    if (!normalizedEmail) {
-      setEmailAvailability({ status: 'idle', message: null })
-      setLastEmailAvailabilityResponse(null)
-      return
-    }
+      if (payload.status === 'invalid') {
+        setUsernameField((previous) => ({
+          ...previous,
+          status: 'invalid',
+          error: reason,
+          isChecking: false,
+          isAvailable: false,
+          lastValidatedValue: trimmed,
+        }))
+        return false
+      }
 
-    if (!isEmailFormatValid) {
-      setEmailAvailability({ status: 'invalid', message: 'Enter a valid email address.' })
-      setLastEmailAvailabilityResponse({
+      if (!payload.available) {
+        setUsernameField((previous) => ({
+          ...previous,
+          status: 'invalid',
+          error: reason || 'That username is already taken.',
+          isChecking: false,
+          isAvailable: false,
+          lastValidatedValue: trimmed,
+        }))
+        return false
+      }
+
+      setUsernameField((previous) => ({
+        ...previous,
+        status: 'valid',
+        error: null,
+        isChecking: false,
+        isAvailable: true,
+        lastValidatedValue: trimmed,
+      }))
+      return true
+    } catch {
+      if (currentRequestId !== usernameRequestId.current) {
+        return false
+      }
+
+      setUsernameField((previous) => ({
+        ...previous,
         status: 'invalid',
-        available: false,
-        reason: 'Client-side email format validation failed.',
-      })
-      return
+        error: trigger === 'submit' ? 'Could not validate username right now.' : 'Could not validate username right now.',
+        isChecking: false,
+        isAvailable: false,
+        lastValidatedValue: trimmed,
+      }))
+      return false
+    }
+  }, [])
+
+  const validateEmailField = useCallback(async (value: string) => {
+    const trimmed = value.trim().toLowerCase()
+
+    if (!trimmed) {
+      setEmailField((previous) => ({
+        ...previous,
+        status: 'invalid',
+        error: 'Enter your email address.',
+        isChecking: false,
+        isAvailable: null,
+        lastValidatedValue: trimmed,
+      }))
+      return false
     }
 
-    const controller = new AbortController()
+    if (!EMAIL_PATTERN.test(trimmed)) {
+      setEmailField((previous) => ({
+        ...previous,
+        status: 'invalid',
+        error: 'Enter a valid email address.',
+        isChecking: false,
+        isAvailable: null,
+        lastValidatedValue: trimmed,
+      }))
+      return false
+    }
+
     emailRequestId.current += 1
     const currentRequestId = emailRequestId.current
-    setEmailAvailability({ status: 'checking', message: null })
+    setEmailField((previous) => ({
+      ...previous,
+      status: 'validating',
+      error: null,
+      isChecking: true,
+      isAvailable: null,
+    }))
 
-    const timeoutId = window.setTimeout(async () => {
-      const requestPath = `/api/auth/availability?type=email&value=${encodeURIComponent(normalizedEmail)}`
-      logAvailabilityDebug('email-request-start', {
-        requestId: currentRequestId,
-        type: 'email',
-        value: normalizedEmail,
-        requestPath,
-      })
-      try {
-        const response = await fetch(requestPath, {
-          signal: controller.signal,
-        })
+    const requestPath = `/api/auth/availability?type=email&value=${encodeURIComponent(trimmed)}`
 
-        const payload = (await response.json()) as AvailabilityResponse
-        setLastEmailAvailabilityResponse(payload)
-        logAvailabilityDebug('email-response', {
-          requestId: currentRequestId,
-          statusCode: response.status,
-          ok: response.ok,
-          payload,
-        })
-        const reason = payload.reason ?? payload.message ?? 'Could not validate email right now.'
-        const payloadStatus = payload.status
+    try {
+      const response = await fetch(requestPath)
+      const payload = (await response.json()) as AvailabilityResponse
+      const reason = payload.reason ?? payload.message ?? 'Could not validate email right now.'
 
-        if (currentRequestId !== emailRequestId.current) {
-          logAvailabilityDebug('email-response-ignored-stale', {
-            requestId: currentRequestId,
-            latestRequestId: emailRequestId.current,
-          })
-          return
-        }
-        if (!response.ok) {
-          setEmailAvailability({ status: 'error', message: reason })
-          logAvailabilityDebug('email-state-updated', { nextStatus: 'error', reason })
-          return
-        }
-
-        if (payloadStatus === 'invalid') {
-          setEmailAvailability({ status: 'invalid', message: reason })
-          logAvailabilityDebug('email-state-updated', { nextStatus: 'invalid', reason })
-          return
-        }
-
-        if (payload.available) {
-          setEmailAvailability({ status: 'available', message: reason })
-          logAvailabilityDebug('email-state-updated', { nextStatus: 'available', reason })
-          return
-        }
-
-        setEmailAvailability({ status: 'unavailable', message: reason || 'That email is already registered.' })
-        logAvailabilityDebug('email-state-updated', { nextStatus: 'unavailable', reason })
-      } catch (availabilityError) {
-        if (controller.signal.aborted) {
-          logAvailabilityDebug('email-request-aborted', { requestId: currentRequestId })
-          return
-        }
-        setEmailAvailability({ status: 'error', message: 'Could not validate email right now.' })
-        logAvailabilityDebug('email-request-failed', {
-          requestId: currentRequestId,
-          error: availabilityError instanceof Error ? availabilityError.message : String(availabilityError),
-        })
+      if (currentRequestId !== emailRequestId.current) {
+        return false
       }
-    }, 450)
 
-    return () => {
-      controller.abort()
-      window.clearTimeout(timeoutId)
+      if (!response.ok) {
+        setEmailField((previous) => ({
+          ...previous,
+          status: 'invalid',
+          error: reason,
+          isChecking: false,
+          isAvailable: false,
+          lastValidatedValue: trimmed,
+        }))
+        return false
+      }
+
+      if (payload.status === 'invalid') {
+        setEmailField((previous) => ({
+          ...previous,
+          status: 'invalid',
+          error: reason,
+          isChecking: false,
+          isAvailable: false,
+          lastValidatedValue: trimmed,
+        }))
+        return false
+      }
+
+      if (!payload.available) {
+        setEmailField((previous) => ({
+          ...previous,
+          status: 'invalid',
+          error: reason || 'That email is already registered.',
+          isChecking: false,
+          isAvailable: false,
+          lastValidatedValue: trimmed,
+        }))
+        return false
+      }
+
+      setEmailField((previous) => ({
+        ...previous,
+        status: 'valid',
+        error: null,
+        isChecking: false,
+        isAvailable: true,
+        lastValidatedValue: trimmed,
+      }))
+      return true
+    } catch {
+      if (currentRequestId !== emailRequestId.current) {
+        return false
+      }
+
+      setEmailField((previous) => ({
+        ...previous,
+        status: 'invalid',
+        error: 'Could not validate email right now.',
+        isChecking: false,
+        isAvailable: false,
+        lastValidatedValue: trimmed,
+      }))
+      return false
     }
-  }, [isEmailFormatValid, normalizedEmail])
+  }, [])
 
   useEffect(() => {
-    logSignupDebug('field-values-updated', {
-      ...observedValues,
-      normalizedUsername,
-      normalizedFullName,
-      normalizedEmail,
-    })
-  }, [logSignupDebug, normalizedEmail, normalizedFullName, normalizedUsername, observedValues])
+    if (usernameField.status !== 'typing') return
+
+    const timeoutId = window.setTimeout(() => {
+      void validateUsernameField(observedValues.username, 'debounce')
+    }, VALIDATION_DEBOUNCE_MS)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [observedValues.username, usernameField.status, validateUsernameField])
 
   useEffect(() => {
-    logSignupDebug('sync-validation-state', {
-      isUsernameFormatValid,
-      isFullNameValid,
-      isEmailFormatValid,
-    })
-  }, [isEmailFormatValid, isFullNameValid, isUsernameFormatValid])
+    if (fullNameField.status !== 'typing') return
+
+    const timeoutId = window.setTimeout(() => {
+      validateFullNameField(observedValues.fullName)
+    }, VALIDATION_DEBOUNCE_MS)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [fullNameField.status, observedValues.fullName, validateFullNameField])
 
   useEffect(() => {
-    logAvailabilityDebug('username-status-transition', {
-      status: usernameAvailability.status,
-      message: usernameAvailability.message,
-    })
-  }, [usernameAvailability.message, usernameAvailability.status])
+    if (emailField.status !== 'typing') return
 
-  useEffect(() => {
-    logAvailabilityDebug('email-status-transition', {
-      status: emailAvailability.status,
-      message: emailAvailability.message,
-    })
-  }, [emailAvailability.message, emailAvailability.status])
+    const timeoutId = window.setTimeout(() => {
+      void validateEmailField(observedValues.email)
+    }, VALIDATION_DEBOUNCE_MS)
 
-  const isUsernameReady = usernameAvailability.status === 'available'
-  const isEmailReady = emailAvailability.status === 'available'
+    return () => window.clearTimeout(timeoutId)
+  }, [emailField.status, observedValues.email, validateEmailField])
 
-  const disabledReason = useMemo(() => {
-    if (isSubmitting) return 'submission in progress'
-    if (normalizedUsername.length === 0) return 'username empty'
-    if (normalizedFullName.length === 0) return 'full name empty'
-    if (normalizedEmail.length === 0) return 'email empty'
-    if (!isUsernameFormatValid) return 'username invalid'
-    if (!isEmailFormatValid) return 'email invalid'
-    if (usernameAvailability.status === 'checking') return 'username availability still checking'
-    if (emailAvailability.status === 'checking') return 'email availability still checking'
-    if (usernameAvailability.status === 'unavailable') return 'username unavailable'
-    if (emailAvailability.status === 'unavailable') return 'email unavailable'
-    if (usernameAvailability.status === 'error') return 'username availability error'
-    if (emailAvailability.status === 'error') return 'email availability error'
-    if (!isUsernameReady) return 'username not ready'
-    if (!isEmailReady) return 'email not ready'
-    return 'ready'
-  }, [
-    emailAvailability.status,
-    isEmailFormatValid,
-    isEmailReady,
-    isSubmitting,
-    isUsernameFormatValid,
-    isUsernameReady,
-    normalizedEmail.length,
-    normalizedFullName.length,
-    normalizedUsername.length,
-    usernameAvailability.status,
-  ])
+  const onUsernameInput = useCallback(() => {
+    syncFromDom()
+    usernameRequestId.current += 1
+    setUsernameField((previous) => ({
+      ...previous,
+      touched: true,
+      dirty: true,
+      status: 'typing',
+      error: null,
+      isChecking: false,
+      isAvailable: null,
+    }))
+  }, [syncFromDom])
 
-  const canSubmit = disabledReason === 'ready'
+  const onFullNameInput = useCallback(() => {
+    syncFromDom()
+    setFullNameField((previous) => ({
+      ...previous,
+      touched: true,
+      dirty: true,
+      status: 'typing',
+      error: null,
+    }))
+  }, [syncFromDom])
 
-  useEffect(() => {
-    logSubmitDebug('canSubmit-recalculated', { canSubmit, disabledReason })
-  }, [canSubmit, disabledReason, logSubmitDebug])
+  const onEmailInput = useCallback(() => {
+    syncFromDom()
+    emailRequestId.current += 1
+    setEmailField((previous) => ({
+      ...previous,
+      touched: true,
+      dirty: true,
+      status: 'typing',
+      error: null,
+      isChecking: false,
+      isAvailable: null,
+    }))
+  }, [syncFromDom])
 
-  useEffect(() => {
-    logSubmitDebug('submit-state-evaluated', {
-      canSubmit,
-      isSubmitting,
-      disabledReason,
-      isUsernameReady,
-      isEmailReady,
-      usernameStatus: usernameAvailability.status,
-      emailStatus: emailAvailability.status,
-      username: normalizedUsername,
-      fullName: normalizedFullName,
-      email: normalizedEmail,
-      isUsernameFormatValid,
-      isFullNameValid,
-      isEmailFormatValid,
-    })
-  }, [
-    canSubmit,
-    disabledReason,
-    emailAvailability.status,
-    isEmailFormatValid,
-    isFullNameValid,
-    isEmailReady,
-    isSubmitting,
-    isUsernameFormatValid,
-    isUsernameReady,
-    normalizedEmail,
-    normalizedFullName,
-    normalizedUsername,
-    usernameAvailability.status,
-  ])
+  const canSubmit = useMemo(() => {
+    return (
+      !isSubmitting &&
+      usernameField.status === 'valid' &&
+      fullNameField.status === 'valid' &&
+      emailField.status === 'valid' &&
+      !usernameField.isChecking &&
+      !emailField.isChecking
+    )
+  }, [emailField.isChecking, emailField.status, fullNameField.status, isSubmitting, usernameField.isChecking, usernameField.status])
+
+  const shouldShowUsernameError = usernameField.status === 'invalid' && usernameField.error && (submitAttempted || usernameField.blurred)
+  const shouldShowFullNameError = fullNameField.status === 'invalid' && fullNameField.error && (submitAttempted || fullNameField.blurred)
+  const shouldShowEmailError = emailField.status === 'invalid' && emailField.error && (submitAttempted || emailField.blurred)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    const submitValues = observedValues
-    logSubmitDebug('submit-attempt', {
-      canSubmit,
-      disabledReason,
-      isSubmitting,
-      payload: {
-        username: submitValues.username,
-        fullName: submitValues.fullName,
-        email: submitValues.email,
-      },
-    })
+    setSubmitAttempted(true)
+    setError(null)
 
-    if (!canSubmit) {
-      logSubmitDebug('submit-blocked', { disabledReason })
+    setUsernameField((previous) => ({ ...previous, touched: true, blurred: true }))
+    setFullNameField((previous) => ({ ...previous, touched: true, blurred: true }))
+    setEmailField((previous) => ({ ...previous, touched: true, blurred: true }))
+
+    const [isUsernameValid, isEmailValid] = await Promise.all([
+      validateUsernameField(observedValues.username, 'submit'),
+      validateEmailField(observedValues.email),
+    ])
+    const isFullNameValid = validateFullNameField(observedValues.fullName)
+
+    if (!isUsernameValid || !isFullNameValid || !isEmailValid) {
       return
     }
 
     setIsSubmitting(true)
-    setError(null)
 
     try {
       const supabase = createClient()
       const payload = {
-        username: submitValues.username,
-        fullName: submitValues.fullName,
-        email: submitValues.email,
+        username: observedValues.username,
+        fullName: observedValues.fullName,
+        email: observedValues.email,
       }
-      logSubmitDebug('submission-started', payload)
 
       const { error: signUpError } = await supabase.auth.signInWithOtp({
         email: payload.email,
@@ -495,15 +518,9 @@ export default function SignUpPage() {
       })
 
       if (signUpError) {
-        logSubmitDebug('submission-failed', {
-          message: signUpError.message,
-          code: signUpError.code,
-          name: signUpError.name,
-        })
         setError(signUpError.message)
         return
       }
-      logSubmitDebug('submission-succeeded', { email: payload.email, username: payload.username })
 
       if (typeof window !== 'undefined') {
         window.sessionStorage.setItem(SIGNUP_DRAFT_KEY, JSON.stringify(payload))
@@ -517,11 +534,7 @@ export default function SignUpPage() {
       })
 
       router.push(`/auth/verify-otp?${query.toString()}`)
-      logSubmitDebug('submission-navigation', { destination: `/auth/verify-otp?${query.toString()}` })
-    } catch (submitError) {
-      logSubmitDebug('submission-exception', {
-        error: submitError instanceof Error ? submitError.message : String(submitError),
-      })
+    } catch {
       setError('Something went wrong while creating your account. Please try again.')
     } finally {
       setIsSubmitting(false)
@@ -543,74 +556,54 @@ export default function SignUpPage() {
       <form onSubmit={handleSubmit} className="mt-8 space-y-6" noValidate autoComplete="off">
         <input type="text" name="fake_username" autoComplete="username" className="hidden" tabIndex={-1} />
         <input type="password" name="fake_password" autoComplete="new-password" className="hidden" tabIndex={-1} />
+
         <div>
           <label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Username</label>
           <div className="relative">
             <input
               ref={usernameRef}
-              className={`tsm-input pr-10 ${fieldStatusClass(usernameAvailability.status)}`}
+              className={`tsm-input pr-10 ${fieldStatusClass(usernameField)}`}
               type="text"
               name="signup_username_input"
-              onChange={(e) => {
-                logInputDebug('react-onChange-fired', { field: 'username', value: e.target.value })
-                syncFromDom('username-onChange')
-              }}
-              onInput={(e) => {
-                logInputDebug('react-onInput-fired', { field: 'username', value: e.currentTarget.value })
-                syncFromDom('username-onInput')
-              }}
-              onFocus={() => {
-                syncFromDom('username-onFocus')
+              onChange={onUsernameInput}
+              onInput={onUsernameInput}
+              onBlur={() => {
+                syncFromDom()
+                setUsernameField((previous) => ({ ...previous, touched: true, blurred: true }))
+                void validateUsernameField(usernameRef.current?.value ?? '', 'blur')
               }}
               required
               disabled={isSubmitting}
               autoComplete="off"
             />
             <div className="pointer-events-none absolute right-2 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center">
-              {usernameAvailability.status === 'checking' && <Spinner className="size-4 text-[#00152a]" />}
-              {usernameAvailability.status === 'available' && <CheckCircle2 className="size-4 text-[#0c7a43]" />}
-              {(usernameAvailability.status === 'invalid' ||
-                usernameAvailability.status === 'unavailable' ||
-                usernameAvailability.status === 'error') && <AlertCircle className="size-4 text-red-600" />}
+              {(usernameField.isChecking || usernameField.status === 'validating') && <Spinner className="size-4 text-[#00152a]" />}
+              {usernameField.status === 'valid' && usernameField.isAvailable && <CheckCircle2 className="size-4 text-[#0c7a43]" />}
+              {usernameField.status === 'invalid' && (submitAttempted || usernameField.blurred) && <AlertCircle className="size-4 text-red-600" />}
             </div>
           </div>
-          {signupDebugEnabled ? (
-            <p className="mt-1 text-[11px] text-[#6b7280]">
-              dom: {JSON.stringify(usernameRef.current?.value ?? '')} | computed: {JSON.stringify(observedValues.username)}
-            </p>
-          ) : null}
-          {hasUsernameInputValue && usernameAvailability.message && usernameAvailability.status !== 'available' ? (
-            <p className="mt-2 text-sm text-red-700">{usernameAvailability.message}</p>
-          ) : null}
+          {shouldShowUsernameError ? <p className="mt-2 text-sm text-red-700">{usernameField.error}</p> : null}
         </div>
 
         <div>
           <label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Full name</label>
           <input
             ref={fullNameRef}
-            className="tsm-input"
+            className={`tsm-input ${fieldStatusClass({ status: fullNameField.status })}`}
             type="text"
             name="signup_full_name_input"
-            onChange={(e) => {
-              logInputDebug('react-onChange-fired', { field: 'fullName', value: e.target.value })
-              syncFromDom('fullName-onChange')
-            }}
-            onInput={(e) => {
-              logInputDebug('react-onInput-fired', { field: 'fullName', value: e.currentTarget.value })
-              syncFromDom('fullName-onInput')
-            }}
-            onFocus={() => {
-              syncFromDom('fullName-onFocus')
+            onChange={onFullNameInput}
+            onInput={onFullNameInput}
+            onBlur={() => {
+              syncFromDom()
+              setFullNameField((previous) => ({ ...previous, touched: true, blurred: true }))
+              validateFullNameField(fullNameRef.current?.value ?? '')
             }}
             required
             disabled={isSubmitting}
             autoComplete="off"
           />
-          {signupDebugEnabled ? (
-            <p className="mt-1 text-[11px] text-[#6b7280]">
-              dom: {JSON.stringify(fullNameRef.current?.value ?? '')} | computed: {JSON.stringify(observedValues.fullName)}
-            </p>
-          ) : null}
+          {shouldShowFullNameError ? <p className="mt-2 text-sm text-red-700">{fullNameField.error}</p> : null}
         </div>
 
         <div>
@@ -618,40 +611,27 @@ export default function SignUpPage() {
           <div className="relative">
             <input
               ref={emailRef}
-              className={`tsm-input pr-10 ${fieldStatusClass(emailAvailability.status)}`}
+              className={`tsm-input pr-10 ${fieldStatusClass(emailField)}`}
               type="email"
               name="signup_email_input"
-              onChange={(e) => {
-                logInputDebug('react-onChange-fired', { field: 'email', value: e.target.value })
-                syncFromDom('email-onChange')
-              }}
-              onInput={(e) => {
-                logInputDebug('react-onInput-fired', { field: 'email', value: e.currentTarget.value })
-                syncFromDom('email-onInput')
-              }}
-              onFocus={() => {
-                syncFromDom('email-onFocus')
+              onChange={onEmailInput}
+              onInput={onEmailInput}
+              onBlur={() => {
+                syncFromDom()
+                setEmailField((previous) => ({ ...previous, touched: true, blurred: true }))
+                void validateEmailField(emailRef.current?.value ?? '')
               }}
               required
               disabled={isSubmitting}
               autoComplete="off"
             />
             <div className="pointer-events-none absolute right-2 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center">
-              {emailAvailability.status === 'checking' && <Spinner className="size-4 text-[#00152a]" />}
-              {emailAvailability.status === 'available' && <CheckCircle2 className="size-4 text-[#0c7a43]" />}
-              {(emailAvailability.status === 'invalid' ||
-                emailAvailability.status === 'unavailable' ||
-                emailAvailability.status === 'error') && <AlertCircle className="size-4 text-red-600" />}
+              {(emailField.isChecking || emailField.status === 'validating') && <Spinner className="size-4 text-[#00152a]" />}
+              {emailField.status === 'valid' && emailField.isAvailable && <CheckCircle2 className="size-4 text-[#0c7a43]" />}
+              {emailField.status === 'invalid' && (submitAttempted || emailField.blurred) && <AlertCircle className="size-4 text-red-600" />}
             </div>
           </div>
-          {signupDebugEnabled ? (
-            <p className="mt-1 text-[11px] text-[#6b7280]">
-              dom: {JSON.stringify(emailRef.current?.value ?? '')} | computed: {JSON.stringify(observedValues.email)}
-            </p>
-          ) : null}
-          {hasEmailInputValue && emailAvailability.message && emailAvailability.status !== 'available' ? (
-            <p className="mt-2 text-sm text-red-700">{emailAvailability.message}</p>
-          ) : null}
+          {shouldShowEmailError ? <p className="mt-2 text-sm text-red-700">{emailField.error}</p> : null}
         </div>
 
         {error && <p className="text-sm text-red-700">{error}</p>}
@@ -672,40 +652,6 @@ export default function SignUpPage() {
           )}
         </button>
       </form>
-
-      {signupDebugEnabled ? (
-        <details className="mt-6 rounded-sm border border-[#c3c6ce] bg-[#f8fafc] p-4">
-          <summary className="cursor-pointer font-label text-xs uppercase tracking-widest text-[#00152a]">
-            Temporary sign-up debug panel (dev-only)
-          </summary>
-          <div className="mt-4 space-y-3 text-xs text-[#1f2937]">
-            <p><strong>username value:</strong> {JSON.stringify(observedValues.username)}</p>
-            <p><strong>fullName value:</strong> {JSON.stringify(observedValues.fullName)}</p>
-            <p><strong>email value:</strong> {JSON.stringify(observedValues.email)}</p>
-            <p><strong>username raw:</strong> {JSON.stringify(observedValues.usernameRaw)}</p>
-            <p><strong>fullName raw:</strong> {JSON.stringify(observedValues.fullNameRaw)}</p>
-            <p><strong>email raw:</strong> {JSON.stringify(observedValues.emailRaw)}</p>
-            <p><strong>hydrated:</strong> {JSON.stringify(hydrated)}</p>
-            <p><strong>username dom:</strong> {JSON.stringify(usernameRef.current?.value ?? '')}</p>
-            <p><strong>fullName dom:</strong> {JSON.stringify(fullNameRef.current?.value ?? '')}</p>
-            <p><strong>email dom:</strong> {JSON.stringify(emailRef.current?.value ?? '')}</p>
-            <p><strong>username format valid:</strong> {String(isUsernameFormatValid)}</p>
-            <p><strong>fullName valid:</strong> {String(isFullNameValid)}</p>
-            <p><strong>email format valid:</strong> {String(isEmailFormatValid)}</p>
-            <p><strong>usernameStatus:</strong> {usernameAvailability.status}</p>
-            <p><strong>emailStatus:</strong> {emailAvailability.status}</p>
-            <p><strong>usernameError:</strong> {usernameAvailability.message ?? 'null'}</p>
-            <p><strong>emailError:</strong> {emailAvailability.message ?? 'null'}</p>
-            <p><strong>canSubmit:</strong> {String(canSubmit)}</p>
-            <p><strong>isSubmitting:</strong> {String(isSubmitting)}</p>
-            <p><strong>disabledReason:</strong> {disabledReason}</p>
-            <p className="font-semibold">last username availability response</p>
-            <pre className="overflow-x-auto rounded bg-white p-2">{JSON.stringify(lastUsernameAvailabilityResponse, null, 2)}</pre>
-            <p className="font-semibold">last email availability response</p>
-            <pre className="overflow-x-auto rounded bg-white p-2">{JSON.stringify(lastEmailAvailabilityResponse, null, 2)}</pre>
-          </div>
-        </details>
-      ) : null}
 
       <p className="mt-8 border-t border-[#c3c6ce55] pt-6 text-center font-body text-sm text-[#43474d]">
         Already have an account?
