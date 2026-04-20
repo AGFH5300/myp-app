@@ -43,6 +43,7 @@ export default function SignUpPage() {
   })
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [hydrated, setHydrated] = useState(false)
   const [usernameAvailability, setUsernameAvailability] = useState<Availability>({ status: 'idle', message: null })
   const [emailAvailability, setEmailAvailability] = useState<Availability>({ status: 'idle', message: null })
   const [lastUsernameAvailabilityResponse, setLastUsernameAvailabilityResponse] = useState<AvailabilityResponse | null>(null)
@@ -106,6 +107,11 @@ export default function SignUpPage() {
     if (!signupDebugEnabled) return
     console.log(`[signup-submit] ${event}`, payload)
   }, [signupDebugEnabled])
+
+  useEffect(() => {
+    console.log('[signup-debug] client hydrated')
+    setHydrated(true)
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -670,6 +676,7 @@ export default function SignUpPage() {
             <p><strong>username raw:</strong> {JSON.stringify(observedValues.usernameRaw)}</p>
             <p><strong>fullName raw:</strong> {JSON.stringify(observedValues.fullNameRaw)}</p>
             <p><strong>email raw:</strong> {JSON.stringify(observedValues.emailRaw)}</p>
+            <p><strong>hydrated:</strong> {JSON.stringify(hydrated)}</p>
             <p><strong>username dom:</strong> {JSON.stringify(usernameRef.current?.value ?? '')}</p>
             <p><strong>fullName dom:</strong> {JSON.stringify(fullNameRef.current?.value ?? '')}</p>
             <p><strong>email dom:</strong> {JSON.stringify(emailRef.current?.value ?? '')}</p>
