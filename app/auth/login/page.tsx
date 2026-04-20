@@ -1,10 +1,12 @@
 "use client"
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { AuthShell } from '@/components/auth-shell'
+
+const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -12,6 +14,12 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY)
+    }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
