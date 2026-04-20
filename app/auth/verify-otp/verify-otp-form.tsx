@@ -21,15 +21,7 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
   const normalizedEmail = email.trim().toLowerCase()
   const canVerify = otpCode.length === 6 && !loading
 
-  const fallbackToSignUp = useMemo(() => {
-    const query = new URLSearchParams({
-      email: normalizedEmail,
-      username: username.trim(),
-      fullName: fullName.trim(),
-    })
-
-    return `/auth/sign-up?${query.toString()}`
-  }, [fullName, normalizedEmail, username])
+  const fallbackToSignUp = useMemo(() => '/auth/sign-up?restoreDraft=1', [])
 
   async function handleVerify(e: React.FormEvent) {
     e.preventDefault()

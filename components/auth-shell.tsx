@@ -1,5 +1,9 @@
+"use client"
+
 import Link from 'next/link'
 import { BrandWordmark } from '@/components/brand-wordmark'
+
+const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
 
 type AuthShellProps = {
   eyebrow: string
@@ -38,7 +42,15 @@ export function AuthShell({ eyebrow, title, description, quote, attribution, chi
             <div className="mb-8 flex items-center justify-between">
               <BrandWordmark className="text-xl" />
               {backToHome ? (
-                <Link href="/" className="font-body text-sm text-[#735b2b] underline-offset-4 hover:underline">
+                <Link
+                  href="/"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY)
+                    }
+                  }}
+                  className="font-body text-sm text-[#735b2b] underline-offset-4 hover:underline"
+                >
                   Back to home
                 </Link>
               ) : null}

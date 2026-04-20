@@ -119,22 +119,31 @@ export default function SignUpPage() {
     }
 
     const params = new URLSearchParams(window.location.search)
+    const shouldRestoreDraft = params.get('restoreDraft') === '1'
+    const hasExplicitQueryValues = params.has('username') || params.has('fullName') || params.has('email')
     const initialUsername = params.get('username') ?? ''
     const initialFullName = params.get('fullName') ?? ''
     const initialEmail = params.get('email') ?? ''
-    const cachedRaw = window.sessionStorage.getItem(SIGNUP_DRAFT_KEY)
+    const shouldUseCachedDraft = shouldRestoreDraft
+    const cachedRaw = shouldUseCachedDraft ? window.sessionStorage.getItem(SIGNUP_DRAFT_KEY) : null
     const cached = cachedRaw ? JSON.parse(cachedRaw) : null
 
+    if (!shouldRestoreDraft && !hasExplicitQueryValues) {
+      window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY)
+    }
+
     const hydratedValues = {
-      username: initialUsername || cached?.username || '',
-      fullName: initialFullName || cached?.fullName || '',
-      email: initialEmail || cached?.email || '',
+      username: initialUsername || (shouldUseCachedDraft ? cached?.username : '') || '',
+      fullName: initialFullName || (shouldUseCachedDraft ? cached?.fullName : '') || '',
+      email: initialEmail || (shouldUseCachedDraft ? cached?.email : '') || '',
     }
     if (usernameRef.current) usernameRef.current.value = hydratedValues.username
     if (fullNameRef.current) fullNameRef.current.value = hydratedValues.fullName
     if (emailRef.current) emailRef.current.value = hydratedValues.email
     syncFromDom('mount-hydration')
     logSignupDebug('hydrated-initial-values', {
+      shouldRestoreDraft,
+      hasExplicitQueryValues,
       initialUsername,
       initialFullName,
       initialEmail,
@@ -700,7 +709,15 @@ export default function SignUpPage() {
 
       <p className="mt-8 border-t border-[#c3c6ce55] pt-6 text-center font-body text-sm text-[#43474d]">
         Already have an account?
-        <Link href="/auth/login" className="ml-1 font-semibold text-[#735b2b]">
+        <Link
+          href="/auth/login"
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY)
+            }
+          }}
+          className="ml-1 font-semibold text-[#735b2b]"
+        >
           Log In
         </Link>
       </p>

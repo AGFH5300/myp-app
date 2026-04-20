@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 type Subject = { id: string; name: string }
+const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
 
 export default function OnboardingPage() {
   const [mypYear, setMypYear] = useState('5')
@@ -55,6 +56,10 @@ export default function OnboardingPage() {
       setError(profileError.message)
       setLoading(false)
       return
+    }
+
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY)
     }
 
     router.push('/dashboard')
