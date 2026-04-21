@@ -22,7 +22,7 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
 
   const normalizedEmail = email.trim().toLowerCase()
   const sanitizedOtpCode = otpCode.replace(/\s/g, '')
-  const canVerify = /^\d{6}$/.test(otpCode) && !loading
+  const canVerify = /^\d{6}$/.test(sanitizedOtpCode) && !loading
 
   const fallbackToSignUp = useMemo(() => '/auth/sign-up?restoreDraft=1', [])
 
@@ -79,18 +79,16 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
     return chars
   }
 
-  const handleOtpPaste = (event: React.ClipboardEvent<HTMLElement>, fallbackIndex: number) => {
+  const handleOtpPaste = (event: React.ClipboardEvent<HTMLInputElement>, index: number) => {
     event.preventDefault()
+    event.stopPropagation()
 
     if (loading) {
       return
     }
 
-    const activeInput = document.activeElement as HTMLInputElement | null
-    const focusedIndex = inputRefs.current.findIndex((node) => node === activeInput)
-    const pasteIndex = focusedIndex >= 0 ? focusedIndex : fallbackIndex
     const pastedText = event.clipboardData.getData('text')
-    mergePastedDigits(pasteIndex, pastedText)
+    mergePastedDigits(index, pastedText)
   }
 
   async function handleVerify(e: React.FormEvent) {
@@ -177,9 +175,6 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
           <div
             className="grid w-full gap-2"
             style={{ gridTemplateColumns: `repeat(${OTP_LENGTH}, minmax(0, 1fr))` }}
-            onPaste={(event) => {
-              handleOtpPaste(event, 0)
-            }}
           >
             {Array.from({ length: OTP_LENGTH }).map((_, index) => {
               const slotValue = /\d/.test(otpCode[index] ?? '') ? otpCode[index] : ''
@@ -295,6 +290,7 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
                     focusIndex(index + 1)
                   }}
                   onPaste={(event) => {
+                    event.stopPropagation()
                     handleOtpPaste(event, index)
                   }}
                 />
