@@ -24,6 +24,7 @@ type FieldState = {
   status: FieldStatus
   error: string | null
   lastValidatedValue: string
+  lastValidatedAt: number | null
 }
 
 type AvailabilityFieldState = FieldState & {
@@ -35,6 +36,16 @@ const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,24}$/
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const VALIDATION_DEBOUNCE_MS = 600
+const AVAILABILITY_CACHE_SUCCESS_TTL_MS = 4 * 60 * 1000
+const AVAILABILITY_CACHE_ERROR_TTL_MS = 8 * 1000
+
+type CachedAvailabilityResult = {
+  status: 'available' | 'invalid' | 'unavailable' | 'error'
+  message: string
+  available: boolean
+  checkedAt: number
+  value: string
+}
 
 function fieldStatusClass({ status, isChecking, isAvailable }: { status: FieldStatus; isChecking?: boolean; isAvailable?: boolean | null }) {
   if (isChecking || status === 'validating') return ''
@@ -50,6 +61,7 @@ const INITIAL_FIELD_STATE: FieldState = {
   status: 'untouched',
   error: null,
   lastValidatedValue: '',
+  lastValidatedAt: null,
 }
 
 const INITIAL_AVAILABILITY_FIELD_STATE: AvailabilityFieldState = {
@@ -77,6 +89,7 @@ export default function SignUpPage() {
 
   const usernameRequestId = useRef(0)
   const emailRequestId = useRef(0)
+  const availabilityCacheRef = useRef<Map<string, CachedAvailabilityResult>>(new Map())
   const usernameRef = useRef<HTMLInputElement>(null)
   const fullNameRef = useRef<HTMLInputElement>(null)
   const emailRef = useRef<HTMLInputElement>(null)
@@ -84,6 +97,21 @@ export default function SignUpPage() {
   const normalizedUsername = observedValues.username
   const normalizedFullName = observedValues.fullName
   const normalizedEmail = observedValues.email
+
+  const getCachedAvailabilityResult = useCallback((cacheKey: string) => {
+    const cached = availabilityCacheRef.current.get(cacheKey)
+    if (!cached) return null
+    const ttl = cached.status === 'error' ? AVAILABILITY_CACHE_ERROR_TTL_MS : AVAILABILITY_CACHE_SUCCESS_TTL_MS
+    if (Date.now() - cached.checkedAt > ttl) {
+      availabilityCacheRef.current.delete(cacheKey)
+      return null
+    }
+    return cached
+  }, [])
+
+  const setCachedAvailabilityResult = useCallback((cacheKey: string, result: CachedAvailabilityResult) => {
+    availabilityCacheRef.current.set(cacheKey, result)
+  }, [])
 
   const syncFromDom = useCallback(() => {
     const usernameRaw = usernameRef.current?.value ?? ''
@@ -172,8 +200,9 @@ export default function SignUpPage() {
     return true
   }, [])
 
-  const validateUsernameField = useCallback(async (value: string, trigger: 'blur' | 'debounce' | 'submit') => {
+  const validateUsernameField = useCallback(async (value: string, trigger: 'blur' | 'debounce' | 'submit' | 'restore') => {
     const trimmed = value.trim()
+    const checkedAt = Date.now()
 
     if (!trimmed) {
       setUsernameField((previous) => ({
@@ -183,6 +212,7 @@ export default function SignUpPage() {
         isChecking: false,
         isAvailable: null,
         lastValidatedValue: trimmed,
+        lastValidatedAt: checkedAt,
       }))
       return false
     }
@@ -195,8 +225,29 @@ export default function SignUpPage() {
         isChecking: false,
         isAvailable: null,
         lastValidatedValue: trimmed,
+        lastValidatedAt: checkedAt,
       }))
       return false
+    }
+
+    if (trigger !== 'submit' && trimmed === usernameField.lastValidatedValue && usernameField.lastValidatedAt) {
+      return usernameField.status === 'valid'
+    }
+
+    const cacheKey = `username:${trimmed}`
+    const cached = getCachedAvailabilityResult(cacheKey)
+    if (cached) {
+      const isValid = cached.status === 'available' && cached.available
+      setUsernameField((previous) => ({
+        ...previous,
+        status: isValid ? 'valid' : 'invalid',
+        error: isValid ? null : cached.message,
+        isChecking: false,
+        isAvailable: cached.available,
+        lastValidatedValue: trimmed,
+        lastValidatedAt: cached.checkedAt,
+      }))
+      return isValid
     }
 
     usernameRequestId.current += 1
@@ -221,6 +272,13 @@ export default function SignUpPage() {
       }
 
       if (!response.ok) {
+        setCachedAvailabilityResult(cacheKey, {
+          status: payload.status === 'invalid' ? 'invalid' : 'error',
+          message: reason,
+          available: false,
+          checkedAt: Date.now(),
+          value: trimmed,
+        })
         setUsernameField((previous) => ({
           ...previous,
           status: 'invalid',
@@ -228,11 +286,19 @@ export default function SignUpPage() {
           isChecking: false,
           isAvailable: false,
           lastValidatedValue: trimmed,
+          lastValidatedAt: Date.now(),
         }))
         return false
       }
 
       if (payload.status === 'invalid') {
+        setCachedAvailabilityResult(cacheKey, {
+          status: 'invalid',
+          message: reason,
+          available: false,
+          checkedAt: Date.now(),
+          value: trimmed,
+        })
         setUsernameField((previous) => ({
           ...previous,
           status: 'invalid',
@@ -240,22 +306,39 @@ export default function SignUpPage() {
           isChecking: false,
           isAvailable: false,
           lastValidatedValue: trimmed,
+          lastValidatedAt: Date.now(),
         }))
         return false
       }
 
       if (!payload.available) {
+        const unavailableMessage = reason || 'That username is already taken.'
+        setCachedAvailabilityResult(cacheKey, {
+          status: 'unavailable',
+          message: unavailableMessage,
+          available: false,
+          checkedAt: Date.now(),
+          value: trimmed,
+        })
         setUsernameField((previous) => ({
           ...previous,
           status: 'invalid',
-          error: reason || 'That username is already taken.',
+          error: unavailableMessage,
           isChecking: false,
           isAvailable: false,
           lastValidatedValue: trimmed,
+          lastValidatedAt: Date.now(),
         }))
         return false
       }
 
+      setCachedAvailabilityResult(cacheKey, {
+        status: 'available',
+        message: '',
+        available: true,
+        checkedAt: Date.now(),
+        value: trimmed,
+      })
       setUsernameField((previous) => ({
         ...previous,
         status: 'valid',
@@ -263,6 +346,7 @@ export default function SignUpPage() {
         isChecking: false,
         isAvailable: true,
         lastValidatedValue: trimmed,
+        lastValidatedAt: Date.now(),
       }))
       return true
     } catch {
@@ -270,20 +354,30 @@ export default function SignUpPage() {
         return false
       }
 
+      const genericError = 'Could not validate username right now.'
+      setCachedAvailabilityResult(cacheKey, {
+        status: 'error',
+        message: genericError,
+        available: false,
+        checkedAt: Date.now(),
+        value: trimmed,
+      })
       setUsernameField((previous) => ({
         ...previous,
         status: 'invalid',
-        error: trigger === 'submit' ? 'Could not validate username right now.' : 'Could not validate username right now.',
+        error: genericError,
         isChecking: false,
         isAvailable: false,
         lastValidatedValue: trimmed,
+        lastValidatedAt: Date.now(),
       }))
       return false
     }
-  }, [])
+  }, [getCachedAvailabilityResult, setCachedAvailabilityResult, usernameField.lastValidatedAt, usernameField.lastValidatedValue, usernameField.status])
 
-  const validateEmailField = useCallback(async (value: string) => {
+  const validateEmailField = useCallback(async (value: string, trigger: 'blur' | 'debounce' | 'submit' | 'restore') => {
     const trimmed = value.trim().toLowerCase()
+    const checkedAt = Date.now()
 
     if (!trimmed) {
       setEmailField((previous) => ({
@@ -293,6 +387,7 @@ export default function SignUpPage() {
         isChecking: false,
         isAvailable: null,
         lastValidatedValue: trimmed,
+        lastValidatedAt: checkedAt,
       }))
       return false
     }
@@ -305,8 +400,29 @@ export default function SignUpPage() {
         isChecking: false,
         isAvailable: null,
         lastValidatedValue: trimmed,
+        lastValidatedAt: checkedAt,
       }))
       return false
+    }
+
+    if (trigger !== 'submit' && trimmed === emailField.lastValidatedValue && emailField.lastValidatedAt) {
+      return emailField.status === 'valid'
+    }
+
+    const cacheKey = `email:${trimmed}`
+    const cached = getCachedAvailabilityResult(cacheKey)
+    if (cached) {
+      const isValid = cached.status === 'available' && cached.available
+      setEmailField((previous) => ({
+        ...previous,
+        status: isValid ? 'valid' : 'invalid',
+        error: isValid ? null : cached.message,
+        isChecking: false,
+        isAvailable: cached.available,
+        lastValidatedValue: trimmed,
+        lastValidatedAt: cached.checkedAt,
+      }))
+      return isValid
     }
 
     emailRequestId.current += 1
@@ -331,6 +447,13 @@ export default function SignUpPage() {
       }
 
       if (!response.ok) {
+        setCachedAvailabilityResult(cacheKey, {
+          status: payload.status === 'invalid' ? 'invalid' : 'error',
+          message: reason,
+          available: false,
+          checkedAt: Date.now(),
+          value: trimmed,
+        })
         setEmailField((previous) => ({
           ...previous,
           status: 'invalid',
@@ -338,11 +461,19 @@ export default function SignUpPage() {
           isChecking: false,
           isAvailable: false,
           lastValidatedValue: trimmed,
+          lastValidatedAt: Date.now(),
         }))
         return false
       }
 
       if (payload.status === 'invalid') {
+        setCachedAvailabilityResult(cacheKey, {
+          status: 'invalid',
+          message: reason,
+          available: false,
+          checkedAt: Date.now(),
+          value: trimmed,
+        })
         setEmailField((previous) => ({
           ...previous,
           status: 'invalid',
@@ -350,22 +481,39 @@ export default function SignUpPage() {
           isChecking: false,
           isAvailable: false,
           lastValidatedValue: trimmed,
+          lastValidatedAt: Date.now(),
         }))
         return false
       }
 
       if (!payload.available) {
+        const unavailableMessage = reason || 'That email is already registered.'
+        setCachedAvailabilityResult(cacheKey, {
+          status: 'unavailable',
+          message: unavailableMessage,
+          available: false,
+          checkedAt: Date.now(),
+          value: trimmed,
+        })
         setEmailField((previous) => ({
           ...previous,
           status: 'invalid',
-          error: reason || 'That email is already registered.',
+          error: unavailableMessage,
           isChecking: false,
           isAvailable: false,
           lastValidatedValue: trimmed,
+          lastValidatedAt: Date.now(),
         }))
         return false
       }
 
+      setCachedAvailabilityResult(cacheKey, {
+        status: 'available',
+        message: '',
+        available: true,
+        checkedAt: Date.now(),
+        value: trimmed,
+      })
       setEmailField((previous) => ({
         ...previous,
         status: 'valid',
@@ -373,6 +521,7 @@ export default function SignUpPage() {
         isChecking: false,
         isAvailable: true,
         lastValidatedValue: trimmed,
+        lastValidatedAt: Date.now(),
       }))
       return true
     } catch {
@@ -380,17 +529,26 @@ export default function SignUpPage() {
         return false
       }
 
+      const genericError = 'Could not validate email right now.'
+      setCachedAvailabilityResult(cacheKey, {
+        status: 'error',
+        message: genericError,
+        available: false,
+        checkedAt: Date.now(),
+        value: trimmed,
+      })
       setEmailField((previous) => ({
         ...previous,
         status: 'invalid',
-        error: 'Could not validate email right now.',
+        error: genericError,
         isChecking: false,
         isAvailable: false,
         lastValidatedValue: trimmed,
+        lastValidatedAt: Date.now(),
       }))
       return false
     }
-  }, [])
+  }, [emailField.lastValidatedAt, emailField.lastValidatedValue, emailField.status, getCachedAvailabilityResult, setCachedAvailabilityResult])
 
   useEffect(() => {
     if (usernameField.status !== 'typing') return
@@ -416,11 +574,21 @@ export default function SignUpPage() {
     if (emailField.status !== 'typing') return
 
     const timeoutId = window.setTimeout(() => {
-      void validateEmailField(observedValues.email)
+      void validateEmailField(observedValues.email, 'debounce')
     }, VALIDATION_DEBOUNCE_MS)
 
     return () => window.clearTimeout(timeoutId)
   }, [emailField.status, observedValues.email, validateEmailField])
+
+  useEffect(() => {
+    if (!normalizedUsername || usernameField.status !== 'untouched') return
+    void validateUsernameField(normalizedUsername, 'restore')
+  }, [normalizedUsername, usernameField.status, validateUsernameField])
+
+  useEffect(() => {
+    if (!normalizedEmail || emailField.status !== 'untouched') return
+    void validateEmailField(normalizedEmail, 'restore')
+  }, [emailField.status, normalizedEmail, validateEmailField])
 
   const onUsernameInput = useCallback(() => {
     syncFromDom()
@@ -487,7 +655,7 @@ export default function SignUpPage() {
 
     const [isUsernameValid, isEmailValid] = await Promise.all([
       validateUsernameField(observedValues.username, 'submit'),
-      validateEmailField(observedValues.email),
+      validateEmailField(observedValues.email, 'submit'),
     ])
     const isFullNameValid = validateFullNameField(observedValues.fullName)
 
@@ -619,7 +787,7 @@ export default function SignUpPage() {
               onBlur={() => {
                 syncFromDom()
                 setEmailField((previous) => ({ ...previous, touched: true, blurred: true }))
-                void validateEmailField(emailRef.current?.value ?? '')
+                void validateEmailField(emailRef.current?.value ?? '', 'blur')
               }}
               required
               disabled={isSubmitting}
@@ -645,7 +813,7 @@ export default function SignUpPage() {
           {isSubmitting ? (
             <>
               <Spinner className="size-4" />
-              <span>Sending verification code...</span>
+              <span>Creating your account...</span>
             </>
           ) : (
             'Create account'
