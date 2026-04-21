@@ -9,6 +9,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { createClient } from '@/lib/supabase/client'
 
 const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
+const OTP_LENGTH = 6
 
 export function VerifyOtpForm({ email, username, fullName }: { email: string; username: string; fullName: string }) {
   const router = useRouter()
@@ -19,7 +20,7 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
   const [notice, setNotice] = useState<string | null>(null)
 
   const normalizedEmail = email.trim().toLowerCase()
-  const canVerify = otpCode.length === 6 && !loading
+  const canVerify = otpCode.length === OTP_LENGTH && !loading
 
   const fallbackToSignUp = useMemo(() => '/auth/sign-up?restoreDraft=1', [])
 
@@ -85,7 +86,7 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
       return
     }
 
-    setNotice('A new 6-digit code has been sent to your email.')
+    setNotice(`A new ${OTP_LENGTH}-digit code has been sent to your email.`)
     setResending(false)
   }
 
@@ -93,7 +94,7 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
     <AuthShell
       eyebrow="Email verification"
       title="Verify your email to continue sign-up."
-      description="Use the one-time 6-digit code sent to your inbox. After verification, you will set your password and be signed in automatically."
+      description={`Use the one-time ${OTP_LENGTH}-digit code sent to your inbox. After verification, you will set your password and be signed in automatically.`}
       backToHome
     >
       <h1 className="font-headline text-4xl text-[#00152a]">Verify email code</h1>
@@ -105,25 +106,25 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
         <div>
           <label className="mb-3 block font-label text-xs uppercase tracking-widest text-[#43474d]">Verification code</label>
           <InputOTP
-            maxLength={6}
+            maxLength={OTP_LENGTH}
             value={otpCode}
             onChange={(value) => {
-              setOtpCode(value.replace(/\D/g, '').slice(0, 6))
+              setOtpCode(value.replace(/\D/g, '').slice(0, OTP_LENGTH))
               setError(null)
             }}
             disabled={loading}
             containerClassName="justify-between"
             className="w-full"
-            pattern="\\d{6}"
+            pattern={`\\d{${OTP_LENGTH}}`}
             inputMode="numeric"
           >
-            <InputOTPGroup className="grid w-full grid-cols-6 gap-2">
-              <InputOTPSlot index={0} className="h-12 w-full rounded-sm border border-[#c3c6ce] bg-white text-base" />
-              <InputOTPSlot index={1} className="h-12 w-full rounded-sm border border-[#c3c6ce] bg-white text-base" />
-              <InputOTPSlot index={2} className="h-12 w-full rounded-sm border border-[#c3c6ce] bg-white text-base" />
-              <InputOTPSlot index={3} className="h-12 w-full rounded-sm border border-[#c3c6ce] bg-white text-base" />
-              <InputOTPSlot index={4} className="h-12 w-full rounded-sm border border-[#c3c6ce] bg-white text-base" />
-              <InputOTPSlot index={5} className="h-12 w-full rounded-sm border border-[#c3c6ce] bg-white text-base" />
+            <InputOTPGroup
+              className="grid w-full gap-2"
+              style={{ gridTemplateColumns: `repeat(${OTP_LENGTH}, minmax(0, 1fr))` }}
+            >
+              {Array.from({ length: OTP_LENGTH }).map((_, index) => (
+                <InputOTPSlot key={index} index={index} className="h-12 w-full rounded-sm border border-[#c3c6ce] bg-white text-base" />
+              ))}
             </InputOTPGroup>
           </InputOTP>
         </div>
