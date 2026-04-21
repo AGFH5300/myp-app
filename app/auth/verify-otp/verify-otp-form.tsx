@@ -2,27 +2,49 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { AuthShell } from '@/components/auth-shell'
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp'
 import { Spinner } from '@/components/ui/spinner'
 import { createClient } from '@/lib/supabase/client'
 
 const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
 const OTP_LENGTH = 6
+const EMPTY_OTP = ' '.repeat(OTP_LENGTH)
 
 export function VerifyOtpForm({ email, username, fullName }: { email: string; username: string; fullName: string }) {
   const router = useRouter()
-  const [otpCode, setOtpCode] = useState('')
+  const [otpCode, setOtpCode] = useState(EMPTY_OTP)
   const [loading, setLoading] = useState(false)
   const [resending, setResending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const inputRefs = useRef<Array<HTMLInputElement | null>>([])
 
   const normalizedEmail = email.trim().toLowerCase()
-  const canVerify = otpCode.length === OTP_LENGTH && !loading
+  const sanitizedOtpCode = otpCode.replace(/\s/g, '')
+  const canVerify = /^\d{6}$/.test(otpCode) && !loading
 
   const fallbackToSignUp = useMemo(() => '/auth/sign-up?restoreDraft=1', [])
+
+  const getOtpChars = () => otpCode.padEnd(OTP_LENGTH, ' ').slice(0, OTP_LENGTH).split('')
+
+  const focusIndex = (index: number) => {
+    const clampedIndex = Math.max(0, Math.min(index, OTP_LENGTH - 1))
+    const target = inputRefs.current[clampedIndex]
+    target?.focus()
+    target?.select()
+  }
+
+  const updateOtpChars = (nextChars: string[]) => {
+    setOtpCode(nextChars.join('').slice(0, OTP_LENGTH).padEnd(OTP_LENGTH, ' '))
+    setError(null)
+  }
+
+  const setDigitAt = (index: number, digit: string) => {
+    const chars = getOtpChars()
+    chars[index] = digit
+    updateOtpChars(chars)
+  }
 
   async function handleVerify(e: React.FormEvent) {
     e.preventDefault()
@@ -38,7 +60,7 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
     const supabase = createClient()
     const { error: verifyError } = await supabase.auth.verifyOtp({
       email: normalizedEmail,
-      token: otpCode,
+      token: sanitizedOtpCode,
       type: 'email',
     })
 
@@ -105,28 +127,153 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
       <form onSubmit={handleVerify} className="mt-8 space-y-6" noValidate>
         <div>
           <label className="mb-3 block font-label text-xs uppercase tracking-widest text-[#43474d]">Verification code</label>
-          <InputOTP
-            maxLength={OTP_LENGTH}
-            value={otpCode}
-            onChange={(value) => {
-              setOtpCode(value.replace(/\D/g, '').slice(0, OTP_LENGTH))
-              setError(null)
-            }}
-            disabled={loading}
-            containerClassName="justify-between"
-            className="w-full"
-            pattern={`\\d{${OTP_LENGTH}}`}
-            inputMode="numeric"
-          >
-            <InputOTPGroup
-              className="grid w-full gap-2"
-              style={{ gridTemplateColumns: `repeat(${OTP_LENGTH}, minmax(0, 1fr))` }}
-            >
-              {Array.from({ length: OTP_LENGTH }).map((_, index) => (
-                <InputOTPSlot key={index} index={index} className="h-12 w-full rounded-sm border border-[#c3c6ce] bg-white text-base" />
-              ))}
-            </InputOTPGroup>
-          </InputOTP>
+          <div className="grid w-full gap-2" style={{ gridTemplateColumns: `repeat(${OTP_LENGTH}, minmax(0, 1fr))` }}>
+            {Array.from({ length: OTP_LENGTH }).map((_, index) => {
+              const slotValue = /\d/.test(otpCode[index] ?? '') ? otpCode[index] : ''
+
+              return (
+                <input
+                  key={index}
+                  ref={(node) => {
+                    inputRefs.current[index] = node
+                  }}
+                  type="text"
+                  value={slotValue}
+                  disabled={loading}
+                  autoComplete={index === 0 ? 'one-time-code' : 'off'}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={OTP_LENGTH}
+                  aria-label={`Verification code digit ${index + 1}`}
+                  className="h-12 w-full rounded-sm border border-[#c3c6ce] bg-white text-center text-base disabled:cursor-not-allowed"
+                  onFocus={(event) => {
+                    event.currentTarget.select()
+                  }}
+                  onKeyDown={(event) => {
+                    if (loading) {
+                      return
+                    }
+
+                    const { key } = event
+
+                    if (key === 'ArrowLeft') {
+                      event.preventDefault()
+                      focusIndex(index - 1)
+                      return
+                    }
+
+                    if (key === 'ArrowRight') {
+                      event.preventDefault()
+                      focusIndex(index + 1)
+                      return
+                    }
+
+                    if (key === 'Backspace') {
+                      event.preventDefault()
+                      const chars = getOtpChars()
+
+                      if (chars[index] !== ' ') {
+                        chars[index] = ' '
+                        updateOtpChars(chars)
+                        focusIndex(index)
+                        return
+                      }
+
+                      if (index > 0) {
+                        chars[index - 1] = ' '
+                        updateOtpChars(chars)
+                        focusIndex(index - 1)
+                      }
+
+                      return
+                    }
+
+                    if (key === 'Delete') {
+                      event.preventDefault()
+                      const chars = getOtpChars()
+                      chars[index] = ' '
+                      updateOtpChars(chars)
+                      focusIndex(index)
+                      return
+                    }
+
+                    if (/^\d$/.test(key)) {
+                      event.preventDefault()
+                      setDigitAt(index, key)
+                      focusIndex(index + 1)
+                      return
+                    }
+
+                    const navigationKeys = new Set(['Tab', 'Shift', 'Meta', 'Control', 'Alt', 'Home', 'End'])
+                    if (navigationKeys.has(key)) {
+                      return
+                    }
+
+                    if (key.length === 1) {
+                      event.preventDefault()
+                    }
+                  }}
+                  onChange={(event) => {
+                    if (loading) {
+                      return
+                    }
+
+                    const pastedDigits = event.currentTarget.value.replace(/\D/g, '')
+
+                    if (!pastedDigits) {
+                      const chars = getOtpChars()
+                      chars[index] = ' '
+                      updateOtpChars(chars)
+                      return
+                    }
+
+                    const chars = getOtpChars()
+                    let nextIndex = index
+
+                    for (const digit of pastedDigits) {
+                      if (nextIndex >= OTP_LENGTH) {
+                        break
+                      }
+
+                      chars[nextIndex] = digit
+                      nextIndex += 1
+                    }
+
+                    updateOtpChars(chars)
+                    focusIndex(nextIndex)
+                  }}
+                  onPaste={(event) => {
+                    event.preventDefault()
+
+                    if (loading) {
+                      return
+                    }
+
+                    const pastedDigits = event.clipboardData.getData('text').replace(/\D/g, '')
+
+                    if (!pastedDigits) {
+                      return
+                    }
+
+                    const chars = getOtpChars()
+                    let nextIndex = index
+
+                    for (const digit of pastedDigits) {
+                      if (nextIndex >= OTP_LENGTH) {
+                        break
+                      }
+
+                      chars[nextIndex] = digit
+                      nextIndex += 1
+                    }
+
+                    updateOtpChars(chars)
+                    focusIndex(nextIndex)
+                  }}
+                />
+              )
+            })}
+          </div>
         </div>
 
         {notice && <p className="text-sm text-[#0c7a43]">{notice}</p>}
