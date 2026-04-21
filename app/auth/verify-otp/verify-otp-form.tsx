@@ -46,6 +46,31 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
     updateOtpChars(chars)
   }
 
+  const mergePastedDigits = (startIndex: number, rawValue: string) => {
+    const sanitizedDigits = rawValue.replace(/\s/g, '').replace(/\D/g, '').slice(0, OTP_LENGTH)
+
+    if (!sanitizedDigits) {
+      return null
+    }
+
+    const chars = getOtpChars()
+    let nextIndex = Math.max(0, Math.min(startIndex, OTP_LENGTH - 1))
+
+    for (const digit of sanitizedDigits) {
+      if (nextIndex >= OTP_LENGTH) {
+        break
+      }
+
+      chars[nextIndex] = digit
+      nextIndex += 1
+    }
+
+    updateOtpChars(chars)
+    focusIndex(nextIndex)
+
+    return chars
+  }
+
   async function handleVerify(e: React.FormEvent) {
     e.preventDefault()
 
@@ -143,7 +168,7 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
                   autoComplete={index === 0 ? 'one-time-code' : 'off'}
                   inputMode="numeric"
                   pattern="[0-9]*"
-                  maxLength={OTP_LENGTH}
+                  maxLength={1}
                   aria-label={`Verification code digit ${index + 1}`}
                   className="h-12 w-full rounded-sm border border-[#c3c6ce] bg-white text-center text-base disabled:cursor-not-allowed"
                   onFocus={(event) => {
@@ -218,29 +243,23 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
                       return
                     }
 
-                    const pastedDigits = event.currentTarget.value.replace(/\D/g, '')
+                    const nextValue = event.currentTarget.value
+                    const pastedChars = nextValue.replace(/\s/g, '').replace(/\D/g, '')
 
-                    if (!pastedDigits) {
+                    if (pastedChars.length > 1) {
+                      mergePastedDigits(index, pastedChars)
+                      return
+                    }
+
+                    if (!pastedChars) {
                       const chars = getOtpChars()
                       chars[index] = ' '
                       updateOtpChars(chars)
                       return
                     }
 
-                    const chars = getOtpChars()
-                    let nextIndex = index
-
-                    for (const digit of pastedDigits) {
-                      if (nextIndex >= OTP_LENGTH) {
-                        break
-                      }
-
-                      chars[nextIndex] = digit
-                      nextIndex += 1
-                    }
-
-                    updateOtpChars(chars)
-                    focusIndex(nextIndex)
+                    setDigitAt(index, pastedChars)
+                    focusIndex(index + 1)
                   }}
                   onPaste={(event) => {
                     event.preventDefault()
@@ -249,26 +268,8 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
                       return
                     }
 
-                    const pastedDigits = event.clipboardData.getData('text').replace(/\D/g, '')
-
-                    if (!pastedDigits) {
-                      return
-                    }
-
-                    const chars = getOtpChars()
-                    let nextIndex = index
-
-                    for (const digit of pastedDigits) {
-                      if (nextIndex >= OTP_LENGTH) {
-                        break
-                      }
-
-                      chars[nextIndex] = digit
-                      nextIndex += 1
-                    }
-
-                    updateOtpChars(chars)
-                    focusIndex(nextIndex)
+                    const pastedText = event.clipboardData.getData('text')
+                    mergePastedDigits(index, pastedText)
                   }}
                 />
               )
