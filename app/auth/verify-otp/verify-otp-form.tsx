@@ -323,9 +323,16 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
           type="button"
           onClick={handleResend}
           disabled={resending || loading || !normalizedEmail}
-          className="font-semibold text-[#735b2b] disabled:cursor-not-allowed disabled:text-[#9d937f]"
+          className="inline-flex items-center gap-1.5 font-semibold text-[#735b2b] disabled:cursor-not-allowed disabled:text-[#9d937f]"
         >
-          {resending ? 'Resending...' : 'Resend code'}
+          {resending ? (
+            <>
+              <span>Resending...</span>
+              <Spinner className="size-3.5" />
+            </>
+          ) : (
+            'Resend code'
+          )}
         </button>
 
         <Link href={fallbackToSignUp} className="font-semibold text-[#735b2b]">
