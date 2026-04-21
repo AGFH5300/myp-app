@@ -85,7 +85,7 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
       return
     }
 
-    setNotice('A fresh 6-digit code has been sent to your email.')
+    setNotice('A new 6-digit code has been sent to your email.')
     setResending(false)
   }
 
