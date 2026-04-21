@@ -36,7 +36,9 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
   }
 
   const updateOtpChars = (nextChars: string[]) => {
-    setOtpCode(nextChars.join('').slice(0, OTP_LENGTH).padEnd(OTP_LENGTH, ' '))
+    const nextOtp = nextChars.join('').slice(0, OTP_LENGTH).padEnd(OTP_LENGTH, ' ')
+    console.log('[otp-debug] otp-after', nextOtp)
+    setOtpCode(nextOtp)
     setError(null)
   }
 
@@ -47,14 +49,19 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
   }
 
   const mergePastedDigits = (startIndex: number, rawValue: string) => {
+    console.log('[otp-debug] paste-fired')
+    console.log('[otp-debug] pasted-raw-text', rawValue)
     const sanitizedDigits = rawValue.replace(/\s/g, '').replace(/\D/g, '').slice(0, OTP_LENGTH)
+    console.log('[otp-debug] pasted-sanitized', sanitizedDigits)
 
     if (!sanitizedDigits) {
       return null
     }
 
     const chars = getOtpChars()
+    console.log('[otp-debug] otp-before', otpCode)
     let nextIndex = Math.max(0, Math.min(startIndex, OTP_LENGTH - 1))
+    console.log('[otp-debug] focused-index', nextIndex)
 
     for (const digit of sanitizedDigits) {
       if (nextIndex >= OTP_LENGTH) {
@@ -66,9 +73,24 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
     }
 
     updateOtpChars(chars)
+    console.log('[otp-debug] focus-after-paste', Math.min(nextIndex, OTP_LENGTH - 1))
     focusIndex(nextIndex)
 
     return chars
+  }
+
+  const handleOtpPaste = (event: React.ClipboardEvent<HTMLElement>, fallbackIndex: number) => {
+    event.preventDefault()
+
+    if (loading) {
+      return
+    }
+
+    const activeInput = document.activeElement as HTMLInputElement | null
+    const focusedIndex = inputRefs.current.findIndex((node) => node === activeInput)
+    const pasteIndex = focusedIndex >= 0 ? focusedIndex : fallbackIndex
+    const pastedText = event.clipboardData.getData('text')
+    mergePastedDigits(pasteIndex, pastedText)
   }
 
   async function handleVerify(e: React.FormEvent) {
@@ -152,7 +174,13 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
       <form onSubmit={handleVerify} className="mt-8 space-y-6" noValidate>
         <div>
           <label className="mb-3 block font-label text-xs uppercase tracking-widest text-[#43474d]">Verification code</label>
-          <div className="grid w-full gap-2" style={{ gridTemplateColumns: `repeat(${OTP_LENGTH}, minmax(0, 1fr))` }}>
+          <div
+            className="grid w-full gap-2"
+            style={{ gridTemplateColumns: `repeat(${OTP_LENGTH}, minmax(0, 1fr))` }}
+            onPaste={(event) => {
+              handleOtpPaste(event, 0)
+            }}
+          >
             {Array.from({ length: OTP_LENGTH }).map((_, index) => {
               const slotValue = /\d/.test(otpCode[index] ?? '') ? otpCode[index] : ''
 
@@ -176,6 +204,10 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
                   }}
                   onKeyDown={(event) => {
                     if (loading) {
+                      return
+                    }
+
+                    if (event.metaKey || event.ctrlKey || event.altKey) {
                       return
                     }
 
@@ -245,6 +277,7 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
 
                     const nextValue = event.currentTarget.value
                     const pastedChars = nextValue.replace(/\s/g, '').replace(/\D/g, '')
+                    console.log('[otp-debug] otp-before', otpCode)
 
                     if (pastedChars.length > 1) {
                       mergePastedDigits(index, pastedChars)
@@ -262,14 +295,7 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
                     focusIndex(index + 1)
                   }}
                   onPaste={(event) => {
-                    event.preventDefault()
-
-                    if (loading) {
-                      return
-                    }
-
-                    const pastedText = event.clipboardData.getData('text')
-                    mergePastedDigits(index, pastedText)
+                    handleOtpPaste(event, index)
                   }}
                 />
               )
