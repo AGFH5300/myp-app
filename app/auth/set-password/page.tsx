@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { AuthShell } from '@/components/auth-shell'
 import { Spinner } from '@/components/ui/spinner'
 import { createClient } from '@/lib/supabase/client'
@@ -44,6 +45,8 @@ export default function SetPasswordPage() {
   const router = useRouter()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [submitAttempted, setSubmitAttempted] = useState(false)
@@ -165,17 +168,28 @@ export default function SetPasswordPage() {
       <form onSubmit={handleSubmit} className="mt-8 space-y-6" noValidate>
         <div>
           <label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Password</label>
-          <input
-            className="tsm-input"
-            type="password"
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onBlur={() => setPasswordSettled(true)}
-            required
-            autoComplete="new-password"
-            disabled={loading}
-          />
+          <div className="relative">
+            <input
+              className="tsm-input pr-10"
+              type={showPassword ? 'text' : 'password'}
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onBlur={() => setPasswordSettled(true)}
+              required
+              autoComplete="new-password"
+              disabled={loading}
+            />
+            <button
+              type="button"
+              className="absolute right-0 top-1/2 -translate-y-1/2 text-[#43474d] hover:text-[#00152a] disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={() => setShowPassword((previous) => !previous)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              disabled={loading}
+            >
+              {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+            </button>
+          </div>
           {passwordError && <p className="mt-2 text-sm text-red-700">{passwordError}</p>}
 
           <div className="mt-3 space-y-2">
@@ -198,17 +212,28 @@ export default function SetPasswordPage() {
 
         <div>
           <label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Confirm password</label>
-          <input
-            className="tsm-input"
-            type="password"
-            minLength={8}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            onBlur={() => setConfirmSettled(true)}
-            required
-            autoComplete="new-password"
-            disabled={loading}
-          />
+          <div className="relative">
+            <input
+              className="tsm-input pr-10"
+              type={showConfirmPassword ? 'text' : 'password'}
+              minLength={8}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              onBlur={() => setConfirmSettled(true)}
+              required
+              autoComplete="new-password"
+              disabled={loading}
+            />
+            <button
+              type="button"
+              className="absolute right-0 top-1/2 -translate-y-1/2 text-[#43474d] hover:text-[#00152a] disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={() => setShowConfirmPassword((previous) => !previous)}
+              aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+              disabled={loading}
+            >
+              {showConfirmPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+            </button>
+          </div>
           {confirmError && <p className="mt-2 text-sm text-red-700">{confirmError}</p>}
           {showConfirmSuccess && <p className="mt-2 text-sm text-[#0c7a43]">Passwords match.</p>}
         </div>
