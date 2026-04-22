@@ -12,17 +12,21 @@ export default function OnboardingPage() {
   const [school, setSchool] = useState('')
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [chosenSubjects, setChosenSubjects] = useState<string[]>([])
-  const [practiceFocus, setPracticeFocus] = useState('')
-  const [preferredSession, setPreferredSession] = useState<'May' | 'November' | ''>('')
-  const [preferredYear, setPreferredYear] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
     createClient().from('subjects').select('id,name').order('name').then(({ data, error }) => {
-      if (error) return setError(error.message)
-      setSubjects(data || [])
+      if (error) {
+        setError('Unable to load subjects right now. Please add/check subjects in Supabase and refresh.')
+        return
+      }
+      if (!data || data.length === 0) {
+        setError('No subjects found yet. Add subjects in Supabase to continue.')
+        return
+      }
+      setSubjects(data)
     })
   }, [])
 
@@ -43,12 +47,9 @@ export default function OnboardingPage() {
       .upsert({
         id: authData.user.id,
         email: authData.user.email,
-        myp_year: Number(mypYear),
+        myp_year: mypYear === 'other' ? null : Number(mypYear),
         school,
         selected_subject_ids: chosenSubjects,
-        practice_focus: practiceFocus,
-        preferred_session: preferredSession || null,
-        preferred_year: preferredYear ? Number(preferredYear) : null,
         onboarding_completed: true,
       })
 
@@ -71,8 +72,7 @@ export default function OnboardingPage() {
         <aside className="relative overflow-hidden rounded-md border border-[#c3c6ce66] bg-[#ece7db] p-8 md:p-10">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_10%_15%,rgba(115,91,43,0.16),transparent_45%),radial-gradient(circle_at_80%_0%,rgba(0,21,42,0.10),transparent_40%)]" />
           <div className="relative">
-            <p className="font-label text-xs uppercase tracking-[.16em] text-[#43474d]">Onboarding</p>
-            <h1 className="mt-4 font-headline text-5xl leading-[1.08] text-[#00152a]">Set your archive to match how you revise.</h1>
+            <h1 className="font-headline text-5xl leading-[1.08] text-[#00152a]">Set your archive to match how you revise.</h1>
             <p className="mt-6 max-w-md font-body text-base leading-relaxed text-[#43474d]">
               A few preferences help MYP Atlas surface relevant papers and questions first, so your dashboard starts with context instead of clutter.
             </p>
@@ -80,8 +80,8 @@ export default function OnboardingPage() {
               <p className="font-label text-xs uppercase tracking-[.12em] text-[#43474d]">What this influences</p>
               <ul className="mt-4 space-y-2 font-body text-sm text-[#43474d]">
                 <li>• Subject-first browsing on your dashboard</li>
-                <li>• Session and year defaults for archive views</li>
-                <li>• Faster returns to your saved weak areas</li>
+                <li>• Better paper recommendations for your MYP level</li>
+                <li>• Faster returns to the topics you revise most often</li>
               </ul>
             </div>
           </div>
@@ -94,12 +94,12 @@ export default function OnboardingPage() {
           </div>
 
           <div className="mt-8 grid md:grid-cols-2 gap-6">
-            <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">MYP year</label><select className="tsm-input" value={mypYear} onChange={(e) => setMypYear(e.target.value)}><option value="4">MYP 4</option><option value="5">MYP 5</option></select></div>
+            <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">MYP year</label><select className="tsm-input" value={mypYear} onChange={(e) => setMypYear(e.target.value)}><option value="3">MYP 3</option><option value="4">MYP 4</option><option value="5">MYP 5</option><option value="other">Other</option></select></div>
             <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">School</label><input className="tsm-input" value={school} onChange={(e) => setSchool(e.target.value)} placeholder="Your school" required /></div>
           </div>
 
           <div className="mt-8">
-            <label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Subjects you care about most</label>
+            <label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Subjects to focus on</label>
             <div className="grid sm:grid-cols-2 gap-3 mt-3">
               {subjects.map((subject) => {
                 const active = chosenSubjects.includes(subject.id)
@@ -115,13 +115,7 @@ export default function OnboardingPage() {
                 )
               })}
             </div>
-          </div>
-
-          <div className="mt-8"><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Current revision focus</label><textarea className="tsm-input min-h-28" value={practiceFocus} onChange={(e) => setPracticeFocus(e.target.value)} placeholder="Examples: command terms in sciences, algebra-heavy papers, November sessions" /></div>
-
-          <div className="mt-8 grid md:grid-cols-2 gap-6">
-            <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Preferred session (optional)</label><select className="tsm-input" value={preferredSession} onChange={(e) => setPreferredSession(e.target.value as 'May' | 'November' | '')}><option value="">No preference</option><option value="May">May</option><option value="November">November</option></select></div>
-            <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Preferred year (optional)</label><input className="tsm-input" type="number" min={2016} max={2025} value={preferredYear} onChange={(e) => setPreferredYear(e.target.value)} placeholder="2016 to 2025" /></div>
+            {subjects.length === 0 && <p className="mt-3 font-body text-sm text-[#43474d]">No subjects available yet. Add subject rows in Supabase first, then refresh this page.</p>}
           </div>
 
           {error && <p className="mt-6 text-sm text-red-700">{error}</p>}
