@@ -11,8 +11,8 @@ const INPUT_SETTLE_DELAY_MS = 600
 const MEANINGFUL_MATCH_LENGTH = 3
 
 const STRENGTH_LEVELS = [
-  { label: 'Hmm', color: '#b91c1c', barClass: 'bg-red-700' },
-  { label: 'Meh', color: '#c2410c', barClass: 'bg-orange-600' },
+  { label: 'Very Weak', color: '#b91c1c', barClass: 'bg-red-700' },
+  { label: 'Weak', color: '#c2410c', barClass: 'bg-orange-600' },
   { label: 'Okay', color: '#ca8a04', barClass: 'bg-yellow-500' },
   { label: 'Solid', color: '#15803d', barClass: 'bg-green-600' },
   { label: 'Godly', color: '#7e22ce', barClass: 'bg-purple-700' },
