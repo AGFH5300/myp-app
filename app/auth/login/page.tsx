@@ -1,5 +1,6 @@
 "use client"
 
+import { Eye, EyeOff } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -11,6 +12,7 @@ const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
@@ -48,7 +50,20 @@ export default function LoginPage() {
       <p className="mt-3 font-body text-[#43474d]">Access your MYP eAssessment workspace.</p>
       <form onSubmit={handleSubmit} className="mt-8 space-y-6">
         <div><label className="font-label text-xs uppercase tracking-[.05em] text-[#43474d]">Email</label><input className="tsm-input" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required /></div>
-        <div><label className="font-label text-xs uppercase tracking-[.05em] text-[#43474d]">Password</label><input className="tsm-input" type="password" value={password} onChange={(e)=>setPassword(e.target.value)} required /></div>
+        <div>
+          <label className="font-label text-xs uppercase tracking-[.05em] text-[#43474d]">Password</label>
+          <div className="relative">
+            <input className="tsm-input pr-10" type={showPassword ? "text" : "password"} value={password} onChange={(e)=>setPassword(e.target.value)} required />
+            <button
+              type="button"
+              className="absolute right-0 top-1/2 -translate-y-1/2 text-[#43474d] hover:text-[#00152a]"
+              onClick={() => setShowPassword((previous) => !previous)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+            </button>
+          </div>
+        </div>
         {error && <p className="text-sm text-red-700">{error}</p>}
         <button className="w-full bg-[#00152a] text-white py-4 rounded-sm" disabled={loading}>{loading ? 'Logging in...' : 'Log in'}</button>
       </form>
