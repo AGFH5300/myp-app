@@ -50,7 +50,7 @@ export default async function QuestionDetailPage({ params }: { params: Promise<{
           {question.context_image_url && <img src={question.context_image_url} alt={`Question ${question.question_number} context`} className="max-w-full h-auto rounded-md" />}
           {question.image_url && <img src={question.image_url} alt={`Question ${question.question_number}`} className="max-w-full h-auto rounded-md" />}
           {question.secondary_image_url && <img src={question.secondary_image_url} alt={`Question ${question.question_number} secondary`} className="max-w-full h-auto rounded-md" />}
-          {!question.image_url && question.prompt_text && <p className="font-body text-[#00152a] whitespace-pre-wrap">{question.prompt_text}</p>}
+          {!question.context_image_url && !question.image_url && !question.secondary_image_url && question.prompt_text && <p className="font-body text-[#00152a] whitespace-pre-wrap">{question.prompt_text}</p>}
         </div>
       </section>
 
