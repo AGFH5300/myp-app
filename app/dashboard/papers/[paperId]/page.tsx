@@ -18,7 +18,7 @@ export default async function PaperDetailPage({ params }: { params: Promise<{ pa
 
   const { data: questions } = await supabase
     .from('questions')
-    .select('id,question_number,prompt_text,marks,image_url,is_published')
+    .select('id,question_number,prompt_text,context_image_url,image_url,secondary_image_url,markscheme_text,markscheme_image_url,marks,is_published')
     .eq('paper_id', paperId)
     .eq('is_published', true)
     .order('question_number')
@@ -47,7 +47,7 @@ export default async function PaperDetailPage({ params }: { params: Promise<{ pa
           {questions?.map((question) => (
             <Link key={question.id} href={`/dashboard/questions/${question.id}`} className="block p-4 bg-[#f5f3ee] rounded-sm">
               <p className="font-headline text-lg text-[#00152a]">Q{question.question_number} · {question.marks} marks</p>
-              <p className="font-body text-sm text-[#43474d] mt-1 line-clamp-2">{question.prompt_text}</p>
+              <p className="font-body text-sm text-[#43474d] mt-1 line-clamp-2">{question.prompt_text || (question.image_url || question.context_image_url || question.secondary_image_url ? 'Image-based question' : '')}</p>
             </Link>
           ))}
           {!questions?.length && <p className="font-body text-sm text-[#43474d]">No published questions in this paper yet.</p>}

@@ -102,7 +102,7 @@ export function PracticeSession({ paper, questions, studentId, bookmarkedQuestio
             {q.context_image_url && <img src={q.context_image_url} alt={`Question ${q.question_number} context`} className="max-w-full h-auto rounded-md" />}
             {q.image_url && <img src={q.image_url} alt={`Question ${q.question_number}`} className="max-w-full h-auto rounded-md" />}
             {q.secondary_image_url && <img src={q.secondary_image_url} alt={`Question ${q.question_number} secondary`} className="max-w-full h-auto rounded-md" />}
-            {!q.image_url && q.prompt_text && <p className="font-body text-lg text-[#00152a] whitespace-pre-wrap">{q.prompt_text}</p>}
+            {!q.context_image_url && !q.image_url && !q.secondary_image_url && q.prompt_text && <p className="font-body text-lg text-[#00152a] whitespace-pre-wrap">{q.prompt_text}</p>}
           </div>
           {answerField()}
           {error && <p className="text-sm text-red-700 mt-4">{error}</p>}
