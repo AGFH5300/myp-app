@@ -44,6 +44,18 @@ export default async function QuestionDetailPage({ params }: { params: Promise<{
       <header>
         <p className="font-body text-sm text-[#43474d]">{question.papers?.title} · {question.papers?.year}</p>
         <h1 className="font-headline text-4xl text-[#00152a]">Question {question.question_number}</h1>
+        {topicNames.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {topicNames.map((topic) => (
+              <span
+                key={topic}
+                className="inline-flex items-center rounded-sm border border-[#c3c6ce66] bg-[#f5f3ee] px-2 py-0.5 font-body text-xs text-[#43474d]"
+              >
+                {topic}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </header>
 
       <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md">
@@ -76,7 +88,6 @@ export default async function QuestionDetailPage({ params }: { params: Promise<{
       <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md space-y-3">
         <h2 className="font-headline text-2xl text-[#00152a]">Tags and markscheme</h2>
         <p className="font-body text-sm text-[#43474d]">Marks: {question.marks ?? '—'}</p>
-        <p className="font-body text-sm text-[#43474d]">Topics: {topicNames.length ? topicNames.join(', ') : 'No topics tagged yet'}</p>
         {question.papers?.markscheme_url && <a href={question.papers.markscheme_url} target="_blank" className="font-body text-sm text-[#735b2b] underline">Open paper markscheme</a>}
         {question.markscheme_image_url ? (
           <img src={question.markscheme_image_url} alt={`Question ${question.question_number} markscheme`} className="max-w-full h-auto rounded-md" />
