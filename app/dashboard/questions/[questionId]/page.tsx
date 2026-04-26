@@ -37,20 +37,39 @@ export default async function QuestionDetailPage({ params }: { params: Promise<{
   }
 
   const topicNames = question.question_topics?.map((row) => row.topics?.name).filter(Boolean) ?? []
+  const hasQuestionImages = Boolean(question.context_image_url || question.image_url || question.secondary_image_url)
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-4xl">
       <header>
         <p className="font-body text-sm text-[#43474d]">{question.papers?.title} · {question.papers?.year}</p>
         <h1 className="font-headline text-4xl text-[#00152a]">Question {question.question_number}</h1>
       </header>
 
       <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md">
-        <div className="space-y-4">
-          {question.context_image_url && <img src={question.context_image_url} alt={`Question ${question.question_number} context`} className="max-w-full h-auto rounded-md" />}
-          {question.image_url && <img src={question.image_url} alt={`Question ${question.question_number}`} className="max-w-full h-auto rounded-md" />}
-          {question.secondary_image_url && <img src={question.secondary_image_url} alt={`Question ${question.question_number} secondary`} className="max-w-full h-auto rounded-md" />}
-          {!question.context_image_url && !question.image_url && !question.secondary_image_url && question.prompt_text && <p className="font-body text-[#00152a] whitespace-pre-wrap">{question.prompt_text}</p>}
+        <div className="space-y-5 max-w-3xl mx-auto">
+          {question.context_image_url && (
+            <img
+              src={question.context_image_url}
+              alt={`Question ${question.question_number} context`}
+              className="w-full h-auto max-w-full rounded-md border border-[#c3c6ce66] bg-white mx-auto"
+            />
+          )}
+          {question.image_url && (
+            <img
+              src={question.image_url}
+              alt={`Question ${question.question_number}`}
+              className="w-full h-auto max-w-full rounded-md border border-[#c3c6ce66] bg-white mx-auto"
+            />
+          )}
+          {question.secondary_image_url && (
+            <img
+              src={question.secondary_image_url}
+              alt={`Question ${question.question_number} secondary`}
+              className="w-full h-auto max-w-full rounded-md border border-[#c3c6ce66] bg-white mx-auto"
+            />
+          )}
+          {!hasQuestionImages && question.prompt_text && <p className="font-body text-[#00152a] whitespace-pre-wrap">{question.prompt_text}</p>}
         </div>
       </section>
 

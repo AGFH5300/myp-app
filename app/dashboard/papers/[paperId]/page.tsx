@@ -18,7 +18,7 @@ export default async function PaperDetailPage({ params }: { params: Promise<{ pa
 
   const { data: questions } = await supabase
     .from('questions')
-    .select('id,question_number,prompt_text,context_image_url,image_url,secondary_image_url,markscheme_text,markscheme_image_url,marks,is_published')
+    .select('id,question_number,context_image_url,image_url,secondary_image_url,marks,is_published')
     .eq('paper_id', paperId)
     .eq('is_published', true)
     .order('question_number')
@@ -44,12 +44,21 @@ export default async function PaperDetailPage({ params }: { params: Promise<{ pa
       <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md">
         <h2 className="font-headline text-2xl text-[#00152a] mb-4">Questions from this paper</h2>
         <div className="space-y-3">
-          {questions?.map((question) => (
-            <Link key={question.id} href={`/dashboard/questions/${question.id}`} className="block p-4 bg-[#f5f3ee] rounded-sm">
-              <p className="font-headline text-lg text-[#00152a]">Q{question.question_number} · {question.marks} marks</p>
-              <p className="font-body text-sm text-[#43474d] mt-1 line-clamp-2">{question.prompt_text || (question.image_url || question.context_image_url || question.secondary_image_url ? 'Image-based question' : '')}</p>
-            </Link>
-          ))}
+          {questions?.map((question) => {
+            const previewImage = question.context_image_url || question.image_url || question.secondary_image_url
+            return (
+              <Link key={question.id} href={`/dashboard/questions/${question.id}`} className="flex items-center justify-between gap-3 p-4 bg-[#f5f3ee] rounded-sm">
+                <p className="font-headline text-lg text-[#00152a]">Q{question.question_number} · {question.marks} marks</p>
+                {previewImage ? (
+                  <img
+                    src={previewImage}
+                    alt={`Question ${question.question_number} preview`}
+                    className="h-12 w-12 rounded-sm object-cover border border-[#c3c6ce66] bg-white shrink-0"
+                  />
+                ) : null}
+              </Link>
+            )
+          })}
           {!questions?.length && <p className="font-body text-sm text-[#43474d]">No published questions in this paper yet.</p>}
         </div>
       </section>
