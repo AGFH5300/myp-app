@@ -18,7 +18,7 @@ export default async function PracticePage({ params }: { params: Promise<{ paper
 
   const { data: questions } = await supabase
     .from('questions')
-    .select('id,question_number,prompt_text,answer_mode,options_json,marks,is_published')
+    .select('id,question_number,prompt_text,context_image_url,image_url,secondary_image_url,answer_mode,options_json,marks,is_published')
     .eq('paper_id', paperId)
     .order('question_number')
 

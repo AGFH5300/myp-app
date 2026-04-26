@@ -9,6 +9,9 @@ type Question = {
   id: string
   question_number: string
   prompt_text: string
+  context_image_url: string | null
+  image_url: string | null
+  secondary_image_url: string | null
   answer_mode: string
   marks: number | null
   options_json: string[] | null
@@ -95,7 +98,12 @@ export function PracticeSession({ paper, questions, studentId, bookmarkedQuestio
       <div className="grid lg:grid-cols-[1fr_260px] gap-6">
         <article className="bg-white border border-[#c3c6ce66] p-8">
           <div className="flex items-center justify-between gap-3 mb-4"><div className="flex items-center gap-3"><span className="font-label text-xs uppercase tracking-widest text-[#43474d]">Question {q.question_number}</span><span className="font-body text-sm text-[#735b2b]">{q.marks ?? 0} marks</span></div><button className="inline-flex items-center gap-2 text-sm text-[#735b2b]" onClick={toggleBookmark}><AppIcon name="bookmark" className={`size-4 ${bookmarks.has(q.id) ? 'fill-[#735b2b]' : ''}`} />{bookmarks.has(q.id) ? 'Bookmarked' : 'Bookmark'}</button></div>
-          <p className="font-body text-lg text-[#00152a] whitespace-pre-wrap">{q.prompt_text}</p>
+          <div className="space-y-4">
+            {q.context_image_url && <img src={q.context_image_url} alt={`Question ${q.question_number} context`} className="max-w-full h-auto rounded-md" />}
+            {q.image_url && <img src={q.image_url} alt={`Question ${q.question_number}`} className="max-w-full h-auto rounded-md" />}
+            {q.secondary_image_url && <img src={q.secondary_image_url} alt={`Question ${q.question_number} secondary`} className="max-w-full h-auto rounded-md" />}
+            {!q.image_url && q.prompt_text && <p className="font-body text-lg text-[#00152a] whitespace-pre-wrap">{q.prompt_text}</p>}
+          </div>
           {answerField()}
           {error && <p className="text-sm text-red-700 mt-4">{error}</p>}
           <div className="mt-8 flex justify-between">
