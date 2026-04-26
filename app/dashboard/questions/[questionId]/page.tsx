@@ -25,7 +25,7 @@ export default async function QuestionDetailPage({ params }: { params: Promise<{
 
   const { data: question } = await supabase
     .from('questions')
-    .select('id,question_number,prompt_text,image_url,marks,papers(id,title,year,markscheme_text,markscheme_url),question_topics(topics(id,name))')
+    .select('id,question_number,prompt_text,image_url,context_image_url,secondary_image_url,markscheme_text,markscheme_image_url,marks,papers(id,title,year,markscheme_url),question_topics(topics(id,name))')
     .eq('id', questionId)
     .eq('is_published', true)
     .maybeSingle()
@@ -46,8 +46,12 @@ export default async function QuestionDetailPage({ params }: { params: Promise<{
       </header>
 
       <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md">
-        <p className="font-body text-[#00152a] whitespace-pre-wrap">{question.prompt_text}</p>
-        {question.image_url && <p className="font-body text-sm text-[#735b2b] mt-4">Image asset: <a href={question.image_url} className="underline" target="_blank">open image</a></p>}
+        <div className="space-y-4">
+          {question.context_image_url && <img src={question.context_image_url} alt={`Question ${question.question_number} context`} className="max-w-full h-auto rounded-md" />}
+          {question.image_url && <img src={question.image_url} alt={`Question ${question.question_number}`} className="max-w-full h-auto rounded-md" />}
+          {question.secondary_image_url && <img src={question.secondary_image_url} alt={`Question ${question.question_number} secondary`} className="max-w-full h-auto rounded-md" />}
+          {!question.image_url && question.prompt_text && <p className="font-body text-[#00152a] whitespace-pre-wrap">{question.prompt_text}</p>}
+        </div>
       </section>
 
       <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md space-y-3">
@@ -55,7 +59,11 @@ export default async function QuestionDetailPage({ params }: { params: Promise<{
         <p className="font-body text-sm text-[#43474d]">Marks: {question.marks ?? '—'}</p>
         <p className="font-body text-sm text-[#43474d]">Topics: {topicNames.length ? topicNames.join(', ') : 'No topics tagged yet'}</p>
         {question.papers?.markscheme_url && <a href={question.papers.markscheme_url} target="_blank" className="font-body text-sm text-[#735b2b] underline">Open paper markscheme</a>}
-        {question.papers?.markscheme_text && <p className="font-body text-sm text-[#43474d] whitespace-pre-wrap">{question.papers.markscheme_text}</p>}
+        {question.markscheme_image_url ? (
+          <img src={question.markscheme_image_url} alt={`Question ${question.question_number} markscheme`} className="max-w-full h-auto rounded-md" />
+        ) : (
+          question.markscheme_text && <p className="font-body text-sm text-[#43474d] whitespace-pre-wrap">{question.markscheme_text}</p>
+        )}
       </section>
 
       {user && <form action={saveBookmark}><input type="hidden" name="question_id" value={question.id} /><input type="hidden" name="paper_id" value={question.papers?.id || ''} /><button className="tsm-btn-primary">Bookmark question</button></form>}
