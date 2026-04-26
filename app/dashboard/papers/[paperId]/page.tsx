@@ -2,8 +2,16 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
-export default async function PaperDetailPage({ params }: { params: Promise<{ paperId: string }> }) {
+export default async function PaperDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ paperId: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
   const { paperId } = await params
+  const query = await searchParams
+  const selectedTopic = typeof query.topic === 'string' ? query.topic : ''
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -18,7 +26,7 @@ export default async function PaperDetailPage({ params }: { params: Promise<{ pa
 
   const { data: questions } = await supabase
     .from('questions')
-    .select('id,question_number,context_image_url,image_url,secondary_image_url,marks,is_published')
+    .select('id,question_number,context_image_url,image_url,secondary_image_url,marks,is_published,question_topics(topic_id,topics(id,name))')
     .eq('paper_id', paperId)
     .eq('is_published', true)
     .order('question_number')
@@ -26,6 +34,23 @@ export default async function PaperDetailPage({ params }: { params: Promise<{ pa
   if (user) {
     await supabase.from('paper_views').insert({ student_id: user.id, paper_id: paperId })
   }
+
+  const topicMap = new Map<string, string>()
+  questions?.forEach((item) => {
+    item.question_topics?.forEach((row) => {
+      const id = row.topics?.id
+      const name = row.topics?.name
+      if (id && name) topicMap.set(id, name)
+    })
+  })
+
+  const paperTopics = Array.from(topicMap.entries())
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  const filteredQuestions = selectedTopic
+    ? (questions ?? []).filter((item) => item.question_topics?.some((row) => row.topics?.id === selectedTopic))
+    : questions ?? []
 
   return (
     <div className="space-y-8">
@@ -42,13 +67,39 @@ export default async function PaperDetailPage({ params }: { params: Promise<{ pa
       </section>
 
       <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md">
-        <h2 className="font-headline text-2xl text-[#00152a] mb-4">Questions from this paper</h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-headline text-2xl text-[#00152a]">Questions from this paper</h2>
+          {paperTopics.length > 0 ? (
+            <form>
+              <select name="topic" defaultValue={selectedTopic} className="tsm-input text-sm">
+                <option value="">All topics</option>
+                {paperTopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}
+              </select>
+              <button className="sr-only">Filter</button>
+            </form>
+          ) : null}
+        </div>
         <div className="space-y-3">
-          {questions?.map((question) => {
+          {filteredQuestions.map((question) => {
             const previewImage = question.context_image_url || question.image_url || question.secondary_image_url
+            const questionTopics = question.question_topics?.map((row) => row.topics).filter(Boolean) ?? []
             return (
               <Link key={question.id} href={`/dashboard/questions/${question.id}`} className="flex items-center justify-between gap-3 p-4 bg-[#f5f3ee] rounded-sm">
-                <p className="font-headline text-lg text-[#00152a]">Q{question.question_number} · {question.marks} marks</p>
+                <div className="min-w-0">
+                  <p className="font-headline text-lg text-[#00152a]">Q{question.question_number} · {question.marks} marks</p>
+                  {questionTopics.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {questionTopics.map((topic) => (
+                        <span
+                          key={topic.id}
+                          className="inline-flex items-center rounded-sm border border-[#c3c6ce66] bg-white px-2 py-0.5 font-body text-xs text-[#43474d]"
+                        >
+                          {topic.name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
                 {previewImage ? (
                   <img
                     src={previewImage}
@@ -59,7 +110,7 @@ export default async function PaperDetailPage({ params }: { params: Promise<{ pa
               </Link>
             )
           })}
-          {!questions?.length && <p className="font-body text-sm text-[#43474d]">No published questions in this paper yet.</p>}
+          {!filteredQuestions.length && <p className="font-body text-sm text-[#43474d]">{selectedTopic ? 'No published questions for this topic in this paper.' : 'No published questions in this paper yet.'}</p>}
         </div>
       </section>
     </div>
