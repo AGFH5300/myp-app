@@ -54,6 +54,16 @@ export default function SetPasswordPage() {
   const [confirmSettled, setConfirmSettled] = useState(false)
   const [strengthBoosted, setStrengthBoosted] = useState(false)
   const prevStrengthScoreRef = useRef(0)
+  const nextPathRef = useRef('/onboarding')
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const rawNext = new URLSearchParams(window.location.search).get('next')
+      if (rawNext?.startsWith('/') && !rawNext.startsWith('//')) {
+        nextPathRef.current = rawNext
+      }
+    }
+  }, [])
 
   useEffect(() => {
     setPasswordSettled(false)
@@ -152,7 +162,7 @@ export default function SetPasswordPage() {
       window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY)
     }
 
-    router.push('/onboarding')
+    router.push(nextPathRef.current)
   }
 
   return (

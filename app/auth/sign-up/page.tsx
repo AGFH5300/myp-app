@@ -80,6 +80,7 @@ export default function SignUpPage() {
     fullName: '',
     email: '',
   })
+  const [nextPath, setNextPath] = useState('/onboarding')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitAttempted, setSubmitAttempted] = useState(false)
@@ -93,6 +94,7 @@ export default function SignUpPage() {
   const usernameRef = useRef<HTMLInputElement>(null)
   const fullNameRef = useRef<HTMLInputElement>(null)
   const emailRef = useRef<HTMLInputElement>(null)
+  const nextPathRef = useRef('/onboarding')
 
   const normalizedUsername = observedValues.username
   const normalizedFullName = observedValues.fullName
@@ -144,6 +146,12 @@ export default function SignUpPage() {
     }
 
     const params = new URLSearchParams(window.location.search)
+    const rawNext = params.get('next')
+    if (rawNext?.startsWith('/') && !rawNext.startsWith('//')) {
+      nextPathRef.current = rawNext
+      setNextPath(rawNext)
+    }
+
     const shouldRestoreDraft = params.get('restoreDraft') === '1'
     const hasExplicitQueryValues = params.has('username') || params.has('fullName') || params.has('email')
     const initialUsername = params.get('username') ?? ''
@@ -682,6 +690,7 @@ export default function SignUpPage() {
             full_name: payload.fullName,
             onboarding_completed: false,
           },
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPathRef.current)}`,
         },
       })
 
@@ -699,6 +708,7 @@ export default function SignUpPage() {
         username: payload.username,
         fullName: payload.fullName,
         mode: 'signup',
+        next: nextPathRef.current,
       })
 
       router.push(`/auth/verify-otp?${query.toString()}`)
@@ -824,7 +834,7 @@ export default function SignUpPage() {
       <p className="mt-8 border-t border-[#c3c6ce55] pt-6 text-center font-body text-sm text-[#43474d]">
         Already have an account?
         <Link
-          href="/auth/login"
+          href={`/auth/login${nextPath !== '/onboarding' ? `?next=${encodeURIComponent(nextPath)}` : ''}`}
           onClick={() => {
             if (typeof window !== 'undefined') {
               window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY)
