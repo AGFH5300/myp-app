@@ -15,11 +15,16 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [nextPath, setNextPath] = useState('/dashboard')
   const router = useRouter()
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY)
+      const rawNext = new URLSearchParams(window.location.search).get('next')
+      if (rawNext?.startsWith('/') && !rawNext.startsWith('//')) {
+        setNextPath(rawNext)
+      }
     }
   }, [])
 
@@ -34,7 +39,7 @@ export default function LoginPage() {
       setLoading(false)
       return
     }
-    router.push('/dashboard')
+    router.push(nextPath)
   }
 
   return (
@@ -67,7 +72,7 @@ export default function LoginPage() {
         {error && <p className="text-sm text-red-700">{error}</p>}
         <button className="w-full bg-[#00152a] text-white py-4 rounded-sm" disabled={loading}>{loading ? 'Logging in...' : 'Log in'}</button>
       </form>
-      <p className="mt-8 border-t border-[#c3c6ce55] pt-6 text-center font-body text-[#43474d]">Don&apos;t have an account?<Link href="/auth/sign-up" className="ml-1 font-semibold text-[#00152a]">Sign Up</Link></p>
+      <p className="mt-8 border-t border-[#c3c6ce55] pt-6 text-center font-body text-[#43474d]">Don&apos;t have an account?<Link href={`/auth/sign-up${nextPath !== '/dashboard' ? `?next=${encodeURIComponent(nextPath)}` : ''}`} className="ml-1 font-semibold text-[#00152a]">Sign Up</Link></p>
     </AuthShell>
   )
 }

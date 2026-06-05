@@ -11,7 +11,7 @@ const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
 const OTP_LENGTH = 6
 const EMPTY_OTP = ' '.repeat(OTP_LENGTH)
 
-export function VerifyOtpForm({ email, username, fullName }: { email: string; username: string; fullName: string }) {
+export function VerifyOtpForm({ email, username, fullName, next }: { email: string; username: string; fullName: string; next: string }) {
   const router = useRouter()
   const [otpCode, setOtpCode] = useState(EMPTY_OTP)
   const [loading, setLoading] = useState(false)
@@ -24,7 +24,7 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
   const sanitizedOtpCode = otpCode.replace(/\s/g, '')
   const canVerify = /^\d{6}$/.test(sanitizedOtpCode) && !loading
 
-  const fallbackToSignUp = useMemo(() => '/auth/sign-up?restoreDraft=1', [])
+  const fallbackToSignUp = useMemo(() => `/auth/sign-up?restoreDraft=1&next=${encodeURIComponent(next)}`, [next])
 
   const getOtpChars = () => otpCode.padEnd(OTP_LENGTH, ' ').slice(0, OTP_LENGTH).split('')
 
@@ -118,11 +118,11 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
     if (typeof window !== 'undefined') {
       window.sessionStorage.setItem(
         SIGNUP_DRAFT_KEY,
-        JSON.stringify({ email: normalizedEmail, username: username.trim(), fullName: fullName.trim() }),
+        JSON.stringify({ email: normalizedEmail, username: username.trim(), fullName: fullName.trim(), next }),
       )
     }
 
-    router.push('/auth/set-password')
+    router.push(`/auth/set-password?next=${encodeURIComponent(next)}`)
   }
 
   async function handleResend() {
@@ -144,6 +144,7 @@ export function VerifyOtpForm({ email, username, fullName }: { email: string; us
           full_name: fullName.trim(),
           onboarding_completed: false,
         },
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
       },
     })
 
