@@ -2,6 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { PracticeSession } from '@/components/practice-session'
 
+function firstRelation<T>(relation: T | T[] | null | undefined) {
+  return Array.isArray(relation) ? relation[0] : relation
+}
+
 export default async function PracticePage({ params }: { params: Promise<{ paperId: string }> }) {
   const { paperId } = await params
   const supabase = await createClient()
@@ -27,5 +31,7 @@ export default async function PracticePage({ params }: { params: Promise<{ paper
     .select('question_id')
     .eq('student_id', user.id)
 
-  return <PracticeSession paper={paper} questions={questions || []} studentId={user.id} bookmarkedQuestionIds={bookmarks?.map((b) => b.question_id) ?? []} />
+  const sessionPaper = { ...paper, subjects: firstRelation(paper.subjects) ?? null }
+
+  return <PracticeSession paper={sessionPaper} questions={questions || []} studentId={user.id} bookmarkedQuestionIds={bookmarks?.map((b) => b.question_id) ?? []} />
 }

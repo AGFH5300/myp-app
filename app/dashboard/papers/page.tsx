@@ -1,6 +1,10 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 
+function firstRelation<T>(relation: T | T[] | null | undefined) {
+  return Array.isArray(relation) ? relation[0] : relation
+}
+
 export default async function PapersPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams
   const subject = typeof params.subject === 'string' ? params.subject : ''
@@ -39,13 +43,13 @@ export default async function PapersPage({ searchParams }: { searchParams: Promi
 
     filteredPaperIds = new Set(
       topicLinks
-        ?.map((item) => item.questions?.paper_id)
+        ?.map((item) => firstRelation(item.questions)?.paper_id)
         .filter((paperId): paperId is string => Boolean(paperId)),
     )
   }
 
   const papers = fetchedPapers?.filter((paper) => {
-    if (session && paper.exam_sessions?.session_month !== session) return false
+    if (session && firstRelation(paper.exam_sessions)?.session_month !== session) return false
     if (filteredPaperIds && !filteredPaperIds.has(paper.id)) return false
     return true
   })
@@ -109,7 +113,7 @@ export default async function PapersPage({ searchParams }: { searchParams: Promi
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="font-headline text-2xl text-[#00152a]">{paper.title}</h2>
-                <p className="mt-2 font-body text-sm text-[#43474d]">{paper.subjects?.name} · {paper.year} · {paper.exam_sessions?.session_month || ''}</p>
+                <p className="mt-2 font-body text-sm text-[#43474d]">{firstRelation(paper.subjects)?.name} · {paper.year} · {firstRelation(paper.exam_sessions)?.session_month || ''}</p>
               </div>
               <Link href={`/dashboard/papers/${paper.id}`} className="tsm-btn-secondary">Open paper</Link>
             </div>

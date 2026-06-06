@@ -1,6 +1,10 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 
+function firstRelation<T>(relation: T | T[] | null | undefined) {
+  return Array.isArray(relation) ? relation[0] : relation
+}
+
 export default async function BookmarksPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -17,9 +21,9 @@ export default async function BookmarksPage() {
       <div className="space-y-4">
         {!bookmarks?.length && <div className="bg-white border border-[#c3c6ce66] p-6 font-body text-[#43474d]">No bookmarks yet.</div>}
         {bookmarks?.map((bookmark) => {
-          const question = bookmark.questions
-          const questionPaper = question?.papers
-          const paper = bookmark.papers || questionPaper
+          const question = firstRelation(bookmark.questions)
+          const questionPaper = firstRelation(question?.papers)
+          const paper = firstRelation(bookmark.papers) || questionPaper
           return (
             <div key={bookmark.id} className="bg-white border border-[#c3c6ce66] p-6 flex items-center justify-between gap-4 rounded-md">
               <div>
