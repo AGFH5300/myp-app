@@ -1,6 +1,10 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 
+function firstRelation<T>(relation: T | T[] | null | undefined) {
+  return Array.isArray(relation) ? relation[0] : relation
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -15,7 +19,8 @@ export default async function DashboardPage() {
   ])
 
   const countByYearSession = (paperCounts ?? []).reduce<Record<string, number>>((acc, paper) => {
-    const key = `${paper.year} ${paper.exam_sessions?.session_month ?? ''}`.trim()
+    const session = firstRelation(paper.exam_sessions)
+    const key = `${paper.year} ${session?.session_month ?? ''}`.trim()
     acc[key] = (acc[key] ?? 0) + 1
     return acc
   }, {})
@@ -31,8 +36,8 @@ export default async function DashboardPage() {
       <section className="grid gap-6 lg:grid-cols-2">
         <article className="rounded-md border border-[#c3c6ce66] bg-white p-6">
           <h2 className="font-headline text-2xl text-[#00152a]">Continue where you left off</h2>
-          <p className="mt-3 font-body text-sm text-[#43474d]">{recentViews?.[0]?.papers?.title ? `Last viewed paper: ${recentViews[0].papers.title} (${recentViews[0].papers.year})` : 'No recent paper views yet.'}</p>
-          <p className="mt-2 font-body text-sm text-[#43474d]">{recentQuestions?.[0]?.questions?.id ? `Last opened question: Q${recentQuestions[0].questions.question_number} from ${recentQuestions[0].questions.papers?.title}` : 'No recent question views yet.'}</p>
+          <p className="mt-3 font-body text-sm text-[#43474d]">{firstRelation(recentViews?.[0]?.papers)?.title ? `Last viewed paper: ${firstRelation(recentViews?.[0]?.papers)?.title} (${firstRelation(recentViews?.[0]?.papers)?.year})` : 'No recent paper views yet.'}</p>
+          <p className="mt-2 font-body text-sm text-[#43474d]">{firstRelation(recentQuestions?.[0]?.questions)?.id ? `Last opened question: Q${firstRelation(recentQuestions?.[0]?.questions)?.question_number} from ${firstRelation(firstRelation(recentQuestions?.[0]?.questions)?.papers)?.title}` : 'No recent question views yet.'}</p>
           <div className="mt-5 flex gap-3"><Link href="/dashboard/papers" className="tsm-btn-primary">Browse papers</Link><Link href="/dashboard/bookmarks" className="tsm-btn-secondary">Open bookmarks</Link></div>
         </article>
 
@@ -64,7 +69,7 @@ export default async function DashboardPage() {
           {recentPapers?.map((paper) => (
             <Link key={paper.id} href={`/dashboard/papers/${paper.id}`} className="block rounded-sm bg-[#f5f3ee] p-4">
               <p className="font-headline text-lg text-[#00152a]">{paper.title}</p>
-              <p className="font-body text-sm text-[#43474d]">{paper.subjects?.name} · {paper.year} {paper.exam_sessions?.session_month}</p>
+              <p className="font-body text-sm text-[#43474d]">{firstRelation(paper.subjects)?.name} · {paper.year} {firstRelation(paper.exam_sessions)?.session_month}</p>
             </Link>
           ))}
           {!recentPapers?.length && <p className="font-body text-sm text-[#43474d]">No papers uploaded yet.</p>}

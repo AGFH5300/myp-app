@@ -1,4 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
+
+function firstRelation<T>(relation: T | T[] | null | undefined) {
+  return Array.isArray(relation) ? relation[0] : relation
+}
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 
@@ -15,12 +19,14 @@ export default async function ResultsPage({ params }: { params: Promise<{ attemp
 
   if (!attempt) notFound()
 
+  const question = firstRelation(attempt.questions)
+  const paper = firstRelation(question?.papers)
   const percent = attempt.max_score ? Math.round(((attempt.score ?? 0) / attempt.max_score) * 100) : 0
 
   return (
     <div className="max-w-3xl mx-auto">
       <h1 className="font-headline text-4xl text-[#00152a]">Attempt Result</h1>
-      <p className="font-body text-[#43474d] mt-2 mb-8">{attempt.questions?.papers?.title} · Question {attempt.questions?.question_number}</p>
+      <p className="font-body text-[#43474d] mt-2 mb-8">{paper?.title} · Question {question?.question_number}</p>
       <div className="bg-white border border-[#c3c6ce66] p-10 text-center">
         <p className="font-headline text-6xl text-[#00152a]">{percent}%</p>
         <p className="font-body text-[#43474d] mt-2">You scored {attempt.score ?? 0} out of {attempt.max_score ?? 0} marks.</p>

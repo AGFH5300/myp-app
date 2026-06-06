@@ -43,7 +43,7 @@ export default async function AdminPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><h1 className="font-headline text-4xl text-[#00152a]">Admin content management</h1><Link href="/dashboard/admin/resource-analytics" className="tsm-btn-secondary">Resource analytics</Link></div>
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><h1 className="font-headline text-4xl text-[#00152a]">Admin content management</h1><Link href="/dashboard/admin/resource-analytics" className="tsm-btn-secondary">Resource analytics</Link><Link href="/dashboard/admin/question-bank" className="tsm-btn-primary">Question bank</Link></div>
 
       <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md"><h2 className="font-headline text-2xl text-[#00152a] mb-3">Subjects</h2><div className="space-y-2">{subjects?.map((item) => <p key={item.id} className="font-body text-sm text-[#43474d]">{item.name}</p>)}</div></section>
 

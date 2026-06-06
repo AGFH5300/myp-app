@@ -2,6 +2,10 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
+function firstRelation<T>(relation: T | T[] | null | undefined) {
+  return Array.isArray(relation) ? relation[0] : relation
+}
+
 async function saveBookmark(formData: FormData) {
   'use server'
   const supabase = await createClient()
@@ -36,13 +40,13 @@ export default async function QuestionDetailPage({ params }: { params: Promise<{
     await supabase.from('recent_question_views').insert({ student_id: user.id, question_id: questionId })
   }
 
-  const topicNames = question.question_topics?.map((row) => row.topics?.name).filter(Boolean) ?? []
+  const topicNames = question.question_topics?.map((row) => firstRelation(row.topics)?.name).filter(Boolean) ?? []
   const hasQuestionImages = Boolean(question.context_image_url || question.image_url || question.secondary_image_url)
 
   return (
     <div className="space-y-8 max-w-4xl">
       <header>
-        <p className="font-body text-sm text-[#43474d]">{question.papers?.title} · {question.papers?.year}</p>
+        <p className="font-body text-sm text-[#43474d]">{firstRelation(question.papers)?.title} · {firstRelation(question.papers)?.year}</p>
         <h1 className="font-headline text-4xl text-[#00152a]">Question {question.question_number}</h1>
         {topicNames.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-2">
@@ -88,7 +92,7 @@ export default async function QuestionDetailPage({ params }: { params: Promise<{
       <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md space-y-3">
         <h2 className="font-headline text-2xl text-[#00152a]">Tags and markscheme</h2>
         <p className="font-body text-sm text-[#43474d]">Marks: {question.marks ?? '—'}</p>
-        {question.papers?.markscheme_url && <a href={question.papers.markscheme_url} target="_blank" className="font-body text-sm text-[#735b2b] underline">Open paper markscheme</a>}
+        {firstRelation(question.papers)?.markscheme_url && <a href={firstRelation(question.papers)?.markscheme_url || ''} target="_blank" className="font-body text-sm text-[#735b2b] underline">Open paper markscheme</a>}
         {question.markscheme_image_url ? (
           <img src={question.markscheme_image_url} alt={`Question ${question.question_number} markscheme`} className="max-w-full h-auto rounded-md" />
         ) : (
@@ -96,9 +100,9 @@ export default async function QuestionDetailPage({ params }: { params: Promise<{
         )}
       </section>
 
-      {user && <form action={saveBookmark}><input type="hidden" name="question_id" value={question.id} /><input type="hidden" name="paper_id" value={question.papers?.id || ''} /><button className="tsm-btn-primary">Bookmark question</button></form>}
+      {user && <form action={saveBookmark}><input type="hidden" name="question_id" value={question.id} /><input type="hidden" name="paper_id" value={firstRelation(question.papers)?.id || ''} /><button className="tsm-btn-primary">Bookmark question</button></form>}
 
-      <Link href={`/dashboard/papers/${question.papers?.id}`} className="tsm-btn-secondary inline-block">Back to paper</Link>
+      <Link href={`/dashboard/papers/${firstRelation(question.papers)?.id}`} className="tsm-btn-secondary inline-block">Back to paper</Link>
     </div>
   )
 }

@@ -2,6 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { AdSlot } from '@/components/ad-slot'
 import { adSlots } from '@/lib/ads'
 
+function firstRelation<T>(relation: T | T[] | null | undefined) {
+  return Array.isArray(relation) ? relation[0] : relation
+}
+
 export default async function ProgressPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -13,7 +17,10 @@ export default async function ProgressPage() {
 
   const bySubject = new Map<string, { name: string; score: number; max: number }>()
   attempts?.forEach((attempt) => {
-    const subjectName = attempt.questions?.papers?.subjects?.name || 'General'
+    const question = firstRelation(attempt.questions)
+    const paper = firstRelation(question?.papers)
+    const subject = firstRelation(paper?.subjects)
+    const subjectName = subject?.name || 'General'
     const item = bySubject.get(subjectName) ?? { name: subjectName, score: 0, max: 0 }
     item.score += attempt.score ?? 0
     item.max += attempt.max_score ?? 0

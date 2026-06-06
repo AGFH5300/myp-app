@@ -2,6 +2,10 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
+function firstRelation<T>(relation: T | T[] | null | undefined) {
+  return Array.isArray(relation) ? relation[0] : relation
+}
+
 export default async function PaperDetailPage({
   params,
   searchParams,
@@ -38,8 +42,9 @@ export default async function PaperDetailPage({
   const topicMap = new Map<string, string>()
   questions?.forEach((item) => {
     item.question_topics?.forEach((row) => {
-      const id = row.topics?.id
-      const name = row.topics?.name
+      const topic = firstRelation(row.topics)
+      const id = topic?.id
+      const name = topic?.name
       if (id && name) topicMap.set(id, name)
     })
   })
@@ -49,14 +54,14 @@ export default async function PaperDetailPage({
     .sort((a, b) => a.name.localeCompare(b.name))
 
   const filteredQuestions = selectedTopic
-    ? (questions ?? []).filter((item) => item.question_topics?.some((row) => row.topics?.id === selectedTopic))
+    ? (questions ?? []).filter((item) => item.question_topics?.some((row) => firstRelation(row.topics)?.id === selectedTopic))
     : questions ?? []
 
   return (
     <div className="space-y-8">
       <header>
         <h1 className="font-headline text-4xl text-[#00152a]">{paper.title}</h1>
-        <p className="font-body text-[#43474d] mt-2">{paper.subjects?.name} · {paper.year} {paper.exam_sessions?.session_month}</p>
+        <p className="font-body text-[#43474d] mt-2">{firstRelation(paper.subjects)?.name} · {paper.year} {firstRelation(paper.exam_sessions)?.session_month}</p>
       </header>
 
       <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md space-y-3">
@@ -82,7 +87,7 @@ export default async function PaperDetailPage({
         <div className="space-y-3">
           {filteredQuestions.map((question) => {
             const previewImage = question.context_image_url || question.image_url || question.secondary_image_url
-            const questionTopics = question.question_topics?.map((row) => row.topics).filter(Boolean) ?? []
+            const questionTopics = question.question_topics?.map((row) => firstRelation(row.topics)).filter((topic): topic is { id: string; name: string } => Boolean(topic?.id && topic?.name)) ?? []
             return (
               <Link key={question.id} href={`/dashboard/questions/${question.id}`} className="flex items-center justify-between gap-3 p-4 bg-[#f5f3ee] rounded-sm">
                 <div className="min-w-0">
