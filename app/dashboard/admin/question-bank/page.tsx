@@ -14,6 +14,18 @@ function stringParam(params: Record<string, string | string[] | undefined>, key:
   return Array.isArray(value) ? value[0] || '' : value || ''
 }
 
+function statusBadge(label: string, tone: 'green' | 'blue' | 'amber' | 'grey') {
+  const classes = tone === 'green'
+    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+    : tone === 'blue'
+      ? 'border-blue-200 bg-blue-50 text-blue-700'
+      : tone === 'amber'
+        ? 'border-amber-200 bg-amber-50 text-amber-800'
+        : 'border-slate-200 bg-slate-100 text-slate-600'
+
+  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${classes}`}>{label}</span>
+}
+
 export default async function AdminQuestionBankPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
   const supabase = await createClient()
@@ -77,7 +89,8 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
         </div>
       </header>
 
-      <form className="rounded-md border border-[#c3c6ce66] bg-white p-5" action="/dashboard/admin/question-bank">
+      <form className="rounded-md border border-blue-100 bg-white p-5 shadow-sm" action="/dashboard/admin/question-bank">
+        <p className="mb-4 font-body text-sm font-semibold text-[#00152a]">Filter the admin question list</p>
         <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
           <label className="md:col-span-2 font-body text-sm text-[#43474d]">Search<input name="q" className="tsm-input mt-1 w-full" defaultValue={stringParam(params, 'q')} placeholder="Paper, topic, or Q1a" /></label>
           <label className="font-body text-sm text-[#43474d]">Subject<select name="subject" className="tsm-input mt-1 w-full" defaultValue={subjectFilter}><option value="">All subjects</option>{subjects?.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
@@ -111,8 +124,8 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
                     <td className="py-4 pr-4">{paper?.year || '—'} {relationName(paper?.exam_sessions, 'session_month')}</td>
                     <td className="py-4 pr-4">Q{question.question_number}</td>
                     <td className="py-4 pr-4">{question.marks ?? '—'}</td>
-                    <td className="py-4 pr-4">{parentName ? `${parentName} → ` : ''}{primaryTopic?.name || 'Not tagged'}</td>
-                    <td className="py-4 pr-4">{question.is_published ? 'Shown' : 'Hidden'} · {question.is_reviewed ? 'Checked' : 'Needs review'}</td>
+                    <td className="py-4 pr-4">{parentName ? <><span className="font-semibold text-[#00152a]">{parentName}</span> <span className="text-[#735b2b]">→</span> </> : null}{primaryTopic?.name || <span className="text-amber-800">Not tagged</span>}</td>
+                    <td className="py-4 pr-4"><div className="flex flex-wrap gap-2">{question.is_published ? statusBadge('Published', 'green') : statusBadge('Draft', 'grey')}{question.is_reviewed ? statusBadge('Checked', 'blue') : statusBadge('Needs check', 'amber')}</div></td>
                     <td className="py-4 pr-4"><Link href={`/dashboard/admin/question-bank/${question.id}/edit`} className="tsm-btn-secondary w-fit">Edit</Link></td>
                   </tr>
                 )

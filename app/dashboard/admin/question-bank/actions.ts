@@ -126,6 +126,40 @@ async function syncTopics(supabase: Awaited<ReturnType<typeof requireAdmin>>, qu
   if (error) throw new Error('Could not save topic tags.')
 }
 
+function uploadedFiles(formData: FormData, key: string) {
+  return formData.getAll(key).filter((value): value is File => value instanceof File && value.size > 0)
+}
+
+async function uploadQuestionAssets(supabase: Awaited<ReturnType<typeof requireAdmin>>, files: File[], folder: 'questions' | 'markschemes') {
+  const paths: string[] = []
+  for (const file of files) {
+    const path = await uploadQuestionAsset(supabase, file, folder)
+    if (path) paths.push(path)
+  }
+  return paths
+}
+
+async function insertQuestionAssets(
+  supabase: Awaited<ReturnType<typeof requireAdmin>>,
+  questionId: string,
+  assetType: 'question' | 'markscheme',
+  paths: string[],
+  sortStart: number,
+) {
+  if (!paths.length) return
+
+  const labelPrefix = assetType === 'question' ? 'Question image' : 'Mark scheme image'
+  const { error } = await supabase.from('question_assets').insert(paths.map((path, index) => ({
+    question_id: questionId,
+    asset_type: assetType,
+    storage_path: path,
+    label: `${labelPrefix} ${sortStart + index + 1}`,
+    sort_order: sortStart + index,
+  })))
+
+  if (error) throw new Error('Could not save uploaded image records.')
+}
+
 function questionPayload(formData: FormData, paperId: string, questionAssetPath: string | null, markschemeAssetPath: string | null) {
   const marks = numberValue(formData, 'marks')
   const questionOrder = numberValue(formData, 'question_order')
@@ -151,10 +185,10 @@ function questionPayload(formData: FormData, paperId: string, questionAssetPath:
 export async function createQuestion(formData: FormData) {
   const supabase = await requireAdmin()
   const paperId = await ensurePaper(supabase, formData)
-  const questionFile = formData.get('question_image_file') instanceof File ? formData.get('question_image_file') as File : null
-  const markschemeFile = formData.get('markscheme_image_file') instanceof File ? formData.get('markscheme_image_file') as File : null
-  const questionAssetPath = await uploadQuestionAsset(supabase, questionFile, 'questions')
-  const markschemeAssetPath = await uploadQuestionAsset(supabase, markschemeFile, 'markschemes')
+  const questionAssetPaths = await uploadQuestionAssets(supabase, uploadedFiles(formData, 'question_image_file'), 'questions')
+  const markschemeAssetPaths = await uploadQuestionAssets(supabase, uploadedFiles(formData, 'markscheme_image_file'), 'markschemes')
+  const questionAssetPath = questionAssetPaths[0] || null
+  const markschemeAssetPath = markschemeAssetPaths[0] || null
 
   const { data: question, error } = await supabase
     .from('questions')
@@ -164,6 +198,8 @@ export async function createQuestion(formData: FormData) {
 
   if (error || !question) throw new Error('Could not create question.')
 
+  await insertQuestionAssets(supabase, question.id, 'question', questionAssetPaths, 0)
+  await insertQuestionAssets(supabase, question.id, 'markscheme', markschemeAssetPaths, 0)
   await syncTopics(supabase, question.id, formData)
   revalidatePath('/dashboard/admin/question-bank')
   redirect(`/dashboard/admin/question-bank/${question.id}/edit`)
@@ -173,10 +209,10 @@ export async function updateQuestion(formData: FormData) {
   const supabase = await requireAdmin()
   const questionId = stringValue(formData, 'question_id')
   const paperId = await ensurePaper(supabase, formData)
-  const questionFile = formData.get('question_image_file') instanceof File ? formData.get('question_image_file') as File : null
-  const markschemeFile = formData.get('markscheme_image_file') instanceof File ? formData.get('markscheme_image_file') as File : null
-  const questionAssetPath = await uploadQuestionAsset(supabase, questionFile, 'questions')
-  const markschemeAssetPath = await uploadQuestionAsset(supabase, markschemeFile, 'markschemes')
+  const questionAssetPaths = await uploadQuestionAssets(supabase, uploadedFiles(formData, 'question_image_file'), 'questions')
+  const markschemeAssetPaths = await uploadQuestionAssets(supabase, uploadedFiles(formData, 'markscheme_image_file'), 'markschemes')
+  const questionAssetPath = questionAssetPaths[0] || null
+  const markschemeAssetPath = markschemeAssetPaths[0] || null
 
   const { error } = await supabase
     .from('questions')
@@ -185,6 +221,8 @@ export async function updateQuestion(formData: FormData) {
 
   if (error) throw new Error('Could not update question.')
 
+  await insertQuestionAssets(supabase, questionId, 'question', questionAssetPaths, numberValue(formData, 'existing_question_asset_count') || 0)
+  await insertQuestionAssets(supabase, questionId, 'markscheme', markschemeAssetPaths, numberValue(formData, 'existing_markscheme_asset_count') || 0)
   await syncTopics(supabase, questionId, formData)
   revalidatePath('/dashboard/admin/question-bank')
   revalidatePath(`/dashboard/admin/question-bank/${questionId}/edit`)
