@@ -1,6 +1,6 @@
 "use client"
 
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -70,7 +70,7 @@ export default function LoginPage() {
           </div>
         </div>
         {error && <p className="text-sm text-red-700">{error}</p>}
-        <button className="w-full bg-[#00152a] text-white py-4 rounded-sm" disabled={loading}>{loading ? 'Logging in...' : 'Log in'}</button>
+        <button className="flex w-full items-center justify-center gap-2 rounded-sm bg-[#00152a] py-4 text-white disabled:cursor-not-allowed disabled:opacity-70" disabled={loading}>{loading ? <><Loader2 className="size-4 animate-spin" /> Logging in...</> : 'Log in'}</button>
       </form>
       <p className="mt-8 border-t border-[#c3c6ce55] pt-6 text-center font-body text-[#43474d]">Don&apos;t have an account?<Link href={`/auth/sign-up${nextPath !== '/dashboard' ? `?next=${encodeURIComponent(nextPath)}` : ''}`} className="ml-1 font-semibold text-[#00152a]">Sign Up</Link></p>
     </AuthShell>

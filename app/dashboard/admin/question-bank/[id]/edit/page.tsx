@@ -14,9 +14,9 @@ export default async function EditQuestionPage({ params }: { params: Promise<{ i
 
   const [{ data: question }, { data: papers }, { data: subjects }, { data: topics }] = await Promise.all([
     supabase.from('questions').select('id,paper_id,question_number,question_order,marks,prompt_text,markscheme_text,image_url,markscheme_image_url,question_image_path,markscheme_image_path,is_published,is_reviewed,question_topics(topic_id,is_primary)').eq('id', id).maybeSingle(),
-    supabase.from('papers').select('id,title,year,level,subjects(name),exam_sessions(session_month)').order('year', { ascending: false }).order('title'),
+    supabase.from('papers').select('id,title,year,level,subjects(id,name),exam_sessions(session_month)').order('year', { ascending: false }).order('title'),
     supabase.from('subjects').select('id,name').order('name'),
-    supabase.from('topics').select('id,name').order('name'),
+    supabase.from('topics').select('id,name,subject_id,parent_topic_id,level,sort_order,is_active').order('sort_order').order('name'),
   ])
 
   if (!question) notFound()

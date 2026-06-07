@@ -3,6 +3,14 @@ import { notFound } from 'next/navigation'
 import { BrandWordmark } from '@/components/brand-wordmark'
 import { createClient } from '@/lib/supabase/server'
 
+type PaperRelation<T> = T | T[] | null
+type QuestionRow = { papers?: PaperRelation<{ level?: string | null }> }
+type LinkRow = { questions?: QuestionRow | QuestionRow[] | null }
+
+function firstRelation<T>(relation: T | T[] | null | undefined) {
+  return Array.isArray(relation) ? relation[0] : relation
+}
+
 export default async function PracticeSubjectPage({ params }: { params: Promise<{ subject: string }> }) {
   const { subject: subjectParam } = await params
   const subjectName = decodeURIComponent(subjectParam)
@@ -11,13 +19,15 @@ export default async function PracticeSubjectPage({ params }: { params: Promise<
   const { data: subject } = await supabase.from('subjects').select('id,name').eq('name', subjectName).maybeSingle()
   if (!subject) notFound()
 
-  const { data: papers } = await supabase
-    .from('papers')
-    .select('id,level')
-    .eq('subject_id', subject.id)
-    .eq('is_published', true)
+  const { data: links } = await supabase
+    .from('question_topics')
+    .select('questions!inner(is_published,papers!inner(level,is_published,subject_id))')
+    .eq('questions.is_published', true)
+    .eq('questions.papers.is_published', true)
+    .eq('questions.papers.subject_id', subject.id)
 
-  const levels = Array.from(new Set((papers ?? []).map((paper) => paper.level || 'General'))).sort()
+  const levels = Array.from(new Set(((links ?? []) as unknown as LinkRow[])
+    .map((link) => firstRelation(firstRelation(link.questions)?.papers)?.level || 'General'))).sort()
 
   return (
     <div className="min-h-screen bg-[#fbf9f4]">
