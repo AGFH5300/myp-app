@@ -11,9 +11,9 @@ export default async function NewQuestionPage() {
   if (profile?.role !== 'admin') redirect('/dashboard')
 
   const [{ data: papers }, { data: subjects }, { data: topics }] = await Promise.all([
-    supabase.from('papers').select('id,title,year,level,subjects(name),exam_sessions(session_month)').order('year', { ascending: false }).order('title'),
+    supabase.from('papers').select('id,title,year,level,subjects(id,name),exam_sessions(session_month)').order('year', { ascending: false }).order('title'),
     supabase.from('subjects').select('id,name').order('name'),
-    supabase.from('topics').select('id,name').order('name'),
+    supabase.from('topics').select('id,name,subject_id,parent_topic_id,level,sort_order,is_active').order('sort_order').order('name'),
   ])
 
   return (

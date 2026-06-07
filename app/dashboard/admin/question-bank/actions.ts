@@ -30,6 +30,10 @@ function numberValue(formData: FormData, key: string) {
   return Number.isFinite(value) ? value : null
 }
 
+function slugify(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+}
+
 async function ensurePaper(supabase: Awaited<ReturnType<typeof requireAdmin>>, formData: FormData) {
   const existingPaperId = stringValue(formData, 'paper_id')
   const newPaperTitle = stringValue(formData, 'new_paper_title')
@@ -75,22 +79,39 @@ async function syncTopics(supabase: Awaited<ReturnType<typeof requireAdmin>>, qu
   const selectedTopicIds = formData.getAll('topic_ids').filter((value): value is string => typeof value === 'string' && value.length > 0)
   const newTopicName = stringValue(formData, 'new_topic_name')
   const primaryTopicId = stringValue(formData, 'primary_topic_id')
+  const topicGroupId = stringValue(formData, 'topic_group_id')
+  const subjectId = stringValue(formData, 'new_paper_subject_id') || null
+  const level = stringValue(formData, 'new_paper_level') || null
   const topicIds = [...selectedTopicIds]
 
   if (newTopicName) {
-    const { data: topic, error } = await supabase
+    const slug = slugify(newTopicName)
+    const existingTopicQuery = supabase
       .from('topics')
-      .upsert({ name: newTopicName }, { onConflict: 'name' })
       .select('id')
-      .single()
+      .eq('slug', slug)
+    const { data: existingTopic } = await (topicGroupId
+      ? existingTopicQuery.eq('parent_topic_id', topicGroupId)
+      : existingTopicQuery.is('parent_topic_id', null)
+    ).maybeSingle()
 
-    if (error || !topic) throw new Error('Could not create topic.')
-    topicIds.push(topic.id)
+    if (existingTopic?.id) {
+      topicIds.push(existingTopic.id)
+    } else {
+      const { data: topic, error } = await supabase
+        .from('topics')
+        .insert({ name: newTopicName, slug, subject_id: subjectId, parent_topic_id: topicGroupId || null, level, is_active: true })
+        .select('id')
+        .single()
+
+      if (error || !topic) throw new Error('Could not create topic.')
+      topicIds.push(topic.id)
+    }
   }
 
   await supabase.from('question_topics').delete().eq('question_id', questionId)
 
-  const uniqueTopicIds = Array.from(new Set(topicIds))
+  const uniqueTopicIds = Array.from(new Set(topicIds.filter(Boolean)))
   if (!uniqueTopicIds.length) return
 
   const primary = primaryTopicId || uniqueTopicIds[0]
