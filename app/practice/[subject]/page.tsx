@@ -46,7 +46,7 @@ export default async function PracticeSubjectPage({ params }: { params: Promise<
         <p className="mt-3 font-body text-[#43474d]">Choose a topic group to practise.</p>
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           {topics.map((topic) => (
-            <Link key={topic.id} href={`/practice/${encodeURIComponent(subject.name)}/${topic.id}`} className="rounded-md border border-[#c3c6ce66] bg-white p-6 hover:border-[#735b2b] focus:outline-none focus:ring-2 focus:ring-[#735b2b]/30">
+            <Link key={topic.id} href={`/practice/${encodeURIComponent(subject.name)}/${topic.id}`} className="cursor-pointer rounded-md border border-[#c3c6ce66] bg-white p-6 transition hover:border-[#735b2b] hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#735b2b]/30">
               <h2 className="font-headline text-3xl text-[#00152a]">{topic.name}</h2>
               <p className="mt-2 font-body text-sm text-[#43474d]">{topic.count} question{topic.count === 1 ? '' : 's'}</p>
             </Link>
