@@ -1,5 +1,6 @@
 "use client"
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from 'react'
 import { useFormStatus } from 'react-dom'
@@ -63,7 +64,7 @@ function StepCard({ step, title, state, helper, children }: { step: number; titl
   const label = state === 'complete' ? 'Complete' : state === 'current' ? 'Current step' : state === 'missing' ? 'Needs attention' : 'Locked'
 
   return (
-    <section className={`rounded-md border bg-white p-6 ${border}`} aria-disabled={locked}>
+    <section className={`rounded-md border bg-white p-6 ${border}`} data-disabled={locked ? 'true' : undefined}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="font-label text-xs uppercase tracking-[.16em] text-[#735b2b]">Step {step}</p>
@@ -89,12 +90,14 @@ function ChoiceCard({ active, title, helper, onClick }: { active: boolean; title
 }
 
 function UploadBox({ name, label, helper, onFiles }: { name: string; label: string; helper: string; onFiles: (files: File[]) => void }) {
+  const inputId = `${name}-input`
+
   return (
-    <label className="block cursor-pointer rounded-md border-2 border-dashed border-blue-200 bg-blue-50/50 p-5 font-body text-sm text-[#43474d] transition hover:border-blue-400 hover:bg-blue-50 focus-within:ring-2 focus-within:ring-blue-300">
+    <label htmlFor={inputId} className="block cursor-pointer rounded-md border-2 border-dashed border-blue-200 bg-blue-50/50 p-5 font-body text-sm text-[#43474d] transition hover:border-blue-400 hover:bg-blue-50 focus-within:ring-2 focus-within:ring-blue-300">
       <span className="block font-semibold text-[#00152a]">{label}</span>
       <span className="mt-1 block">{helper}</span>
       <span className="mt-4 inline-flex rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white">Upload images</span>
-      <input name={name} type="file" accept="image/*" multiple className="sr-only" onChange={(event) => onFiles(Array.from(event.target.files ?? []))} />
+      <input id={inputId} name={name} type="file" accept="image/*" multiple className="sr-only" onChange={(event) => onFiles(Array.from(event.target.files ?? []))} />
     </label>
   )
 }
@@ -218,26 +221,26 @@ export function QuestionBankForm({
           <ChoiceCard active={paperMode === 'new'} title="Create new paper" helper="Create a simple paper record first, then attach this question." onClick={() => { setPaperMode('new'); setPaperId('') }} />
         </div>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <label className="font-body text-sm text-[#43474d]">Subject<select name="new_paper_subject_id" value={subjectId} onChange={updateSubject} className="tsm-input mt-1 w-full cursor-pointer" required><option value="">Choose subject</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
+          <label htmlFor="admin-question-subject" className="font-body text-sm text-[#43474d]">Subject<select id="admin-question-subject" name="new_paper_subject_id" value={subjectId} onChange={updateSubject} className="tsm-input mt-1 w-full cursor-pointer" required><option value="">Choose subject</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
         </div>
         {paperMode === 'existing' ? (
           <div className="mt-5 rounded-md border border-blue-100 bg-blue-50/40 p-4">
-            <label className="font-body text-sm text-[#43474d]">Matching existing paper<select value={paperId} onChange={(event) => setPaperId(event.target.value)} className="tsm-input mt-1 w-full cursor-pointer"><option value="">Choose a paper</option>{filteredPapers.map((paper) => <option key={paper.id} value={paper.id}>{paperLabel(paper)}</option>)}</select></label>
+            <label htmlFor="admin-question-paper" className="font-body text-sm text-[#43474d]">Matching existing paper<select id="admin-question-paper" value={paperId} onChange={(event) => setPaperId(event.target.value)} className="tsm-input mt-1 w-full cursor-pointer"><option value="">Choose a paper</option>{filteredPapers.map((paper) => <option key={paper.id} value={paper.id}>{paperLabel(paper)}</option>)}</select></label>
             {!filteredPapers.length ? <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 font-body text-sm text-amber-800">No papers found for this subject. Create a new paper first. <button type="button" className="cursor-pointer font-semibold underline" onClick={() => setPaperMode('new')}>Create a new paper instead.</button></div> : null}
           </div>
         ) : (
           <div className="mt-5 rounded-md border border-blue-100 bg-blue-50/40 p-4">
             <div className="grid gap-4 md:grid-cols-3">
-              <label className="font-body text-sm text-[#43474d]">Year<input name="new_paper_year" type="number" min="2016" max="2030" className="tsm-input mt-1 w-full" value={newPaperYear} onChange={(event) => setNewPaperYear(event.target.value)} /></label>
-              <label className="font-body text-sm text-[#43474d]">Session<select name="new_paper_session" className="tsm-input mt-1 w-full" value={newPaperSession} onChange={(event) => setNewPaperSession(event.target.value)}><option value="May">May</option><option value="November">November</option></select></label>
-              <label className="font-body text-sm text-[#43474d]">Paper title/code<input name="new_paper_title" className="tsm-input mt-1 w-full" value={newPaperTitle} onChange={(event) => setNewPaperTitle(event.target.value)} placeholder="M25 Maths Extended" /></label>
+              <label htmlFor="admin-question-new-paper-year" className="font-body text-sm text-[#43474d]">Year<input id="admin-question-new-paper-year" name="new_paper_year" type="number" min="2016" max="2030" className="tsm-input mt-1 w-full" value={newPaperYear} onChange={(event) => setNewPaperYear(event.target.value)} /></label>
+              <label htmlFor="admin-question-new-paper-session" className="font-body text-sm text-[#43474d]">Session<select id="admin-question-new-paper-session" name="new_paper_session" className="tsm-input mt-1 w-full" value={newPaperSession} onChange={(event) => setNewPaperSession(event.target.value)}><option value="May">May</option><option value="November">November</option></select></label>
+              <label htmlFor="admin-question-new-paper-title" className="font-body text-sm text-[#43474d]">Paper title/code<input id="admin-question-new-paper-title" name="new_paper_title" className="tsm-input mt-1 w-full" value={newPaperTitle} onChange={(event) => setNewPaperTitle(event.target.value)} placeholder="M25 Maths Extended" /></label>
             </div>
             <details className="mt-4 rounded-sm border border-[#c3c6ce66] bg-white p-4">
               <summary className="cursor-pointer font-body font-semibold text-[#735b2b]">Advanced paper options</summary>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <label className="font-body text-sm text-[#43474d]">Source PDF path<input name="new_paper_source_pdf_path" className="tsm-input mt-1 w-full" placeholder="optional private path" /></label>
-                <label className="font-body text-sm text-[#43474d]">Mark scheme PDF path<input name="new_paper_markscheme_pdf_path" className="tsm-input mt-1 w-full" placeholder="optional private path" /></label>
-                <label className="flex items-center gap-2 font-body text-sm text-[#43474d]"><input type="checkbox" name="new_paper_is_published" defaultChecked /> Show paper to students</label>
+                <label htmlFor="admin-question-source-pdf" className="font-body text-sm text-[#43474d]">Source PDF path<input id="admin-question-source-pdf" name="new_paper_source_pdf_path" className="tsm-input mt-1 w-full" placeholder="optional private path" /></label>
+                <label htmlFor="admin-question-markscheme-pdf" className="font-body text-sm text-[#43474d]">Mark scheme PDF path<input id="admin-question-markscheme-pdf" name="new_paper_markscheme_pdf_path" className="tsm-input mt-1 w-full" placeholder="optional private path" /></label>
+                <label htmlFor="admin-question-new-paper-published" className="flex cursor-pointer items-center gap-2 font-body text-sm text-[#43474d]"><input id="admin-question-new-paper-published" type="checkbox" name="new_paper_is_published" defaultChecked /> Show paper to students</label>
               </div>
             </details>
           </div>
@@ -246,9 +249,9 @@ export function QuestionBankForm({
 
       <StepCard step={2} title="Question details" state={step2State} helper="Add the simple labels students and admins use to find this question.">
         <div className="grid gap-4 md:grid-cols-3">
-          <label className="font-body text-sm text-[#43474d]">Question number<input name="question_number" required className="tsm-input mt-1 w-full" value={questionNumber} onChange={(event) => setQuestionNumber(event.target.value)} placeholder="1a" /><span className="mt-1 block text-xs text-[#6f737b]">Use the number students see in the paper, for example 1a or 3(b).</span></label>
-          <label className="font-body text-sm text-[#43474d]">Marks<input name="marks" type="number" min="0" className="tsm-input mt-1 w-full" defaultValue={question?.marks ?? ''} /></label>
-          <label className="font-body text-sm text-[#43474d]">Display order<input name="question_order" type="number" className="tsm-input mt-1 w-full" defaultValue={question?.question_order ?? ''} placeholder="Optional" /><span className="mt-1 block text-xs text-[#6f737b]">Display order controls where it appears within the paper.</span></label>
+          <label htmlFor="admin-question-number" className="font-body text-sm text-[#43474d]">Question number<input id="admin-question-number" name="question_number" required className="tsm-input mt-1 w-full" value={questionNumber} onChange={(event) => setQuestionNumber(event.target.value)} placeholder="1a" /><span className="mt-1 block text-xs text-[#6f737b]">Use the number students see in the paper, for example 1a or 3(b).</span></label>
+          <label htmlFor="admin-question-marks" className="font-body text-sm text-[#43474d]">Marks<input id="admin-question-marks" name="marks" type="number" min="0" className="tsm-input mt-1 w-full" defaultValue={question?.marks ?? ''} /></label>
+          <label htmlFor="admin-question-order" className="font-body text-sm text-[#43474d]">Display order<input id="admin-question-order" name="question_order" type="number" className="tsm-input mt-1 w-full" defaultValue={question?.question_order ?? ''} placeholder="Optional" /><span className="mt-1 block text-xs text-[#6f737b]">Display order controls where it appears within the paper.</span></label>
         </div>
       </StepCard>
 
@@ -281,34 +284,34 @@ export function QuestionBankForm({
         <details className="mt-5 rounded-sm bg-[#f5f3ee] p-4">
           <summary className="cursor-pointer font-body font-semibold text-[#735b2b]">Advanced image and text options</summary>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <label className="font-body text-sm text-[#43474d]">Direct question image path<input name="question_image_path" className="tsm-input mt-1 w-full" defaultValue={question?.question_image_path || ''} placeholder="questions/file.png" /></label>
-            <label className="font-body text-sm text-[#43474d]">Direct mark scheme image path<input name="markscheme_image_path" className="tsm-input mt-1 w-full" defaultValue={question?.markscheme_image_path || ''} placeholder="markschemes/file.png" /></label>
-            <label className="font-body text-sm text-[#43474d]">Fallback public question image URL<input name="image_url" className="tsm-input mt-1 w-full" defaultValue={question?.image_url || ''} /></label>
-            <label className="font-body text-sm text-[#43474d]">Fallback public mark scheme image URL<input name="markscheme_image_url" className="tsm-input mt-1 w-full" defaultValue={question?.markscheme_image_url || ''} /></label>
-            <label className="md:col-span-2 font-body text-sm text-[#43474d]">Question placeholder text<textarea name="prompt_text" className="tsm-input mt-1 min-h-24 w-full" defaultValue={question?.prompt_text || ''} placeholder="Use only if there is no image yet." /></label>
-            <label className="md:col-span-2 font-body text-sm text-[#43474d]">Mark scheme placeholder text<textarea name="markscheme_text" className="tsm-input mt-1 min-h-24 w-full" defaultValue={question?.markscheme_text || ''} /></label>
+            <label htmlFor="admin-question-image-path" className="font-body text-sm text-[#43474d]">Direct question image path<input id="admin-question-image-path" name="question_image_path" className="tsm-input mt-1 w-full" defaultValue={question?.question_image_path || ''} placeholder="questions/file.png" /></label>
+            <label htmlFor="admin-question-markscheme-path" className="font-body text-sm text-[#43474d]">Direct mark scheme image path<input id="admin-question-markscheme-path" name="markscheme_image_path" className="tsm-input mt-1 w-full" defaultValue={question?.markscheme_image_path || ''} placeholder="markschemes/file.png" /></label>
+            <label htmlFor="admin-question-image-url" className="font-body text-sm text-[#43474d]">Fallback public question image URL<input id="admin-question-image-url" name="image_url" className="tsm-input mt-1 w-full" defaultValue={question?.image_url || ''} /></label>
+            <label htmlFor="admin-question-markscheme-url" className="font-body text-sm text-[#43474d]">Fallback public mark scheme image URL<input id="admin-question-markscheme-url" name="markscheme_image_url" className="tsm-input mt-1 w-full" defaultValue={question?.markscheme_image_url || ''} /></label>
+            <label htmlFor="admin-question-prompt-text" className="md:col-span-2 font-body text-sm text-[#43474d]">Question placeholder text<textarea id="admin-question-prompt-text" name="prompt_text" className="tsm-input mt-1 min-h-24 w-full" defaultValue={question?.prompt_text || ''} placeholder="Use only if there is no image yet." /></label>
+            <label htmlFor="admin-question-markscheme-text" className="md:col-span-2 font-body text-sm text-[#43474d]">Mark scheme placeholder text<textarea id="admin-question-markscheme-text" name="markscheme_text" className="tsm-input mt-1 min-h-24 w-full" defaultValue={question?.markscheme_text || ''} /></label>
           </div>
         </details>
       </StepCard>
 
       <StepCard step={4} title="Topics & publish" state={step4State} helper="Choose a topic group, then the exact subtopic. Publish only when checked.">
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="font-body text-sm text-[#43474d]">Topic group<select name="topic_group_id" value={topicGroupId} onChange={(event) => { setTopicGroupId(event.target.value); setPrimaryTopicId('') }} className="tsm-input mt-1 w-full cursor-pointer"><option value="">Choose topic group</option>{mainTopicGroups.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></label>
-          <label className="font-body text-sm text-[#43474d]">Exact subtopic<select name="topic_ids" value={primaryTopicId || topicGroupId} onChange={(event) => setPrimaryTopicId(event.target.value)} className="tsm-input mt-1 w-full cursor-pointer"><option value={topicGroupId}>Use the topic group</option>{subtopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></label>
-          <label className="md:col-span-2 font-body text-sm text-[#43474d]">Optional: create new subtopic under selected group<input name="new_topic_name" className="tsm-input mt-1 w-full" value={newTopicName} onChange={(event) => setNewTopicName(event.target.value)} placeholder="e.g. Inequalities and feasible regions" /></label>
+          <label htmlFor="admin-question-topic-group" className="font-body text-sm text-[#43474d]">Topic group<select id="admin-question-topic-group" name="topic_group_id" value={topicGroupId} onChange={(event) => { setTopicGroupId(event.target.value); setPrimaryTopicId('') }} className="tsm-input mt-1 w-full cursor-pointer"><option value="">Choose topic group</option>{mainTopicGroups.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></label>
+          <label htmlFor="admin-question-primary-topic" className="font-body text-sm text-[#43474d]">Exact subtopic<select id="admin-question-primary-topic" name="topic_ids" value={primaryTopicId || topicGroupId} onChange={(event) => setPrimaryTopicId(event.target.value)} className="tsm-input mt-1 w-full cursor-pointer"><option value={topicGroupId}>Use the topic group</option>{subtopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></label>
+          <label htmlFor="admin-question-new-topic" className="md:col-span-2 font-body text-sm text-[#43474d]">Optional: create new subtopic under selected group<input id="admin-question-new-topic" name="new_topic_name" className="tsm-input mt-1 w-full" value={newTopicName} onChange={(event) => setNewTopicName(event.target.value)} placeholder="e.g. Inequalities and feasible regions" /></label>
         </div>
         {!mainTopicGroups.length ? <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 font-body text-sm text-amber-800">No active topic groups match this subject. Create the group first, or use the legacy secondary section only for old data.</p> : null}
         <details className="mt-5 rounded-sm bg-[#f5f3ee] p-4">
           <summary className="cursor-pointer font-body font-semibold text-[#735b2b]">Legacy/global secondary topics</summary>
           <p className="mt-2 font-body text-sm text-[#43474d]">These are old/global topics. They are available only as secondary tags, not as the main topic.</p>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {legacyTopics.map((topic) => <label key={topic.id} className="flex cursor-pointer items-center gap-2 rounded-sm bg-white px-3 py-2 font-body text-sm text-[#43474d] hover:bg-blue-50"><input type="checkbox" name="topic_ids" value={topic.id} defaultChecked={selectedTopics.has(topic.id)} /> {topic.name}</label>)}
+            {legacyTopics.map((topic) => <label key={topic.id} htmlFor={`admin-question-legacy-topic-${topic.id}`} className="flex cursor-pointer items-center gap-2 rounded-sm bg-white px-3 py-2 font-body text-sm text-[#43474d] hover:bg-blue-50"><input id={`admin-question-legacy-topic-${topic.id}`} type="checkbox" name="topic_ids" value={topic.id} defaultChecked={selectedTopics.has(topic.id)} /> {topic.name}</label>)}
             {!legacyTopics.length ? <p className="font-body text-sm text-[#43474d]">No legacy/global topics match this scope.</p> : null}
           </div>
         </details>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <label className={`cursor-pointer rounded-md border p-4 font-body text-sm transition hover:shadow-sm ${published ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}><span className="mb-2 inline-flex rounded-full bg-white px-2 py-1 text-xs font-semibold">{published ? 'Show to students' : 'Save as draft'}</span><span className="flex items-center gap-2"><input type="checkbox" name="is_published" checked={published} onChange={(event) => setPublished(event.target.checked)} /> Published</span><span className="mt-1 block text-xs">Draft questions stay hidden from student practice pages.</span></label>
-          <label className={`cursor-pointer rounded-md border p-4 font-body text-sm transition hover:shadow-sm ${reviewed ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}><span className="mb-2 inline-flex rounded-full bg-white px-2 py-1 text-xs font-semibold">{reviewed ? 'Checked and ready' : 'Not checked'}</span><span className="flex items-center gap-2"><input type="checkbox" name="is_reviewed" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /> Reviewed</span><span className="mt-1 block text-xs">Use this after the image, mark scheme, and topic have been checked.</span></label>
+          <label htmlFor="admin-question-published" className={`cursor-pointer rounded-md border p-4 font-body text-sm transition hover:shadow-sm focus-within:ring-2 focus-within:ring-emerald-300 ${published ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}><span className="mb-2 inline-flex rounded-full bg-white px-2 py-1 text-xs font-semibold">{published ? 'Show to students' : 'Save as draft'}</span><span className="flex items-center gap-2"><input id="admin-question-published" type="checkbox" name="is_published" checked={published} onChange={(event) => setPublished(event.target.checked)} /> Published</span><span className="mt-1 block text-xs">Draft questions stay hidden from student practice pages.</span></label>
+          <label htmlFor="admin-question-reviewed" className={`cursor-pointer rounded-md border p-4 font-body text-sm transition hover:shadow-sm focus-within:ring-2 focus-within:ring-blue-300 ${reviewed ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}><span className="mb-2 inline-flex rounded-full bg-white px-2 py-1 text-xs font-semibold">{reviewed ? 'Checked and ready' : 'Not checked'}</span><span className="flex items-center gap-2"><input id="admin-question-reviewed" type="checkbox" name="is_reviewed" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /> Reviewed</span><span className="mt-1 block text-xs">Use this after the image, mark scheme, and topic have been checked.</span></label>
         </div>
       </StepCard>
 
@@ -336,7 +339,7 @@ function PreviewCard({ title, url, subtitle, order }: { title: string; url: stri
         </div>
         <a href={url} target="_blank" rel="noreferrer" className="cursor-pointer rounded-md border border-blue-200 px-3 py-1 font-body text-xs font-semibold text-blue-700 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300">Open in new tab</a>
       </div>
-      <img src={url} alt={title} className="max-h-80 w-full rounded-sm border border-[#f0eee9] bg-[#f8f6f1] object-contain" />
+      <Image src={url} alt={title} width={900} height={600} unoptimized className="max-h-80 w-full rounded-sm border border-[#f0eee9] bg-[#f8f6f1] object-contain" />
     </div>
   )
 }

@@ -172,7 +172,7 @@ export function VerifyOtpForm({ email, username, fullName, next }: { email: stri
 
       <form onSubmit={handleVerify} className="mt-8 space-y-6" noValidate>
         <div>
-          <label className="mb-3 block font-label text-xs uppercase tracking-widest text-[#43474d]">Verification code</label>
+          <label htmlFor="otp-digit-1" className="mb-3 block font-label text-xs uppercase tracking-widest text-[#43474d]">Verification code</label>
           <div
             className="grid w-full gap-2"
             style={{ gridTemplateColumns: `repeat(${OTP_LENGTH}, minmax(0, 1fr))` }}
@@ -183,6 +183,7 @@ export function VerifyOtpForm({ email, username, fullName, next }: { email: stri
               return (
                 <input
                   key={index}
+                  id={`otp-digit-${index + 1}`}
                   ref={(node) => {
                     inputRefs.current[index] = node
                   }}
@@ -304,7 +305,7 @@ export function VerifyOtpForm({ email, username, fullName, next }: { email: stri
         {error && <p className="text-sm text-red-700">{error}</p>}
 
         <button
-          className="flex w-full items-center justify-center gap-2 rounded-sm bg-[#00152a] py-4 text-white transition-colors disabled:cursor-not-allowed disabled:border disabled:border-[#b6bec8] disabled:bg-[#d6dce5] disabled:text-[#667281]"
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-sm bg-[#00152a] py-4 text-white transition-colors hover:bg-[#08284a] focus:outline-none focus:ring-2 focus:ring-[#00152a]/30 disabled:cursor-not-allowed disabled:border disabled:border-[#b6bec8] disabled:bg-[#d6dce5] disabled:text-[#667281]"
           disabled={!canVerify}
           type="submit"
         >
@@ -324,7 +325,7 @@ export function VerifyOtpForm({ email, username, fullName, next }: { email: stri
           type="button"
           onClick={handleResend}
           disabled={resending || loading || !normalizedEmail}
-          className="inline-flex items-center gap-1.5 font-semibold text-[#735b2b] disabled:cursor-not-allowed disabled:text-[#9d937f]"
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-sm font-semibold text-[#735b2b] underline-offset-4 hover:underline focus:outline-none focus:ring-2 focus:ring-[#735b2b]/30 disabled:cursor-not-allowed disabled:text-[#9d937f]"
         >
           {resending ? (
             <>

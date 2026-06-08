@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { BrandWordmark } from '@/components/brand-wordmark'
@@ -65,7 +66,7 @@ export default async function PracticeQuestionPage({ params }: { params: Promise
           <h2 className="font-headline text-2xl text-[#00152a]">Try the question</h2>
           <div className="mt-5 max-w-4xl">
             {questionImageUrl ? (
-              <img src={questionImageUrl} alt={`Question ${question.question_number}`} className="h-auto max-w-full rounded-md border border-[#c3c6ce66] bg-white" />
+              <Image src={questionImageUrl} alt={`Question ${question.question_number}`} width={1200} height={800} unoptimized className="h-auto max-w-full rounded-md border border-[#c3c6ce66] bg-white" />
             ) : (
               <p className="font-body whitespace-pre-wrap text-[#00152a]">{question.prompt_text}</p>
             )}
@@ -76,7 +77,7 @@ export default async function PracticeQuestionPage({ params }: { params: Promise
           <summary className="cursor-pointer font-body font-semibold text-[#735b2b]">Reveal mark scheme</summary>
           <div className="mt-5 max-w-4xl">
             {markschemeImageUrl ? (
-              <img src={markschemeImageUrl} alt={`Question ${question.question_number} mark scheme`} className="h-auto max-w-full rounded-md border border-[#c3c6ce66] bg-white" />
+              <Image src={markschemeImageUrl} alt={`Question ${question.question_number} mark scheme`} width={1200} height={800} unoptimized className="h-auto max-w-full rounded-md border border-[#c3c6ce66] bg-white" />
             ) : question.markscheme_text ? (
               <p className="font-body whitespace-pre-wrap text-[#43474d]">{question.markscheme_text}</p>
             ) : (

@@ -55,11 +55,11 @@ export default function LoginPage() {
       <h1 className="font-headline text-4xl text-[#00152a]">Log in</h1>
       <p className="mt-3 font-body text-[#43474d]">Access your MYP eAssessment workspace.</p>
       <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-        <div><label className="font-label text-xs uppercase tracking-[.05em] text-[#43474d]">Email</label><input className="tsm-input" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required disabled={loading} /></div>
+        <div><label htmlFor="login-email" className="font-label text-xs uppercase tracking-[.05em] text-[#43474d]">Email</label><input id="login-email" className="tsm-input" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required disabled={loading} /></div>
         <div>
-          <label className="font-label text-xs uppercase tracking-[.05em] text-[#43474d]">Password</label>
+          <label htmlFor="login-password" className="font-label text-xs uppercase tracking-[.05em] text-[#43474d]">Password</label>
           <div className="relative">
-            <input className="tsm-input pr-10" type={showPassword ? "text" : "password"} value={password} onChange={(e)=>setPassword(e.target.value)} required disabled={loading} />
+            <input id="login-password" className="tsm-input pr-10" type={showPassword ? "text" : "password"} value={password} onChange={(e)=>setPassword(e.target.value)} required disabled={loading} />
             <button
               type="button"
               className="absolute right-0 top-1/2 -translate-y-1/2 text-[#43474d] hover:text-[#00152a] disabled:cursor-not-allowed disabled:opacity-60"
@@ -72,7 +72,7 @@ export default function LoginPage() {
           </div>
         </div>
         {error && <p className="text-sm text-red-700">{error}</p>}
-        <button type="submit" className="flex w-full items-center justify-center gap-2 rounded-sm bg-[#00152a] py-4 text-white disabled:cursor-not-allowed disabled:opacity-70" disabled={loading || !email || !password}>{loading ? <><Loader2 className="size-4 animate-spin" /> Logging in...</> : 'Log in'}</button>
+        <button type="submit" className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-sm bg-[#00152a] py-4 text-white transition-colors hover:bg-[#08284a] focus:outline-none focus:ring-2 focus:ring-[#00152a]/30 disabled:cursor-not-allowed disabled:opacity-70" disabled={loading || !email || !password}>{loading ? <><Loader2 className="size-4 animate-spin" /> Logging in...</> : 'Log in'}</button>
       </form>
       <p className="mt-8 border-t border-[#c3c6ce55] pt-6 text-center font-body text-[#43474d]">Don&apos;t have an account?<Link href={`/auth/sign-up${nextPath !== '/dashboard' ? `?next=${encodeURIComponent(nextPath)}` : ''}`} className="ml-1 font-semibold text-[#00152a]">Sign Up</Link></p>
     </AuthShell>

@@ -49,7 +49,7 @@ export function AuthShell({ eyebrow, title, description, quote, attribution, chi
                       window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY)
                     }
                   }}
-                  className="font-body text-sm text-[#735b2b] underline-offset-4 hover:underline"
+                  className="rounded-sm font-body text-sm text-[#735b2b] underline-offset-4 hover:underline focus:outline-none focus:ring-2 focus:ring-[#735b2b]/30"
                 >
                   Back to home
                 </Link>

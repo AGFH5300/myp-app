@@ -733,14 +733,15 @@ export default function SignUpPage() {
       <p className="mt-3 font-body text-[#43474d]">Create your account to start structured, source-based revision.</p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-6" noValidate autoComplete="off">
-        <input type="text" name="fake_username" autoComplete="username" className="hidden" tabIndex={-1} />
-        <input type="password" name="fake_password" autoComplete="new-password" className="hidden" tabIndex={-1} />
+        <input type="text" name="fake_username" autoComplete="username" className="hidden" tabIndex={-1} aria-label="Autofill username placeholder" />
+        <input type="password" name="fake_password" autoComplete="new-password" className="hidden" tabIndex={-1} aria-label="Autofill password placeholder" />
 
         <div>
-          <label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Username</label>
+          <label htmlFor="signup-username" className="font-label text-xs uppercase tracking-widest text-[#43474d]">Username</label>
           <div className="relative">
             <input
               ref={usernameRef}
+              id="signup-username"
               className={`tsm-input pr-10 ${fieldStatusClass(usernameField)}`}
               type="text"
               name="signup_username_input"
@@ -765,9 +766,10 @@ export default function SignUpPage() {
         </div>
 
         <div>
-          <label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Full name</label>
+          <label htmlFor="signup-full-name" className="font-label text-xs uppercase tracking-widest text-[#43474d]">Full name</label>
           <input
             ref={fullNameRef}
+            id="signup-full-name"
             className={`tsm-input ${fieldStatusClass({ status: fullNameField.status })}`}
             type="text"
             name="signup_full_name_input"
@@ -786,10 +788,11 @@ export default function SignUpPage() {
         </div>
 
         <div>
-          <label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Email</label>
+          <label htmlFor="signup-email" className="font-label text-xs uppercase tracking-widest text-[#43474d]">Email</label>
           <div className="relative">
             <input
               ref={emailRef}
+              id="signup-email"
               className={`tsm-input pr-10 ${fieldStatusClass(emailField)}`}
               type="email"
               name="signup_email_input"
@@ -817,9 +820,8 @@ export default function SignUpPage() {
 
         <button
           type="submit"
-          className="flex w-full items-center justify-center gap-2 rounded-sm bg-[#00152a] py-4 text-white transition-colors disabled:cursor-not-allowed disabled:border disabled:border-[#b6bec8] disabled:bg-[#d6dce5] disabled:text-[#667281]"
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-sm bg-[#00152a] py-4 text-white transition-colors hover:bg-[#08284a] focus:outline-none focus:ring-2 focus:ring-[#00152a]/30 disabled:cursor-not-allowed disabled:border disabled:border-[#b6bec8] disabled:bg-[#d6dce5] disabled:text-[#667281]"
           disabled={!canSubmit}
-          aria-disabled={!canSubmit}
         >
           {isSubmitting ? (
             <>

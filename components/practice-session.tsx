@@ -1,7 +1,8 @@
 "use client"
 
-import { useMemo, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
+import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AppIcon } from '@/components/app-icon'
 
@@ -37,14 +38,17 @@ export function PracticeSession({ paper, questions, studentId, bookmarkedQuestio
     const onChange = (v: string) => setAnswers((a) => ({ ...a, [q.id]: v }))
 
     if (q.answer_mode === 'multiple_choice' && q.options_json?.length) {
-      return <div className="mt-8 space-y-3">{q.options_json.map((opt) => <label key={opt} className="block p-4 border border-[#c3c6ce66] bg-[#f5f3ee]"><input type="radio" name={q.id} className="mr-3" checked={value === opt} onChange={() => onChange(opt)} /><span className="font-body">{opt}</span></label>)}</div>
+      return <div className="mt-8 space-y-3">{q.options_json.map((opt, optionIndex) => {
+        const optionId = `${q.id}-option-${optionIndex}`
+        return <label key={opt} htmlFor={optionId} className="block cursor-pointer border border-[#c3c6ce66] bg-[#f5f3ee] p-4 hover:border-[#735b2b] focus-within:ring-2 focus-within:ring-[#735b2b]/30"><input id={optionId} type="radio" name={q.id} className="mr-3" checked={value === opt} onChange={() => onChange(opt)} /><span className="font-body">{opt}</span></label>
+      })}</div>
     }
     if (q.answer_mode === 'dropdown' && q.options_json?.length) {
-      return <select className={common} value={value} onChange={(e) => onChange(e.target.value)}><option value="">Select an option</option>{q.options_json.map((opt) => <option key={opt}>{opt}</option>)}</select>
+      return <select aria-label={`Answer for question ${q.question_number}`} className={common} value={value} onChange={(e) => onChange(e.target.value)}><option value="">Select an option</option>{q.options_json.map((opt) => <option key={opt}>{opt}</option>)}</select>
     }
-    if (q.answer_mode === 'short_text') return <input className={common} value={value} onChange={(e) => onChange(e.target.value)} placeholder="Type your response" />
-    if (q.answer_mode === 'numeric') return <input type="number" className={common} value={value} onChange={(e) => onChange(e.target.value)} placeholder="Enter a numeric answer" />
-    if (q.answer_mode === 'long_text') return <textarea className={`${common} min-h-40`} value={value} onChange={(e) => onChange(e.target.value)} placeholder="Write your detailed response" />
+    if (q.answer_mode === 'short_text') return <input aria-label={`Answer for question ${q.question_number}`} className={common} value={value} onChange={(e) => onChange(e.target.value)} placeholder="Type your response" />
+    if (q.answer_mode === 'numeric') return <input aria-label={`Answer for question ${q.question_number}`} type="number" className={common} value={value} onChange={(e) => onChange(e.target.value)} placeholder="Enter a numeric answer" />
+    if (q.answer_mode === 'long_text') return <textarea aria-label={`Answer for question ${q.question_number}`} className={`${common} min-h-40`} value={value} onChange={(e) => onChange(e.target.value)} placeholder="Write your detailed response" />
 
     return <div className="mt-8 border border-dashed border-[#c3c6ce] p-6 bg-[#f5f3ee] font-body text-sm text-[#43474d]">This response mode ({q.answer_mode}) is not interactive yet. A richer input module can be plugged in here.</div>
   }
@@ -65,6 +69,7 @@ export function PracticeSession({ paper, questions, studentId, bookmarkedQuestio
   }
 
   async function submitCurrentAndNext() {
+    if (saving) return
     setSaving(true)
     setError(null)
     const supabase = createClient()
@@ -97,21 +102,21 @@ export function PracticeSession({ paper, questions, studentId, bookmarkedQuestio
       <div className="h-1 bg-[#e4e2dd] mb-8"><div className="h-full bg-[#735b2b]" style={{ width: `${progress}%` }} /></div>
       <div className="grid lg:grid-cols-[1fr_260px] gap-6">
         <article className="bg-white border border-[#c3c6ce66] p-8">
-          <div className="flex items-center justify-between gap-3 mb-4"><div className="flex items-center gap-3"><span className="font-label text-xs uppercase tracking-widest text-[#43474d]">Question {q.question_number}</span><span className="font-body text-sm text-[#735b2b]">{q.marks ?? 0} marks</span></div><button className="inline-flex items-center gap-2 text-sm text-[#735b2b]" onClick={toggleBookmark}><AppIcon name="bookmark" className={`size-4 ${bookmarks.has(q.id) ? 'fill-[#735b2b]' : ''}`} />{bookmarks.has(q.id) ? 'Bookmarked' : 'Bookmark'}</button></div>
+          <div className="flex items-center justify-between gap-3 mb-4"><div className="flex items-center gap-3"><span className="font-label text-xs uppercase tracking-widest text-[#43474d]">Question {q.question_number}</span><span className="font-body text-sm text-[#735b2b]">{q.marks ?? 0} marks</span></div><button type="button" className="inline-flex cursor-pointer items-center gap-2 rounded-sm text-sm text-[#735b2b] underline-offset-4 hover:underline focus:outline-none focus:ring-2 focus:ring-[#735b2b]/30" onClick={toggleBookmark}><AppIcon name="bookmark" className={`size-4 ${bookmarks.has(q.id) ? 'fill-[#735b2b]' : ''}`} />{bookmarks.has(q.id) ? 'Bookmarked' : 'Bookmark'}</button></div>
           <div className="space-y-4">
-            {q.context_image_url && <img src={q.context_image_url} alt={`Question ${q.question_number} context`} className="max-w-full h-auto rounded-md" />}
-            {q.image_url && <img src={q.image_url} alt={`Question ${q.question_number}`} className="max-w-full h-auto rounded-md" />}
-            {q.secondary_image_url && <img src={q.secondary_image_url} alt={`Question ${q.question_number} secondary`} className="max-w-full h-auto rounded-md" />}
+            {q.context_image_url && <Image src={q.context_image_url} alt={`Question ${q.question_number} context`} width={1200} height={800} unoptimized className="h-auto max-w-full rounded-md" />}
+            {q.image_url && <Image src={q.image_url} alt={`Question ${q.question_number}`} width={1200} height={800} unoptimized className="h-auto max-w-full rounded-md" />}
+            {q.secondary_image_url && <Image src={q.secondary_image_url} alt={`Question ${q.question_number} secondary`} width={1200} height={800} unoptimized className="h-auto max-w-full rounded-md" />}
             {!q.context_image_url && !q.image_url && !q.secondary_image_url && q.prompt_text && <p className="font-body text-lg text-[#00152a] whitespace-pre-wrap">{q.prompt_text}</p>}
           </div>
           {answerField()}
           {error && <p className="text-sm text-red-700 mt-4">{error}</p>}
           <div className="mt-8 flex justify-between">
-            <button className="tsm-btn-secondary" onClick={() => setIndex((v) => Math.max(0, v - 1))}>Previous</button>
-            <button className="tsm-btn-primary" onClick={submitCurrentAndNext} disabled={saving}>{saving ? 'Saving...' : index === questions.length - 1 ? 'Finish' : 'Save & Next'}</button>
+            <button type="button" className="tsm-btn-secondary" onClick={() => setIndex((v) => Math.max(0, v - 1))}>Previous</button>
+            <button type="button" className="tsm-btn-primary disabled:cursor-not-allowed disabled:opacity-60" onClick={submitCurrentAndNext} disabled={saving}>{saving ? 'Saving...' : index === questions.length - 1 ? 'Finish' : 'Save & Next'}</button>
           </div>
         </article>
-        <aside className="bg-[#f5f3ee] border border-[#c3c6ce66] p-6"><h2 className="font-headline text-xl text-[#00152a] mb-4">Question Index</h2><div className="grid grid-cols-5 gap-2">{questions.map((item, i) => <button key={item.id} onClick={() => setIndex(i)} className={`h-9 border text-sm ${i === index ? 'bg-[#00152a] text-white border-[#00152a]' : 'bg-white border-[#c3c6ce66]'}`}>{i + 1}</button>)}</div></aside>
+        <aside className="bg-[#f5f3ee] border border-[#c3c6ce66] p-6"><h2 className="font-headline text-xl text-[#00152a] mb-4">Question Index</h2><div className="grid grid-cols-5 gap-2">{questions.map((item, i) => <button key={item.id} type="button" onClick={() => setIndex(i)} aria-label={`Go to question ${i + 1}`} aria-current={i === index ? 'step' : undefined} className={`h-9 cursor-pointer border text-sm transition hover:border-[#735b2b] focus:outline-none focus:ring-2 focus:ring-[#735b2b]/30 ${i === index ? 'bg-[#00152a] text-white border-[#00152a]' : 'bg-white border-[#c3c6ce66]'}`}>{i + 1}</button>)}</div></aside>
       </div>
     </div>
   )

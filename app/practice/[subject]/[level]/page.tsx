@@ -59,7 +59,7 @@ export default async function PracticeTopicGroupPage({ params }: { params: Promi
         <p className="mt-3 font-body text-[#43474d]">Choose a subtopic.</p>
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           {visibleChildren.map((child) => (
-            <Link key={child.id} href={`/practice/${encodeURIComponent(subject.name)}/${topicGroup.id}/${child.id}`} className="rounded-md border border-[#c3c6ce66] bg-white p-6 hover:border-[#735b2b] focus:outline-none focus:ring-2 focus:ring-[#735b2b]/30">
+            <Link key={child.id} href={`/practice/${encodeURIComponent(subject.name)}/${topicGroup.id}/${child.id}`} className="cursor-pointer rounded-md border border-[#c3c6ce66] bg-white p-6 transition hover:border-[#735b2b] hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#735b2b]/30">
               <h2 className="font-headline text-3xl text-[#00152a]">{child.name}</h2>
               <p className="mt-2 font-body text-sm text-[#43474d]">{counts.get(child.id)} question{counts.get(child.id) === 1 ? '' : 's'}</p>
             </Link>

@@ -177,9 +177,10 @@ export default function SetPasswordPage() {
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-6" noValidate>
         <div>
-          <label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Password</label>
+          <label htmlFor="set-password" className="font-label text-xs uppercase tracking-widest text-[#43474d]">Password</label>
           <div className="relative">
             <input
+              id="set-password"
               className="tsm-input pr-10"
               type={showPassword ? 'text' : 'password'}
               minLength={8}
@@ -221,9 +222,10 @@ export default function SetPasswordPage() {
         </div>
 
         <div>
-          <label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Confirm password</label>
+          <label htmlFor="set-password-confirm" className="font-label text-xs uppercase tracking-widest text-[#43474d]">Confirm password</label>
           <div className="relative">
             <input
+              id="set-password-confirm"
               className="tsm-input pr-10"
               type={showConfirmPassword ? 'text' : 'password'}
               minLength={8}
@@ -251,7 +253,7 @@ export default function SetPasswordPage() {
         {error && <p className="text-sm text-red-700">{error}</p>}
 
         <button
-          className="flex w-full items-center justify-center gap-2 rounded-sm bg-[#00152a] py-4 text-white transition-colors disabled:cursor-not-allowed disabled:border disabled:border-[#b6bec8] disabled:bg-[#d6dce5] disabled:text-[#667281]"
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-sm bg-[#00152a] py-4 text-white transition-colors hover:bg-[#08284a] focus:outline-none focus:ring-2 focus:ring-[#00152a]/30 disabled:cursor-not-allowed disabled:border disabled:border-[#b6bec8] disabled:bg-[#d6dce5] disabled:text-[#667281]"
           disabled={!canSubmit}
           type="submit"
         >
