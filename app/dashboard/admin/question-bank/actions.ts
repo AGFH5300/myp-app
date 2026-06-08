@@ -42,7 +42,7 @@ async function ensurePaper(supabase: Awaited<ReturnType<typeof requireAdmin>>, f
   const subjectId = stringValue(formData, 'new_paper_subject_id')
   const year = numberValue(formData, 'new_paper_year')
   const session = stringValue(formData, 'new_paper_session') || 'May'
-  const level = stringValue(formData, 'new_paper_level') || 'Maths Extended'
+  const level = stringValue(formData, 'new_paper_level') || null
 
   if (!newPaperTitle || !subjectId || !year) throw new Error('New papers need a title, subject, and year.')
 
@@ -81,7 +81,6 @@ async function syncTopics(supabase: Awaited<ReturnType<typeof requireAdmin>>, qu
   const primaryTopicId = stringValue(formData, 'primary_topic_id')
   const topicGroupId = stringValue(formData, 'topic_group_id')
   const subjectId = stringValue(formData, 'new_paper_subject_id') || null
-  const level = stringValue(formData, 'new_paper_level') || null
   const topicIds = [...selectedTopicIds]
 
   if (newTopicName) {
@@ -90,6 +89,7 @@ async function syncTopics(supabase: Awaited<ReturnType<typeof requireAdmin>>, qu
       .from('topics')
       .select('id')
       .eq('slug', slug)
+      .eq('subject_id', subjectId)
     const { data: existingTopic } = await (topicGroupId
       ? existingTopicQuery.eq('parent_topic_id', topicGroupId)
       : existingTopicQuery.is('parent_topic_id', null)
@@ -100,7 +100,7 @@ async function syncTopics(supabase: Awaited<ReturnType<typeof requireAdmin>>, qu
     } else {
       const { data: topic, error } = await supabase
         .from('topics')
-        .insert({ name: newTopicName, slug, subject_id: subjectId, parent_topic_id: topicGroupId || null, level, is_active: true })
+        .insert({ name: newTopicName, slug, subject_id: subjectId, parent_topic_id: topicGroupId || null, level: null, is_active: true })
         .select('id')
         .single()
 

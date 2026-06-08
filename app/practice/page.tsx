@@ -26,11 +26,11 @@ export default async function PracticeHomePage() {
         <section className="max-w-3xl">
           <p className="font-label text-xs uppercase tracking-[.16em] text-[#735b2b]">Past paper practice</p>
           <h1 className="mt-4 font-headline text-5xl text-[#00152a]">Practise questions by topic.</h1>
-          <p className="mt-4 font-body text-lg text-[#43474d]">Choose a subject, then a level and topic to open individual past paper questions.</p>
+          <p className="mt-4 font-body text-lg text-[#43474d]">Choose a subject, then a topic group and subtopic to open individual past paper questions.</p>
         </section>
         <section className="mt-10 grid gap-4 md:grid-cols-2">
           {uniqueSubjects.map((subject) => (
-            <Link key={subject.id} href={`/practice/${encodeURIComponent(subject.name)}`} className="rounded-md border border-[#c3c6ce66] bg-white p-6 hover:border-[#735b2b]">
+            <Link key={subject.id} href={`/practice/${encodeURIComponent(subject.name)}`} className="rounded-md border border-[#c3c6ce66] bg-white p-6 hover:border-[#735b2b] focus:outline-none focus:ring-2 focus:ring-[#735b2b]/30">
               <h2 className="font-headline text-3xl text-[#00152a]">{subject.name}</h2>
               <p className="mt-2 font-body text-sm text-[#43474d]">{subject.description || 'Open topic-based past paper questions.'}</p>
             </Link>
