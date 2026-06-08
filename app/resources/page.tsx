@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { AppIcon } from '@/components/app-icon'
+import { PendingLink } from '@/components/pending-link'
 import { BrandWordmark } from '@/components/brand-wordmark'
 import { createClient } from '@/lib/supabase/server'
 
@@ -107,12 +108,12 @@ export default async function ResourcesPage() {
                           </div>
                           {resource.source_label && <p className="mt-4 font-body text-xs text-[#58616c]">Source: {resource.source_label}</p>}
                           <div className="mt-5 flex flex-wrap gap-3">
-                            <Link href={`/api/resources/${resource.id}/open`} className="tsm-btn-primary inline-flex items-center gap-2">
+                            <PendingLink href={`/api/resources/${resource.id}/open`} className="tsm-btn-primary inline-flex items-center gap-2" pendingChildren={<><AppIcon name="open_in_new" className="size-4" />Opening...</>}>
                               <AppIcon name="open_in_new" className="size-4" />Open
-                            </Link>
-                            <Link href={`/api/resources/${resource.id}/download`} className="tsm-btn-secondary inline-flex items-center gap-2">
+                            </PendingLink>
+                            <PendingLink href={`/api/resources/${resource.id}/download`} className="tsm-btn-secondary inline-flex items-center gap-2" pendingChildren={<><AppIcon name="download" className="size-4" />Downloading...</>}>
                               <AppIcon name="download" className="size-4" />Download
-                            </Link>
+                            </PendingLink>
                           </div>
                         </article>
                       ))}

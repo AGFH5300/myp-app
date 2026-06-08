@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { BrandWordmark } from '@/components/brand-wordmark'
 import { createClient } from '@/lib/supabase/server'
 import { resolveQuestionAssetUrl } from '@/lib/question-assets'
+import { PendingSubmitButton } from '@/components/pending-submit-button'
 
 function firstRelation<T>(relation: T | T[] | null | undefined) {
   return Array.isArray(relation) ? relation[0] : relation
@@ -28,7 +29,7 @@ export default async function PracticeQuestionPage({ params }: { params: Promise
 
   const { data: question } = await supabase
     .from('questions')
-    .select('id,question_number,prompt_text,image_url,question_image_path,markscheme_text,markscheme_image_url,markscheme_image_path,marks,papers(id,title,year,level,is_published,subjects(name),exam_sessions(session_month)),question_topics(is_primary,topics(id,name))')
+    .select('id,question_number,prompt_text,image_url,question_image_path,markscheme_text,markscheme_image_url,markscheme_image_path,marks,papers(id,title,year,level,is_published,subjects(name),exam_sessions(session_month)),question_topics(is_primary,topics(id,name,parent_topic_id))')
     .eq('id', questionId)
     .eq('is_published', true)
     .eq('papers.is_published', true)
@@ -46,9 +47,8 @@ export default async function PracticeQuestionPage({ params }: { params: Promise
   if (!paper) notFound()
   const subject = firstRelation(paper.subjects)
   const subjectName = subject?.name || 'Subject'
-  const level = paper.level || 'General'
   const primaryTopic = firstRelation(question.question_topics?.find((row) => row.is_primary)?.topics)
-  const topicBackHref = primaryTopic?.id ? `/practice/${encodeURIComponent(subjectName)}/${encodeURIComponent(level)}/${primaryTopic.id}` : '/practice'
+  const topicBackHref = primaryTopic?.id ? `/practice/${encodeURIComponent(subjectName)}${primaryTopic.parent_topic_id ? `/${primaryTopic.parent_topic_id}` : ''}/${primaryTopic.id}` : '/practice'
 
   return (
     <div className="min-h-screen bg-[#fbf9f4]">
@@ -56,7 +56,7 @@ export default async function PracticeQuestionPage({ params }: { params: Promise
       <main className="tsm-shell py-12">
         <Link href={topicBackHref} className="font-body text-sm text-[#735b2b] underline">← Back to questions</Link>
         <header className="mt-6 rounded-md border border-[#c3c6ce66] bg-white p-6">
-          <p className="font-body text-sm text-[#43474d]">{subjectName} · {level} · {paper.title} · {paper.year} {firstRelation(paper.exam_sessions)?.session_month}</p>
+          <p className="font-body text-sm text-[#43474d]">{subjectName} · {paper.title} · {paper.year} {firstRelation(paper.exam_sessions)?.session_month}</p>
           <h1 className="mt-2 font-headline text-5xl text-[#00152a]">Question {question.question_number}</h1>
           <p className="mt-3 font-body text-[#43474d]">{question.marks ?? '—'} marks{primaryTopic?.name ? ` · ${primaryTopic.name}` : ''}</p>
         </header>
@@ -89,7 +89,7 @@ export default async function PracticeQuestionPage({ params }: { params: Promise
           <form action={savePracticeBookmark} className="mt-6">
             <input type="hidden" name="question_id" value={question.id} />
             <input type="hidden" name="paper_id" value={paper.id} />
-            <button className="tsm-btn-primary">Bookmark question</button>
+            <PendingSubmitButton className="tsm-btn-primary disabled:cursor-not-allowed disabled:opacity-60" label="Bookmark question" pendingLabel="Bookmarking..." />
           </form>
         ) : null}
       </main>

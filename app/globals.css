@@ -55,3 +55,36 @@ body { background: var(--background); color: var(--text); }
   animation-name: tsm-autofill-start;
   animation-duration: 0.01s;
 }
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+a[href],
+summary,
+.tsm-btn-primary:not(:disabled),
+.tsm-btn-secondary:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"],
+.tsm-btn-primary:disabled,
+.tsm-btn-secondary:disabled {
+  cursor: not-allowed;
+}
+
+.tsm-btn-primary,
+.tsm-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease;
+}
+
+.tsm-btn-primary:hover { opacity: .92; }
+.tsm-btn-secondary:hover { border-color: var(--secondary); color: var(--secondary); }
+.tsm-btn-primary:focus-visible,
+.tsm-btn-secondary:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--secondary) 45%, transparent);
+  outline-offset: 2px;
+}

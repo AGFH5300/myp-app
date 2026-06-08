@@ -23,21 +23,26 @@ function firstRelation<T>(relation: T | T[] | null | undefined) {
 }
 
 export default async function PracticeTopicPage({ params }: { params: Promise<{ subject: string; level: string; topic: string }> }) {
-  const { subject: subjectParam, level: levelParam, topic } = await params
+  const { subject: subjectParam, level: topicGroupId, topic } = await params
   const subjectName = decodeURIComponent(subjectParam)
-  const level = decodeURIComponent(levelParam)
   const supabase = await createClient()
 
-  const [{ data: subject }, { data: topicRow }] = await Promise.all([
-    supabase.from('subjects').select('id,name').eq('name', subjectName).maybeSingle(),
-    supabase.from('topics').select('id,name,parent_topic_id').eq('id', topic).maybeSingle(),
-  ])
-  if (!subject || !topicRow) notFound()
+  const { data: subject } = await supabase.from('subjects').select('id,name').eq('name', subjectName).maybeSingle()
+  if (!subject) notFound()
+
+  const { data: topicRow } = await supabase
+    .from('topics')
+    .select('id,name,parent_topic_id')
+    .eq('id', topic)
+    .eq('subject_id', subject.id)
+    .maybeSingle()
+  if (!topicRow) notFound()
 
   const { data: childTopics } = await supabase
     .from('topics')
     .select('id,name,sort_order')
     .eq('parent_topic_id', topicRow.id)
+    .eq('subject_id', subject.id)
     .eq('is_active', true)
     .order('sort_order')
     .order('name')
@@ -50,7 +55,6 @@ export default async function PracticeTopicPage({ params }: { params: Promise<{ 
     .eq('questions.is_published', true)
     .eq('questions.papers.is_published', true)
     .eq('questions.papers.subject_id', subject.id)
-    .eq('questions.papers.level', level)
 
   const rows = (links ?? []) as unknown as LinkRow[]
 
@@ -63,12 +67,12 @@ export default async function PracticeTopicPage({ params }: { params: Promise<{ 
       <div className="min-h-screen bg-[#fbf9f4]">
         <header className="border-b border-[#f0eee9] bg-[#fbf9f4]/95"><div className="tsm-shell py-6"><BrandWordmark className="text-2xl" href="/practice" /></div></header>
         <main className="tsm-shell py-12">
-          <Link href={`/practice/${encodeURIComponent(subject.name)}/${encodeURIComponent(level)}`} className="font-body text-sm text-[#735b2b] underline">← {level} topics</Link>
+          <Link href={`/practice/${encodeURIComponent(subject.name)}`} className="font-body text-sm text-[#735b2b] underline">← {subject.name} topics</Link>
           <h1 className="mt-4 font-headline text-5xl text-[#00152a]">{topicRow.name}</h1>
           <p className="mt-3 font-body text-[#43474d]">Choose a subtopic.</p>
           <div className="mt-8 grid gap-4 md:grid-cols-2">
             {visibleChildren.map((child) => (
-              <Link key={child.id} href={`/practice/${encodeURIComponent(subject.name)}/${encodeURIComponent(level)}/${child.id}`} className="rounded-md border border-[#c3c6ce66] bg-white p-6 hover:border-[#735b2b]">
+              <Link key={child.id} href={`/practice/${encodeURIComponent(subject.name)}/${topicRow.id}/${child.id}`} className="rounded-md border border-[#c3c6ce66] bg-white p-6 hover:border-[#735b2b] focus:outline-none focus:ring-2 focus:ring-[#735b2b]/30">
                 <h2 className="font-headline text-3xl text-[#00152a]">{child.name}</h2>
                 <p className="mt-2 font-body text-sm text-[#43474d]">{counts.get(child.id)} question{counts.get(child.id) === 1 ? '' : 's'}</p>
               </Link>
@@ -94,7 +98,7 @@ export default async function PracticeTopicPage({ params }: { params: Promise<{ 
     <div className="min-h-screen bg-[#fbf9f4]">
       <header className="border-b border-[#f0eee9] bg-[#fbf9f4]/95"><div className="tsm-shell py-6"><BrandWordmark className="text-2xl" href="/practice" /></div></header>
       <main className="tsm-shell py-12">
-        <Link href={`/practice/${encodeURIComponent(subject.name)}/${encodeURIComponent(level)}${topicRow.parent_topic_id ? `/${topicRow.parent_topic_id}` : ''}`} className="font-body text-sm text-[#735b2b] underline">← {topicRow.parent_topic_id ? 'Subtopics' : `${level} topics`}</Link>
+        <Link href={`/practice/${encodeURIComponent(subject.name)}/${topicRow.parent_topic_id || topicGroupId}`} className="font-body text-sm text-[#735b2b] underline">← Subtopics</Link>
         <h1 className="mt-4 font-headline text-5xl text-[#00152a]">{topicRow.name}</h1>
         <p className="mt-3 font-body text-[#43474d]">Open a question, try it, then reveal the mark scheme.</p>
         <div className="mt-8 space-y-4">
@@ -103,7 +107,7 @@ export default async function PracticeTopicPage({ params }: { params: Promise<{ 
             const paper = firstRelation(question.papers)
             const primary = question.question_topics?.find((row) => row.is_primary)?.topics ?? question.question_topics?.[0]?.topics
             return (
-              <Link key={question.id} href={`/practice/question/${question.id}`} className="flex items-center justify-between gap-4 rounded-md border border-[#c3c6ce66] bg-white p-5 hover:border-[#735b2b]">
+              <Link key={question.id} href={`/practice/question/${question.id}`} className="flex items-center justify-between gap-4 rounded-md border border-[#c3c6ce66] bg-white p-5 hover:border-[#735b2b] focus:outline-none focus:ring-2 focus:ring-[#735b2b]/30">
                 <div>
                   <h2 className="font-headline text-2xl text-[#00152a]">{paper?.title} Q{question.question_number}</h2>
                   <p className="mt-1 font-body text-sm text-[#43474d]">{paper?.year} {firstRelation(paper?.exam_sessions)?.session_month} · {question.marks ?? '—'} marks · {primary?.name || topicRow.name}</p>

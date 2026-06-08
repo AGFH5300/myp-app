@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from 'react'
+import { useFormStatus } from 'react-dom'
 import { createQuestion, updateQuestion } from './actions'
 
 type PaperRelation<T> = T | T[] | null
@@ -36,18 +37,17 @@ function relationLabel(relation: unknown, key: 'id' | 'name' | 'session_month') 
 }
 
 function paperLabel(paper: Paper) {
-  const session = relationLabel(paper.exam_sessions, 'session_month') || 'Session'
+  const rawSession = relationLabel(paper.exam_sessions, 'session_month') || 'Session'
+  const session = rawSession.toLowerCase().startsWith('nov') ? 'Nov' : rawSession.toLowerCase().startsWith('may') ? 'May' : rawSession
   return `${paper.title} — ${session} ${paper.year}`
 }
 
-function topicMatchesMainScope(topic: Topic, subjectId: string, level: string) {
-  return topic.is_active !== false && Boolean(subjectId) && Boolean(level) && topic.subject_id === subjectId && topic.level === level
+function topicMatchesMainScope(topic: Topic, subjectId: string) {
+  return topic.is_active !== false && Boolean(subjectId) && topic.subject_id === subjectId
 }
 
-function topicMatchesLegacyScope(topic: Topic, subjectId: string, level: string) {
-  const subjectMatches = !topic.subject_id || topic.subject_id === subjectId
-  const levelMatches = !topic.level || topic.level === level
-  return topic.is_active !== false && subjectMatches && levelMatches && !topicMatchesMainScope(topic, subjectId, level)
+function topicMatchesLegacyScope(topic: Topic, subjectId: string) {
+  return topic.is_active !== false && topic.subject_id !== subjectId
 }
 
 function statusBadgeClasses(state: StepState) {
@@ -80,7 +80,7 @@ function StepCard({ step, title, state, helper, children }: { step: number; titl
 
 function ChoiceCard({ active, title, helper, onClick }: { active: boolean; title: string; helper: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className={`rounded-md border p-4 text-left transition ${active ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-100' : 'border-[#c3c6ce66] bg-white hover:border-blue-200'}`}>
+    <button type="button" onClick={onClick} className={`cursor-pointer rounded-md border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-blue-300 ${active ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100' : 'border-[#c3c6ce66] bg-white hover:border-blue-300 hover:bg-blue-50/40'}`}>
       <span className={`inline-flex rounded-full px-2 py-1 font-body text-xs font-semibold ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{active ? 'Selected' : 'Choose'}</span>
       <h3 className="mt-3 font-headline text-xl text-[#00152a]">{title}</h3>
       <p className="mt-1 font-body text-sm text-[#43474d]">{helper}</p>
@@ -90,10 +90,10 @@ function ChoiceCard({ active, title, helper, onClick }: { active: boolean; title
 
 function UploadBox({ name, label, helper, onFiles }: { name: string; label: string; helper: string; onFiles: (files: File[]) => void }) {
   return (
-    <label className="block rounded-md border-2 border-dashed border-blue-200 bg-blue-50/50 p-5 font-body text-sm text-[#43474d] transition hover:border-blue-400 hover:bg-blue-50">
+    <label className="block cursor-pointer rounded-md border-2 border-dashed border-blue-200 bg-blue-50/50 p-5 font-body text-sm text-[#43474d] transition hover:border-blue-400 hover:bg-blue-50 focus-within:ring-2 focus-within:ring-blue-300">
       <span className="block font-semibold text-[#00152a]">{label}</span>
       <span className="mt-1 block">{helper}</span>
-      <span className="mt-4 inline-flex rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white">Choose images</span>
+      <span className="mt-4 inline-flex rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white">Upload images</span>
       <input name={name} type="file" accept="image/*" multiple className="sr-only" onChange={(event) => onFiles(Array.from(event.target.files ?? []))} />
     </label>
   )
@@ -123,16 +123,15 @@ export function QuestionBankForm({
   questionAssets?: QuestionAsset[]
 }) {
   const currentPaper = papers.find((paper) => paper.id === question?.paper_id)
-  const defaultSubjectId = relationLabel(currentPaper?.subjects, 'id') || subjects.find((subject) => subject.name === 'Mathematics')?.id || subjects[0]?.id || ''
-  const defaultLevel = currentPaper?.level || 'Maths Extended'
+  const defaultSubjectId = relationLabel(currentPaper?.subjects, 'id') || subjects.find((subject) => subject.name === 'Mathematics Extended')?.id || subjects.find((subject) => subject.name === 'Mathematics')?.id || subjects[0]?.id || ''
   const primaryTopicIdFromQuestion = question?.question_topics?.find((row) => row.is_primary)?.topic_id || ''
   const primaryTopic = topics.find((topic) => topic.id === primaryTopicIdFromQuestion)
   const action = mode === 'new' ? createQuestion : updateQuestion
 
   const [paperMode, setPaperMode] = useState<'existing' | 'new'>(question?.paper_id ? 'existing' : 'existing')
   const [subjectId, setSubjectId] = useState(defaultSubjectId)
-  const [level, setLevel] = useState(defaultLevel)
   const [paperId, setPaperId] = useState(question?.paper_id || '')
+  const selectedSubjectName = subjects.find((subject) => subject.id === subjectId)?.name || ''
   const [newPaperTitle, setNewPaperTitle] = useState('')
   const [newPaperYear, setNewPaperYear] = useState('2025')
   const [newPaperSession, setNewPaperSession] = useState('May')
@@ -171,38 +170,32 @@ export function QuestionBankForm({
     setPrimaryTopicId('')
   }
 
-  function updateLevel(event: ChangeEvent<HTMLInputElement>) {
-    setLevel(event.target.value)
-    setPaperId('')
-    setTopicGroupId('')
-    setPrimaryTopicId('')
-  }
 
   const filteredPapers = papers.filter((paper) => {
     const paperSubjectId = relationLabel(paper.subjects, 'id')
-    return (!subjectId || paperSubjectId === subjectId) && (!level || paper.level === level)
+    return !subjectId || paperSubjectId === subjectId
   })
 
   const mainTopicGroups = useMemo(() => topics
-    .filter((topic) => !topic.parent_topic_id && topicMatchesMainScope(topic, subjectId, level))
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name)), [topics, subjectId, level])
+    .filter((topic) => !topic.parent_topic_id && topicMatchesMainScope(topic, subjectId))
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name)), [topics, subjectId])
 
   const subtopics = useMemo(() => topics
-    .filter((topic) => topic.parent_topic_id === topicGroupId && topicMatchesMainScope(topic, subjectId, level))
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name)), [topics, topicGroupId, subjectId, level])
+    .filter((topic) => topic.parent_topic_id === topicGroupId && topicMatchesMainScope(topic, subjectId))
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name)), [topics, topicGroupId, subjectId])
 
   const legacyTopics = useMemo(() => topics
-    .filter((topic) => topic.id !== primaryTopicId && topic.id !== topicGroupId && topicMatchesLegacyScope(topic, subjectId, level))
-    .sort((a, b) => a.name.localeCompare(b.name)), [topics, primaryTopicId, topicGroupId, subjectId, level])
+    .filter((topic) => topic.id !== primaryTopicId && topic.id !== topicGroupId && topicMatchesLegacyScope(topic, subjectId))
+    .sort((a, b) => a.name.localeCompare(b.name)), [topics, primaryTopicId, topicGroupId, subjectId])
 
   const existingQuestionAssets = questionAssets.filter((asset) => asset.asset_type === 'question')
   const existingMarkschemeAssets = questionAssets.filter((asset) => asset.asset_type === 'markscheme')
   const hasExistingQuestionImage = Boolean(questionPreviewUrl || existingQuestionAssets.length)
   const hasQuestionImage = hasExistingQuestionImage || questionFiles.length > 0
-  const step1Complete = paperMode === 'existing' ? Boolean(subjectId && level && paperId) : Boolean(subjectId && level && newPaperTitle && newPaperYear && newPaperSession)
+  const step1Complete = paperMode === 'existing' ? Boolean(subjectId && paperId) : Boolean(subjectId && newPaperTitle && newPaperYear && newPaperSession)
   const step2Complete = Boolean(questionNumber.trim())
   const step3Complete = hasQuestionImage
-  const step4Complete = Boolean(topicGroupId && (primaryTopicId || newTopicName.trim()))
+  const step4Complete = Boolean(topicGroupId)
   const readyToSubmit = step1Complete && step2Complete && step3Complete && step4Complete
 
   const step1State: StepState = step1Complete ? 'complete' : 'current'
@@ -217,20 +210,20 @@ export function QuestionBankForm({
       <input type="hidden" name="primary_topic_id" value={primaryTopicId || topicGroupId} />
       <input type="hidden" name="existing_question_asset_count" value={existingQuestionAssets.length} />
       <input type="hidden" name="existing_markscheme_asset_count" value={existingMarkschemeAssets.length} />
+      <input type="hidden" name="new_paper_level" value={selectedSubjectName} />
 
       <StepCard step={1} title="Paper setup" state={step1State} helper="Choose whether this question belongs to an existing paper or a new paper record.">
         <div className="grid gap-4 md:grid-cols-2">
-          <ChoiceCard active={paperMode === 'existing'} title="Add to existing paper" helper="Pick a subject and course, then choose one matching paper." onClick={() => setPaperMode('existing')} />
+          <ChoiceCard active={paperMode === 'existing'} title="Add to existing paper" helper="Pick a subject, then choose one matching paper." onClick={() => setPaperMode('existing')} />
           <ChoiceCard active={paperMode === 'new'} title="Create new paper" helper="Create a simple paper record first, then attach this question." onClick={() => { setPaperMode('new'); setPaperId('') }} />
         </div>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <label className="font-body text-sm text-[#43474d]">Subject<select name="new_paper_subject_id" value={subjectId} onChange={updateSubject} className="tsm-input mt-1 w-full" required><option value="">Choose subject</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
-          <label className="font-body text-sm text-[#43474d]">Level / course<input name="new_paper_level" className="tsm-input mt-1 w-full" value={level} onChange={updateLevel} placeholder="Maths Extended" required /></label>
+          <label className="font-body text-sm text-[#43474d]">Subject<select name="new_paper_subject_id" value={subjectId} onChange={updateSubject} className="tsm-input mt-1 w-full cursor-pointer" required><option value="">Choose subject</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
         </div>
         {paperMode === 'existing' ? (
           <div className="mt-5 rounded-md border border-blue-100 bg-blue-50/40 p-4">
-            <label className="font-body text-sm text-[#43474d]">Matching existing paper<select value={paperId} onChange={(event) => setPaperId(event.target.value)} className="tsm-input mt-1 w-full"><option value="">Choose a paper</option>{filteredPapers.map((paper) => <option key={paper.id} value={paper.id}>{paperLabel(paper)}</option>)}</select></label>
-            {!filteredPapers.length ? <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 font-body text-sm text-amber-800">No papers match this subject and level. <button type="button" className="font-semibold underline" onClick={() => setPaperMode('new')}>Create a new paper instead.</button></div> : null}
+            <label className="font-body text-sm text-[#43474d]">Matching existing paper<select value={paperId} onChange={(event) => setPaperId(event.target.value)} className="tsm-input mt-1 w-full cursor-pointer"><option value="">Choose a paper</option>{filteredPapers.map((paper) => <option key={paper.id} value={paper.id}>{paperLabel(paper)}</option>)}</select></label>
+            {!filteredPapers.length ? <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 font-body text-sm text-amber-800">No papers found for this subject. Create a new paper first. <button type="button" className="cursor-pointer font-semibold underline" onClick={() => setPaperMode('new')}>Create a new paper instead.</button></div> : null}
           </div>
         ) : (
           <div className="mt-5 rounded-md border border-blue-100 bg-blue-50/40 p-4">
@@ -269,18 +262,18 @@ export function QuestionBankForm({
           <div>
             <h3 className="font-body text-sm font-semibold text-[#00152a]">Question previews</h3>
             <div className="mt-3 grid gap-3">
-              {existingQuestionAssets.map((asset, index) => asset.preview_url ? <PreviewCard key={asset.id} title={asset.label || `Question image ${index + 1}`} url={asset.preview_url} /> : null)}
-              {!existingQuestionAssets.length && questionPreviewUrl ? <PreviewCard title="Question image 1" url={questionPreviewUrl} /> : null}
-              {questionFiles.map((file, index) => <PreviewCard key={file.url} title={`New question image ${index + 1}`} url={file.url} subtitle={file.name} />)}
+              {existingQuestionAssets.map((asset, index) => asset.preview_url ? <PreviewCard key={asset.id} title={asset.label || `Question image ${index + 1}`} url={asset.preview_url} order={index + 1} /> : null)}
+              {!existingQuestionAssets.length && questionPreviewUrl ? <PreviewCard title="Question image 1" url={questionPreviewUrl} order={1} /> : null}
+              {questionFiles.map((file, index) => <PreviewCard key={file.url} title={`New question image ${index + 1}`} url={file.url} subtitle={file.name} order={existingQuestionAssets.length + index + 1} />)}
               {!hasExistingQuestionImage && !questionFiles.length ? <p className="rounded-md border border-dashed border-slate-200 p-4 font-body text-sm text-slate-500">No question images selected yet.</p> : null}
             </div>
           </div>
           <div>
             <h3 className="font-body text-sm font-semibold text-[#00152a]">Mark scheme previews</h3>
             <div className="mt-3 grid gap-3">
-              {existingMarkschemeAssets.map((asset, index) => asset.preview_url ? <PreviewCard key={asset.id} title={asset.label || `Mark scheme image ${index + 1}`} url={asset.preview_url} /> : null)}
-              {!existingMarkschemeAssets.length && markschemePreviewUrl ? <PreviewCard title="Mark scheme image 1" url={markschemePreviewUrl} /> : null}
-              {markschemeFiles.map((file, index) => <PreviewCard key={file.url} title={`New mark scheme image ${index + 1}`} url={file.url} subtitle={file.name} />)}
+              {existingMarkschemeAssets.map((asset, index) => asset.preview_url ? <PreviewCard key={asset.id} title={asset.label || `Mark scheme image ${index + 1}`} url={asset.preview_url} order={index + 1} /> : null)}
+              {!existingMarkschemeAssets.length && markschemePreviewUrl ? <PreviewCard title="Mark scheme image 1" url={markschemePreviewUrl} order={1} /> : null}
+              {markschemeFiles.map((file, index) => <PreviewCard key={file.url} title={`New mark scheme image ${index + 1}`} url={file.url} subtitle={file.name} order={existingMarkschemeAssets.length + index + 1} />)}
               {!existingMarkschemeAssets.length && !markschemePreviewUrl && !markschemeFiles.length ? <p className="rounded-md border border-dashed border-slate-200 p-4 font-body text-sm text-slate-500">No mark scheme images selected yet.</p> : null}
             </div>
           </div>
@@ -300,22 +293,22 @@ export function QuestionBankForm({
 
       <StepCard step={4} title="Topics & publish" state={step4State} helper="Choose a topic group, then the exact subtopic. Publish only when checked.">
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="font-body text-sm text-[#43474d]">Topic group<select name="topic_group_id" value={topicGroupId} onChange={(event) => { setTopicGroupId(event.target.value); setPrimaryTopicId('') }} className="tsm-input mt-1 w-full"><option value="">Choose topic group</option>{mainTopicGroups.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></label>
-          <label className="font-body text-sm text-[#43474d]">Exact subtopic<select name="topic_ids" value={primaryTopicId} onChange={(event) => setPrimaryTopicId(event.target.value)} className="tsm-input mt-1 w-full"><option value={topicGroupId}>Use the topic group</option>{subtopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></label>
+          <label className="font-body text-sm text-[#43474d]">Topic group<select name="topic_group_id" value={topicGroupId} onChange={(event) => { setTopicGroupId(event.target.value); setPrimaryTopicId('') }} className="tsm-input mt-1 w-full cursor-pointer"><option value="">Choose topic group</option>{mainTopicGroups.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></label>
+          <label className="font-body text-sm text-[#43474d]">Exact subtopic<select name="topic_ids" value={primaryTopicId || topicGroupId} onChange={(event) => setPrimaryTopicId(event.target.value)} className="tsm-input mt-1 w-full cursor-pointer"><option value={topicGroupId}>Use the topic group</option>{subtopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></label>
           <label className="md:col-span-2 font-body text-sm text-[#43474d]">Optional: create new subtopic under selected group<input name="new_topic_name" className="tsm-input mt-1 w-full" value={newTopicName} onChange={(event) => setNewTopicName(event.target.value)} placeholder="e.g. Inequalities and feasible regions" /></label>
         </div>
-        {!mainTopicGroups.length ? <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 font-body text-sm text-amber-800">No active topic groups match this subject and level. Create the group first, or use the legacy secondary section only for old data.</p> : null}
+        {!mainTopicGroups.length ? <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 font-body text-sm text-amber-800">No active topic groups match this subject. Create the group first, or use the legacy secondary section only for old data.</p> : null}
         <details className="mt-5 rounded-sm bg-[#f5f3ee] p-4">
           <summary className="cursor-pointer font-body font-semibold text-[#735b2b]">Legacy/global secondary topics</summary>
           <p className="mt-2 font-body text-sm text-[#43474d]">These are old/global topics. They are available only as secondary tags, not as the main topic.</p>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {legacyTopics.map((topic) => <label key={topic.id} className="flex items-center gap-2 rounded-sm bg-white px-3 py-2 font-body text-sm text-[#43474d]"><input type="checkbox" name="topic_ids" value={topic.id} defaultChecked={selectedTopics.has(topic.id)} /> {topic.name}</label>)}
+            {legacyTopics.map((topic) => <label key={topic.id} className="flex cursor-pointer items-center gap-2 rounded-sm bg-white px-3 py-2 font-body text-sm text-[#43474d] hover:bg-blue-50"><input type="checkbox" name="topic_ids" value={topic.id} defaultChecked={selectedTopics.has(topic.id)} /> {topic.name}</label>)}
             {!legacyTopics.length ? <p className="font-body text-sm text-[#43474d]">No legacy/global topics match this scope.</p> : null}
           </div>
         </details>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <label className={`rounded-md border p-4 font-body text-sm ${published ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}><span className="mb-2 inline-flex rounded-full bg-white px-2 py-1 text-xs font-semibold">{published ? 'Show to students' : 'Save as draft'}</span><span className="flex items-center gap-2"><input type="checkbox" name="is_published" checked={published} onChange={(event) => setPublished(event.target.checked)} /> Published</span><span className="mt-1 block text-xs">Draft questions stay hidden from student practice pages.</span></label>
-          <label className={`rounded-md border p-4 font-body text-sm ${reviewed ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}><span className="mb-2 inline-flex rounded-full bg-white px-2 py-1 text-xs font-semibold">{reviewed ? 'Checked and ready' : 'Not checked'}</span><span className="flex items-center gap-2"><input type="checkbox" name="is_reviewed" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /> Reviewed</span><span className="mt-1 block text-xs">Use this after the image, mark scheme, and topic have been checked.</span></label>
+          <label className={`cursor-pointer rounded-md border p-4 font-body text-sm transition hover:shadow-sm ${published ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}><span className="mb-2 inline-flex rounded-full bg-white px-2 py-1 text-xs font-semibold">{published ? 'Show to students' : 'Save as draft'}</span><span className="flex items-center gap-2"><input type="checkbox" name="is_published" checked={published} onChange={(event) => setPublished(event.target.checked)} /> Published</span><span className="mt-1 block text-xs">Draft questions stay hidden from student practice pages.</span></label>
+          <label className={`cursor-pointer rounded-md border p-4 font-body text-sm transition hover:shadow-sm ${reviewed ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}><span className="mb-2 inline-flex rounded-full bg-white px-2 py-1 text-xs font-semibold">{reviewed ? 'Checked and ready' : 'Not checked'}</span><span className="flex items-center gap-2"><input type="checkbox" name="is_reviewed" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /> Reviewed</span><span className="mt-1 block text-xs">Use this after the image, mark scheme, and topic have been checked.</span></label>
         </div>
       </StepCard>
 
@@ -323,7 +316,7 @@ export function QuestionBankForm({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className={`font-body text-sm font-semibold ${readyToSubmit ? 'text-emerald-700' : 'text-amber-800'}`}>{readyToSubmit ? 'Ready to save: all required steps are complete.' : 'Not ready yet: complete the highlighted required steps.'}</p>
           <div className="flex flex-wrap gap-3">
-            <button className="tsm-btn-primary disabled:cursor-not-allowed disabled:opacity-50" disabled={!readyToSubmit}>{mode === 'new' ? 'Create question' : 'Save question'}</button>
+            <SubmitButton readyToSubmit={readyToSubmit} label={mode === 'new' ? 'Create question' : 'Save question'} />
             <Link href="/dashboard/admin/question-bank" className="tsm-btn-secondary">Cancel</Link>
           </div>
         </div>
@@ -332,17 +325,28 @@ export function QuestionBankForm({
   )
 }
 
-function PreviewCard({ title, url, subtitle }: { title: string; url: string; subtitle?: string }) {
+function PreviewCard({ title, url, subtitle, order }: { title: string; url: string; subtitle?: string; order?: number }) {
   return (
     <div className="rounded-md border border-[#c3c6ce66] bg-white p-3">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div>
           <p className="font-body text-sm font-semibold text-[#00152a]">{title}</p>
+          {order ? <p className="font-body text-xs font-semibold text-[#735b2b]">Order {order}</p> : null}
           {subtitle ? <p className="font-body text-xs text-[#6f737b]">{subtitle}</p> : null}
         </div>
-        <a href={url} target="_blank" rel="noreferrer" className="rounded-md border border-blue-200 px-3 py-1 font-body text-xs font-semibold text-blue-700 hover:bg-blue-50">Open in new tab</a>
+        <a href={url} target="_blank" rel="noreferrer" className="cursor-pointer rounded-md border border-blue-200 px-3 py-1 font-body text-xs font-semibold text-blue-700 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300">Open in new tab</a>
       </div>
       <img src={url} alt={title} className="max-h-80 w-full rounded-sm border border-[#f0eee9] bg-[#f8f6f1] object-contain" />
     </div>
+  )
+}
+
+function SubmitButton({ readyToSubmit, label }: { readyToSubmit: boolean; label: string }) {
+  const { pending } = useFormStatus()
+  return (
+    <button type="submit" className="tsm-btn-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50" disabled={!readyToSubmit || pending}>
+      {pending ? <span className="inline-block size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" /> : null}
+      {pending ? 'Saving...' : label}
+    </button>
   )
 }

@@ -1,0 +1,5 @@
+{
+  "ignore": {
+    "files": [".next/**", "node_modules/**", "pnpm-lock.yaml"]
+  }
+}

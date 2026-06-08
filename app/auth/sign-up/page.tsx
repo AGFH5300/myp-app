@@ -654,6 +654,7 @@ export default function SignUpPage() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (isSubmitting) return
     setSubmitAttempted(true)
     setError(null)
 
