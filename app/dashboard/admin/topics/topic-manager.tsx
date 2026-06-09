@@ -155,26 +155,30 @@ export function TopicManager({ subjects, topics, questionTopics, initialSubjectI
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <section className="rounded-md border border-[#c3c6ce66] bg-white p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="font-label text-xs uppercase tracking-[.14em] text-[#735b2b]">Topic groups</p>
-              <h2 className="mt-2 font-headline text-3xl text-[#00152a]">Groups</h2>
-            </div>
-            <form action={createTopic} className="flex min-w-64 flex-1 gap-2 sm:max-w-md">
-              <HiddenContext subjectId={subjectId} groupId={activeSelectedGroupId} />
-              <input type="hidden" name="subject_id" value={subjectId} />
-              <input name="name" required placeholder="New topic group" className="tsm-input min-w-0 flex-1" />
-              <button className="tsm-btn-primary" type="submit">Add group</button>
-            </form>
+          <div>
+            <p className="font-label text-xs uppercase tracking-[.14em] text-[#735b2b]">Topic groups</p>
+            <h2 className="mt-2 font-headline text-3xl text-[#00152a]">Groups</h2>
           </div>
+          <form action={createTopic} className="mt-5 grid gap-3 rounded-md border border-[#c3c6ce66] bg-[#fbf9f4] p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <HiddenContext subjectId={subjectId} groupId={activeSelectedGroupId} />
+            <input type="hidden" name="subject_id" value={subjectId} />
+            <label className="font-body text-sm text-[#43474d]">
+              New topic group
+              <input name="name" required placeholder="Topic group name" className="tsm-input mt-1 min-w-0" />
+            </label>
+            <button className="tsm-btn-primary w-full sm:w-auto" type="submit">Add group</button>
+          </form>
 
           <div className="mt-6 space-y-3">
             {groups.map((group, index) => {
               const childCount = subjectTopics.filter((topic) => topic.parent_topic_id === group.id).length
               return (
                 <article key={group.id} className={`rounded-md border p-4 ${group.id === activeSelectedGroupId ? 'border-[#735b2b] bg-[#fbf9f4]' : 'border-[#c3c6ce66] bg-white'}`}>
-                  <button type="button" onClick={() => { setSelectedGroupId(group.id); setMergeSourceId(''); setMergeTargetId('') }} className="block w-full text-left">
-                    <span className="flex items-center justify-between gap-3"><strong className="font-headline text-2xl text-[#00152a]">{group.name}</strong><StatusBadge active={group.is_active !== false} /></span>
+                  <button type="button" onClick={() => { setSelectedGroupId(group.id); setMergeSourceId(''); setMergeTargetId('') }} className="block w-full rounded-sm text-left focus:outline-none focus:ring-2 focus:ring-[#735b2b]/30">
+                    <span className="flex flex-wrap items-start justify-between gap-3">
+                      <strong className="min-w-0 flex-1 break-words font-headline text-2xl leading-tight text-[#00152a]" title={group.name}>{group.name}</strong>
+                      <StatusBadge active={group.is_active !== false} />
+                    </span>
                     <span className="mt-2 block font-body text-sm text-[#43474d]">{childCount} subtopic{childCount === 1 ? '' : 's'} · {groupQuestionCount(group.id)} question{groupQuestionCount(group.id) === 1 ? '' : 's'}</span>
                   </button>
                   <TopicActions topic={group} subjectId={subjectId} groupId={activeSelectedGroupId} index={index} lastIndex={groups.length - 1} />
@@ -186,27 +190,28 @@ export function TopicManager({ subjects, topics, questionTopics, initialSubjectI
         </section>
 
         <section className="rounded-md border border-[#c3c6ce66] bg-white p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="font-label text-xs uppercase tracking-[.14em] text-[#735b2b]">Subtopics</p>
-              <h2 className="mt-2 font-headline text-3xl text-[#00152a]">{selectedGroup?.name ?? 'Choose a group'}</h2>
-            </div>
-            <form action={createTopic} className="flex min-w-64 flex-1 gap-2 sm:max-w-md">
-              <HiddenContext subjectId={subjectId} groupId={activeSelectedGroupId} />
-              <input type="hidden" name="subject_id" value={subjectId} />
-              <input type="hidden" name="parent_topic_id" value={activeSelectedGroupId} />
-              <input name="name" required disabled={!activeSelectedGroupId} placeholder="New subtopic" className="tsm-input min-w-0 flex-1 disabled:opacity-50" />
-              <button className="tsm-btn-primary disabled:opacity-50" type="submit" disabled={!activeSelectedGroupId}>Add subtopic</button>
-            </form>
+          <div>
+            <p className="font-label text-xs uppercase tracking-[.14em] text-[#735b2b]">Subtopics</p>
+            <h2 className="mt-2 break-words font-headline text-3xl text-[#00152a]" title={selectedGroup?.name}>{selectedGroup?.name ?? 'Choose a group'}</h2>
           </div>
+          <form action={createTopic} className="mt-5 grid gap-3 rounded-md border border-[#c3c6ce66] bg-[#fbf9f4] p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <HiddenContext subjectId={subjectId} groupId={activeSelectedGroupId} />
+            <input type="hidden" name="subject_id" value={subjectId} />
+            <input type="hidden" name="parent_topic_id" value={activeSelectedGroupId} />
+            <label className="font-body text-sm text-[#43474d]">
+              New subtopic
+              <input name="name" required disabled={!activeSelectedGroupId} placeholder="Subtopic name" className="tsm-input mt-1 min-w-0 disabled:opacity-50" />
+            </label>
+            <button className="tsm-btn-primary w-full disabled:opacity-50 sm:w-auto" type="submit" disabled={!activeSelectedGroupId}>Add subtopic</button>
+          </form>
 
           <div className="mt-6 space-y-3">
             {subtopics.map((subtopic, index) => (
               <article key={subtopic.id} className="rounded-md border border-[#c3c6ce66] bg-white p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h3 className="font-headline text-2xl text-[#00152a]">{subtopic.name}</h3>
-                    <p className="mt-1 font-body text-sm text-[#43474d]">{topicQuestionCount(subtopic.id)} question{topicQuestionCount(subtopic.id) === 1 ? '' : 's'} tagged</p>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="break-words font-headline text-2xl leading-tight text-[#00152a]" title={subtopic.name}>{subtopic.name}</h3>
+                    <p className="mt-2 font-body text-sm text-[#43474d]">{topicQuestionCount(subtopic.id)} question{topicQuestionCount(subtopic.id) === 1 ? '' : 's'} tagged</p>
                   </div>
                   <StatusBadge active={subtopic.is_active !== false} />
                 </div>
@@ -216,10 +221,10 @@ export function TopicManager({ subjects, topics, questionTopics, initialSubjectI
             {!subtopics.length ? <p className="rounded-md border border-[#c3c6ce66] bg-[#fbf9f4] px-4 py-3 font-body text-sm text-[#43474d]">No subtopics yet for this group.</p> : null}
           </div>
 
-          <div className="mt-8 rounded-md border border-amber-200 bg-amber-50 p-4">
+          <div className="mt-8 rounded-md border border-amber-200 bg-amber-50 p-5">
             <h3 className="font-headline text-2xl text-[#00152a]">Merge duplicate subtopics</h3>
-            <p className="mt-2 font-body text-sm text-amber-900">This will move all question tags from source to target and deactivate the source topic.</p>
-            <form action={mergeSubtopics} className="mt-4 space-y-4">
+            <p className="mt-2 max-w-2xl font-body text-sm leading-6 text-amber-900">This will move all question tags from source to target and deactivate the source topic. Use this only after confirming both subtopics belong together.</p>
+            <form action={mergeSubtopics} className="mt-5 space-y-5">
               <HiddenContext subjectId={subjectId} groupId={activeSelectedGroupId} />
               <input type="hidden" name="source_topic_id" value={mergeSourceId} />
               <input type="hidden" name="target_topic_id" value={mergeTargetId} />
@@ -227,7 +232,7 @@ export function TopicManager({ subjects, topics, questionTopics, initialSubjectI
                 <SearchableSelect id="merge-source" label="Source subtopic" value={mergeSourceId} onChange={(value) => { setMergeSourceId(value); if (value === mergeTargetId) setMergeTargetId('') }} placeholder="Choose duplicate source" emptyText="No source subtopics found." options={mergeOptions.filter((option) => option.value !== mergeTargetId)} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
                 <SearchableSelect id="merge-target" label="Target subtopic" value={mergeTargetId} onChange={(value) => { setMergeTargetId(value); if (value === mergeSourceId) setMergeSourceId('') }} placeholder="Choose official target" emptyText="No target subtopics found." options={mergeOptions.filter((option) => option.value !== mergeSourceId)} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
               </div>
-              <button className="tsm-btn-primary disabled:opacity-50" type="submit" disabled={!mergeSourceId || !mergeTargetId}>Confirm merge</button>
+              <button className="tsm-btn-primary w-full disabled:opacity-50 sm:w-auto" type="submit" disabled={!mergeSourceId || !mergeTargetId}>Confirm merge</button>
             </form>
           </div>
         </section>
@@ -237,34 +242,45 @@ export function TopicManager({ subjects, topics, questionTopics, initialSubjectI
 }
 
 function TopicActions({ topic, subjectId, groupId, index, lastIndex }: { topic: Topic; subjectId: string; groupId: string; index: number; lastIndex: number }) {
+  const [isRenaming, setIsRenaming] = useState(false)
+  const isInactive = topic.is_active === false
+
   return (
-    <div className="mt-4 grid gap-3 border-t border-[#c3c6ce66] pt-4 md:grid-cols-[minmax(0,1fr)_auto]">
-      <form action={renameTopic} className="flex gap-2">
-        <HiddenContext subjectId={subjectId} groupId={groupId} />
-        <input type="hidden" name="topic_id" value={topic.id} />
-        <input name="name" required defaultValue={topic.name} className="tsm-input min-w-0 flex-1" aria-label={`Rename ${topic.name}`} />
-        <button className="tsm-btn-secondary" type="submit">Rename</button>
-      </form>
-      <div className="flex flex-wrap gap-2">
+    <div className="mt-4 space-y-4 border-t border-[#c3c6ce66] pt-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <button className="tsm-btn-secondary px-3 py-2" type="button" onClick={() => setIsRenaming(true)}>Rename</button>
         <form action={reorderTopic}>
           <HiddenContext subjectId={subjectId} groupId={groupId} />
           <input type="hidden" name="topic_id" value={topic.id} />
           <input type="hidden" name="direction" value="up" />
-          <button className="tsm-btn-secondary inline-flex items-center gap-1 disabled:opacity-50" disabled={index === 0} type="submit"><ChevronUp className="size-4" />Up</button>
+          <button className="tsm-btn-secondary inline-flex items-center gap-1 px-3 py-2 disabled:opacity-50" disabled={index === 0} type="submit" aria-label={`Move ${topic.name} up`} title="Move up"><ChevronUp className="size-4" />Up</button>
         </form>
         <form action={reorderTopic}>
           <HiddenContext subjectId={subjectId} groupId={groupId} />
           <input type="hidden" name="topic_id" value={topic.id} />
           <input type="hidden" name="direction" value="down" />
-          <button className="tsm-btn-secondary inline-flex items-center gap-1 disabled:opacity-50" disabled={index === lastIndex} type="submit"><ChevronDown className="size-4" />Down</button>
+          <button className="tsm-btn-secondary inline-flex items-center gap-1 px-3 py-2 disabled:opacity-50" disabled={index === lastIndex} type="submit" aria-label={`Move ${topic.name} down`} title="Move down"><ChevronDown className="size-4" />Down</button>
         </form>
         <form action={toggleTopicActive}>
           <HiddenContext subjectId={subjectId} groupId={groupId} />
           <input type="hidden" name="topic_id" value={topic.id} />
-          <input type="hidden" name="next_active" value={topic.is_active === false ? 'true' : 'false'} />
-          <button className={topic.is_active === false ? 'tsm-btn-primary' : 'tsm-btn-secondary'} type="submit">{topic.is_active === false ? 'Reactivate' : 'Deactivate'}</button>
+          <input type="hidden" name="next_active" value={isInactive ? 'true' : 'false'} />
+          <button className={`${isInactive ? 'tsm-btn-primary' : 'tsm-btn-secondary'} px-3 py-2`} type="submit">{isInactive ? 'Reactivate' : 'Deactivate'}</button>
         </form>
       </div>
+
+      {isRenaming ? (
+        <form action={renameTopic} className="grid gap-3 rounded-md border border-[#c3c6ce66] bg-white/70 p-4 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
+          <HiddenContext subjectId={subjectId} groupId={groupId} />
+          <input type="hidden" name="topic_id" value={topic.id} />
+          <label className="font-body text-sm text-[#43474d]">
+            Rename {topic.parent_topic_id ? 'subtopic' : 'group'}
+            <input name="name" required defaultValue={topic.name} className="tsm-input mt-1 min-w-0" aria-label={`Rename ${topic.name}`} />
+          </label>
+          <button className="tsm-btn-primary w-full sm:w-auto" type="submit">Save</button>
+          <button className="tsm-btn-secondary w-full sm:w-auto" type="button" onClick={() => setIsRenaming(false)}>Cancel</button>
+        </form>
+      ) : null}
     </div>
   )
 }
