@@ -30,10 +30,6 @@ function numberValue(formData: FormData, key: string) {
   return Number.isFinite(value) ? value : null
 }
 
-function slugify(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-}
-
 async function ensurePaper(supabase: Awaited<ReturnType<typeof requireAdmin>>, formData: FormData) {
   const existingPaperId = stringValue(formData, 'paper_id')
   const newPaperTitle = stringValue(formData, 'new_paper_title')
@@ -77,44 +73,13 @@ async function ensurePaper(supabase: Awaited<ReturnType<typeof requireAdmin>>, f
 
 async function syncTopics(supabase: Awaited<ReturnType<typeof requireAdmin>>, questionId: string, formData: FormData) {
   const selectedTopicIds = formData.getAll('topic_ids').filter((value): value is string => typeof value === 'string' && value.length > 0)
-  const newTopicName = stringValue(formData, 'new_topic_name')
   const primaryTopicId = stringValue(formData, 'primary_topic_id')
-  const topicGroupId = stringValue(formData, 'topic_group_id')
-  const subjectId = stringValue(formData, 'new_paper_subject_id') || null
-  const topicIds = [...selectedTopicIds]
-
-  if (newTopicName) {
-    const slug = slugify(newTopicName)
-    const existingTopicQuery = supabase
-      .from('topics')
-      .select('id')
-      .eq('slug', slug)
-      .eq('subject_id', subjectId)
-    const { data: existingTopic } = await (topicGroupId
-      ? existingTopicQuery.eq('parent_topic_id', topicGroupId)
-      : existingTopicQuery.is('parent_topic_id', null)
-    ).maybeSingle()
-
-    if (existingTopic?.id) {
-      topicIds.push(existingTopic.id)
-    } else {
-      const { data: topic, error } = await supabase
-        .from('topics')
-        .insert({ name: newTopicName, slug, subject_id: subjectId, parent_topic_id: topicGroupId || null, level: null, is_active: true })
-        .select('id')
-        .single()
-
-      if (error || !topic) throw new Error('Could not create topic.')
-      topicIds.push(topic.id)
-    }
-  }
+  const uniqueTopicIds = Array.from(new Set(selectedTopicIds.filter(Boolean)))
 
   await supabase.from('question_topics').delete().eq('question_id', questionId)
-
-  const uniqueTopicIds = Array.from(new Set(topicIds.filter(Boolean)))
   if (!uniqueTopicIds.length) return
 
-  const primary = primaryTopicId || uniqueTopicIds[0]
+  const primary = uniqueTopicIds.includes(primaryTopicId) ? primaryTopicId : uniqueTopicIds[0]
   const rows = uniqueTopicIds.map((topicId) => ({
     question_id: questionId,
     topic_id: topicId,
@@ -139,25 +104,74 @@ async function uploadQuestionAssets(supabase: Awaited<ReturnType<typeof requireA
   return paths
 }
 
+type InsertedAsset = { id: string; storage_path: string | null }
+
 async function insertQuestionAssets(
   supabase: Awaited<ReturnType<typeof requireAdmin>>,
   questionId: string,
   assetType: 'question' | 'markscheme',
   paths: string[],
-  sortStart: number,
 ) {
-  if (!paths.length) return
+  if (!paths.length) return [] as InsertedAsset[]
 
   const labelPrefix = assetType === 'question' ? 'Question image' : 'Mark scheme image'
-  const { error } = await supabase.from('question_assets').insert(paths.map((path, index) => ({
-    question_id: questionId,
-    asset_type: assetType,
-    storage_path: path,
-    label: `${labelPrefix} ${sortStart + index + 1}`,
-    sort_order: sortStart + index,
-  })))
+  const { data, error } = await supabase
+    .from('question_assets')
+    .insert(paths.map((path, index) => ({
+      question_id: questionId,
+      asset_type: assetType,
+      storage_path: path,
+      label: `${labelPrefix} ${index + 1}`,
+      sort_order: index,
+    })))
+    .select('id,storage_path')
 
-  if (error) throw new Error('Could not save uploaded image records.')
+  if (error || !data) throw new Error('Could not save uploaded image records.')
+  return data as InsertedAsset[]
+}
+
+function formStrings(formData: FormData, key: string) {
+  return formData.getAll(key).filter((value): value is string => typeof value === 'string' && value.length > 0)
+}
+
+async function applyAssetOrder(
+  supabase: Awaited<ReturnType<typeof requireAdmin>>,
+  questionId: string,
+  assetType: 'question' | 'markscheme',
+  orderKey: string,
+  fileKey: string,
+  insertedAssets: InsertedAsset[],
+  formData: FormData,
+) {
+  const submittedOrder = formStrings(formData, orderKey)
+  const fileKeys = formStrings(formData, fileKey)
+  const insertedByToken = new Map(fileKeys.map((key, index) => [`new:${key}`, insertedAssets[index]]))
+  const existingIds = submittedOrder.filter((token) => token.startsWith('existing:')).map((token) => token.replace('existing:', ''))
+
+  const { data: existingAssets, error: existingError } = await supabase
+    .from('question_assets')
+    .select('id,storage_path,public_url')
+    .eq('question_id', questionId)
+    .eq('asset_type', assetType)
+    .in('id', existingIds.length ? existingIds : ['00000000-0000-0000-0000-000000000000'])
+
+  if (existingError) throw new Error('Could not read existing image records.')
+  const existingById = new Map((existingAssets ?? []).map((asset) => [asset.id as string, asset as { id: string; storage_path: string | null; public_url: string | null }]))
+  const labelPrefix = assetType === 'question' ? 'Question image' : 'Mark scheme image'
+  const orderedAssets = submittedOrder
+    .map((token) => token.startsWith('new:') ? insertedByToken.get(token) : existingById.get(token.replace('existing:', '')))
+    .filter((asset): asset is InsertedAsset & { public_url?: string | null } => Boolean(asset))
+
+  for (const [index, asset] of orderedAssets.entries()) {
+    const { error } = await supabase
+      .from('question_assets')
+      .update({ sort_order: index, label: `${labelPrefix} ${index + 1}` })
+      .eq('id', asset.id)
+      .eq('question_id', questionId)
+    if (error) throw new Error('Could not save image order.')
+  }
+
+  return orderedAssets[0]?.storage_path || orderedAssets[0]?.public_url || null
 }
 
 function questionPayload(formData: FormData, paperId: string, questionAssetPath: string | null, markschemeAssetPath: string | null) {
@@ -198,8 +212,14 @@ export async function createQuestion(formData: FormData) {
 
   if (error || !question) throw new Error('Could not create question.')
 
-  await insertQuestionAssets(supabase, question.id, 'question', questionAssetPaths, 0)
-  await insertQuestionAssets(supabase, question.id, 'markscheme', markschemeAssetPaths, 0)
+  const insertedQuestionAssets = await insertQuestionAssets(supabase, question.id, 'question', questionAssetPaths)
+  const insertedMarkschemeAssets = await insertQuestionAssets(supabase, question.id, 'markscheme', markschemeAssetPaths)
+  const firstQuestionAssetPath = await applyAssetOrder(supabase, question.id, 'question', 'question_asset_order', 'question_file_key', insertedQuestionAssets, formData)
+  const firstMarkschemeAssetPath = await applyAssetOrder(supabase, question.id, 'markscheme', 'markscheme_asset_order', 'markscheme_file_key', insertedMarkschemeAssets, formData)
+  await supabase.from('questions').update({
+    question_image_path: firstQuestionAssetPath || questionAssetPath || stringValue(formData, 'question_image_path') || null,
+    markscheme_image_path: firstMarkschemeAssetPath || markschemeAssetPath || stringValue(formData, 'markscheme_image_path') || null,
+  }).eq('id', question.id)
   await syncTopics(supabase, question.id, formData)
   revalidatePath('/dashboard/admin/question-bank')
   redirect(`/dashboard/admin/question-bank/${question.id}/edit`)
@@ -221,8 +241,14 @@ export async function updateQuestion(formData: FormData) {
 
   if (error) throw new Error('Could not update question.')
 
-  await insertQuestionAssets(supabase, questionId, 'question', questionAssetPaths, numberValue(formData, 'existing_question_asset_count') || 0)
-  await insertQuestionAssets(supabase, questionId, 'markscheme', markschemeAssetPaths, numberValue(formData, 'existing_markscheme_asset_count') || 0)
+  const insertedQuestionAssets = await insertQuestionAssets(supabase, questionId, 'question', questionAssetPaths)
+  const insertedMarkschemeAssets = await insertQuestionAssets(supabase, questionId, 'markscheme', markschemeAssetPaths)
+  const firstQuestionAssetPath = await applyAssetOrder(supabase, questionId, 'question', 'question_asset_order', 'question_file_key', insertedQuestionAssets, formData)
+  const firstMarkschemeAssetPath = await applyAssetOrder(supabase, questionId, 'markscheme', 'markscheme_asset_order', 'markscheme_file_key', insertedMarkschemeAssets, formData)
+  await supabase.from('questions').update({
+    question_image_path: firstQuestionAssetPath || questionAssetPath || stringValue(formData, 'question_image_path') || null,
+    markscheme_image_path: firstMarkschemeAssetPath || markschemeAssetPath || stringValue(formData, 'markscheme_image_path') || null,
+  }).eq('id', questionId)
   await syncTopics(supabase, questionId, formData)
   revalidatePath('/dashboard/admin/question-bank')
   revalidatePath(`/dashboard/admin/question-bank/${questionId}/edit`)
