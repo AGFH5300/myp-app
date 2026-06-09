@@ -4,6 +4,10 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 
+export type TopicActionResult = { ok: true; message: string } | { ok: false; message: string }
+
+const genericError = 'Could not update topic. Please try again.'
+
 async function requireAdmin() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -24,14 +28,8 @@ function textValue(formData: FormData, key: string) {
   return typeof value === 'string' ? value.trim() : ''
 }
 
-function topicPath(formData: FormData, message: string, error = false) {
-  const params = new URLSearchParams()
-  const subjectId = textValue(formData, 'current_subject_id') || textValue(formData, 'subject_id')
-  const groupId = textValue(formData, 'current_group_id') || textValue(formData, 'parent_topic_id')
-  if (subjectId) params.set('subject', subjectId)
-  if (groupId) params.set('group', groupId)
-  params.set(error ? 'error' : 'notice', message)
-  return `/dashboard/admin/topics?${params.toString()}`
+function fail(message = genericError): TopicActionResult {
+  return { ok: false, message }
 }
 
 function slugify(value: string) {
@@ -72,17 +70,23 @@ async function nextSortOrder(supabase: Awaited<ReturnType<typeof requireAdmin>>,
   return maxSort + 10
 }
 
-export async function createTopic(formData: FormData) {
+function revalidateTopicViews() {
+  revalidatePath('/dashboard/admin/topics')
+  revalidatePath('/dashboard/admin/question-bank')
+  revalidatePath('/dashboard/papers')
+}
+
+export async function createTopic(formData: FormData): Promise<TopicActionResult> {
   const supabase = await requireAdmin()
   const subjectId = textValue(formData, 'subject_id')
   const parentTopicId = textValue(formData, 'parent_topic_id') || null
   const name = textValue(formData, 'name')
 
-  if (!subjectId || !name) redirect(topicPath(formData, 'Topic name and subject are required.', true))
+  if (!subjectId || !name) return fail('Topic name and subject are required.')
 
   if (parentTopicId) {
     const { data: parent } = await supabase.from('topics').select('id,subject_id').eq('id', parentTopicId).maybeSingle()
-    if (!parent || parent.subject_id !== subjectId) redirect(topicPath(formData, 'Subtopics must belong to the selected subject and topic group.', true))
+    if (!parent || parent.subject_id !== subjectId) return fail('Subtopics must belong to the selected subject and topic group.')
   }
 
   const slug = await uniqueSlug(supabase, name, subjectId, parentTopicId)
@@ -97,63 +101,62 @@ export async function createTopic(formData: FormData) {
     is_active: true,
   })
 
-  if (error) redirect(topicPath(formData, error.message, true))
-  revalidatePath('/dashboard/admin/topics')
-  revalidatePath('/dashboard/admin/question-bank')
-  redirect(topicPath(formData, parentTopicId ? 'Subtopic created.' : 'Topic group created.'))
+  if (error) return fail()
+  revalidateTopicViews()
+  return { ok: true, message: parentTopicId ? 'Subtopic added' : 'Topic group added' }
 }
 
-export async function renameTopic(formData: FormData) {
+export async function renameTopic(formData: FormData): Promise<TopicActionResult> {
   const supabase = await requireAdmin()
   const topicId = textValue(formData, 'topic_id')
   const name = textValue(formData, 'name')
-  if (!topicId || !name) redirect(topicPath(formData, 'Choose a topic and enter a new name.', true))
+  if (!topicId || !name) return fail('Choose a topic and enter a new name.')
 
   const { data: topic } = await supabase.from('topics').select('id,subject_id,parent_topic_id').eq('id', topicId).maybeSingle()
-  if (!topic?.subject_id) redirect(topicPath(formData, 'Topic not found.', true))
+  if (!topic?.subject_id) return fail('Topic not found.')
 
   const slug = await uniqueSlug(supabase, name, topic.subject_id, topic.parent_topic_id ?? null, topicId)
   const { error } = await supabase.from('topics').update({ name, slug }).eq('id', topicId)
-  if (error) redirect(topicPath(formData, error.message, true))
+  if (error) return fail()
 
-  revalidatePath('/dashboard/admin/topics')
-  revalidatePath('/dashboard/admin/question-bank')
-  revalidatePath('/dashboard/papers')
-  redirect(topicPath(formData, 'Topic renamed.'))
+  revalidateTopicViews()
+  return { ok: true, message: topic.parent_topic_id ? 'Subtopic renamed' : 'Topic group renamed' }
 }
 
-export async function toggleTopicActive(formData: FormData) {
+export async function toggleTopicActive(formData: FormData): Promise<TopicActionResult> {
   const supabase = await requireAdmin()
   const topicId = textValue(formData, 'topic_id')
   const nextActive = textValue(formData, 'next_active') === 'true'
-  if (!topicId) redirect(topicPath(formData, 'Topic not found.', true))
+  if (!topicId) return fail('Topic not found.')
 
-  if (!nextActive) {
+  const { data: topic } = await supabase.from('topics').select('id,parent_topic_id').eq('id', topicId).maybeSingle()
+  if (!topic) return fail('Topic not found.')
+
+  if (!nextActive && !topic.parent_topic_id) {
     const { count } = await supabase
       .from('topics')
       .select('id', { count: 'exact', head: true })
       .eq('parent_topic_id', topicId)
       .eq('is_active', true)
-    if ((count ?? 0) > 0) redirect(topicPath(formData, 'Deactivate active subtopics first, then deactivate the topic group.', true))
+    if ((count ?? 0) > 0) return fail('Deactivate active subtopics first, then deactivate the topic group.')
   }
 
   const { error } = await supabase.from('topics').update({ is_active: nextActive }).eq('id', topicId)
-  if (error) redirect(topicPath(formData, error.message, true))
+  if (error) return fail()
 
-  revalidatePath('/dashboard/admin/topics')
-  revalidatePath('/dashboard/admin/question-bank')
-  revalidatePath('/dashboard/papers')
-  redirect(topicPath(formData, nextActive ? 'Topic reactivated.' : 'Topic deactivated.'))
+  revalidateTopicViews()
+  const noun = topic.parent_topic_id ? 'Subtopic' : 'Topic group'
+  return { ok: true, message: `${noun} ${nextActive ? 'reactivated' : 'deactivated'}` }
 }
 
-export async function reorderTopic(formData: FormData) {
+export async function reorderTopic(formData: FormData): Promise<TopicActionResult> {
   const supabase = await requireAdmin()
   const topicId = textValue(formData, 'topic_id')
   const direction = textValue(formData, 'direction') === 'up' ? -1 : 1
-  if (!topicId) redirect(topicPath(formData, 'Topic not found.', true))
+  if (!topicId) return fail('Topic not found.')
 
   const { data: topic } = await supabase.from('topics').select('id,subject_id,parent_topic_id,sort_order').eq('id', topicId).maybeSingle()
-  if (!topic?.subject_id) redirect(topicPath(formData, 'Topic not found.', true))
+  if (!topic?.subject_id) return fail('Topic not found.')
 
   const query = supabase
     .from('topics')
@@ -165,24 +168,24 @@ export async function reorderTopic(formData: FormData) {
   const { data: siblings } = topic.parent_topic_id ? await query.eq('parent_topic_id', topic.parent_topic_id) : await query.is('parent_topic_id', null)
   const index = (siblings ?? []).findIndex((item) => item.id === topicId)
   const swap = siblings?.[index + direction]
-  if (!swap) redirect(topicPath(formData, 'Topic is already in that position.', true))
+  if (!swap) return fail('Topic is already in that position.')
 
   const currentOrder = topic.sort_order ?? 0
   const swapOrder = swap.sort_order ?? 0
   const { error: firstError } = await supabase.from('topics').update({ sort_order: swapOrder }).eq('id', topicId)
   const { error: secondError } = await supabase.from('topics').update({ sort_order: currentOrder }).eq('id', swap.id)
-  if (firstError || secondError) redirect(topicPath(formData, firstError?.message || secondError?.message || 'Could not reorder topic.', true))
+  if (firstError || secondError) return fail()
 
   revalidatePath('/dashboard/admin/topics')
   revalidatePath('/dashboard/papers')
-  redirect(topicPath(formData, 'Topic order updated.'))
+  return { ok: true, message: topic.parent_topic_id ? 'Subtopic reordered' : 'Topic group reordered' }
 }
 
-export async function mergeSubtopics(formData: FormData) {
+export async function mergeSubtopics(formData: FormData): Promise<TopicActionResult> {
   const supabase = await requireAdmin()
   const sourceId = textValue(formData, 'source_topic_id')
   const targetId = textValue(formData, 'target_topic_id')
-  if (!sourceId || !targetId || sourceId === targetId) redirect(topicPath(formData, 'Choose two different subtopics to merge.', true))
+  if (!sourceId || !targetId || sourceId === targetId) return fail('Choose two different subtopics to merge.')
 
   const { data: topics } = await supabase
     .from('topics')
@@ -192,7 +195,7 @@ export async function mergeSubtopics(formData: FormData) {
   const source = topics?.find((topic) => topic.id === sourceId)
   const target = topics?.find((topic) => topic.id === targetId)
   if (!source?.parent_topic_id || !target?.parent_topic_id || source.subject_id !== target.subject_id || source.parent_topic_id !== target.parent_topic_id) {
-    redirect(topicPath(formData, 'Merge is restricted to subtopics in the same topic group.', true))
+    return fail('Merge is restricted to subtopics in the same topic group.')
   }
 
   const { data: sourceRows } = await supabase.from('question_topics').select('question_id,is_primary,confidence').eq('topic_id', sourceId)
@@ -204,7 +207,7 @@ export async function mergeSubtopics(formData: FormData) {
 
   if (rowsToInsert.length) {
     const { error } = await supabase.from('question_topics').insert(rowsToInsert)
-    if (error) redirect(topicPath(formData, error.message, true))
+    if (error) return fail()
   }
 
   const primaryQuestionIds = (sourceRows ?? [])
@@ -212,17 +215,15 @@ export async function mergeSubtopics(formData: FormData) {
     .map((row) => row.question_id)
   if (primaryQuestionIds.length) {
     const { error } = await supabase.from('question_topics').update({ is_primary: true }).eq('topic_id', targetId).in('question_id', primaryQuestionIds)
-    if (error) redirect(topicPath(formData, error.message, true))
+    if (error) return fail()
   }
 
   const { error: deleteError } = await supabase.from('question_topics').delete().eq('topic_id', sourceId)
-  if (deleteError) redirect(topicPath(formData, deleteError.message, true))
+  if (deleteError) return fail()
 
   const { error: deactivateError } = await supabase.from('topics').update({ is_active: false }).eq('id', sourceId)
-  if (deactivateError) redirect(topicPath(formData, deactivateError.message, true))
+  if (deactivateError) return fail()
 
-  revalidatePath('/dashboard/admin/topics')
-  revalidatePath('/dashboard/admin/question-bank')
-  revalidatePath('/dashboard/papers')
-  redirect(topicPath(formData, 'Subtopics merged. The source topic was deactivated.'))
+  revalidateTopicViews()
+  return { ok: true, message: 'Subtopics merged' }
 }

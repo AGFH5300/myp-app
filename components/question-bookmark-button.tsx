@@ -3,8 +3,7 @@
 import { useActionState, useEffect } from 'react'
 import { useFormStatus } from 'react-dom'
 import { AppIcon } from '@/components/app-icon'
-import { Toaster } from '@/components/ui/toaster'
-import { toast } from '@/hooks/use-toast'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
 export type BookmarkActionState = {
@@ -47,8 +46,8 @@ export function QuestionBookmarkButton({ action, initialBookmarked, questionId, 
   const [state, formAction] = useActionState(action, { bookmarked: initialBookmarked })
 
   useEffect(() => {
-    if (state.message) toast({ title: state.message })
-    if (state.error) toast({ variant: 'destructive', title: state.error })
+    if (state.message) toast.success(state.message)
+    if (state.error) toast.error(state.error)
   }, [state.message, state.error])
 
   return (
@@ -57,7 +56,6 @@ export function QuestionBookmarkButton({ action, initialBookmarked, questionId, 
       <input type="hidden" name="paper_id" value={paperId} />
       <BookmarkSubmitButton bookmarked={state.bookmarked} />
       {state.error ? <p className="font-body text-sm text-red-700">{state.error}</p> : null}
-      <Toaster />
     </form>
   )
 }

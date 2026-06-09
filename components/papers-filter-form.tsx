@@ -28,7 +28,7 @@ export function PapersFilterForm({ initial, subjects, papers, topicGroups, subto
         <input id="papers-filter-search" type="search" name="q" defaultValue={initial.q} className="tsm-input mt-1 w-full" placeholder="Question number or paper title" />
       </div>
       <div className="flex flex-wrap items-center gap-3 md:col-span-2 xl:col-span-5">
-        <button className="tsm-btn-primary">Apply filters</button>
+        <button type="submit" className="tsm-btn-primary">Apply filters</button>
         <Link href="/dashboard/papers" className="tsm-btn-secondary">Clear</Link>
       </div>
     </form>

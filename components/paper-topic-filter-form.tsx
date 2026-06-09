@@ -12,7 +12,7 @@ export function PaperTopicFilterForm({ selectedTopic, topics }: { selectedTopic:
       <div className="min-w-56">
         <SearchableSelect id="paper-detail-topic" name="topic" label="Topic" value={topic} onChange={setTopic} placeholder="All topics" emptyText="No matching topics found." options={topics} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
       </div>
-      <button className="tsm-btn-secondary mb-0.5">Filter</button>
+      <button type="submit" className="tsm-btn-secondary mb-0.5">Filter</button>
     </form>
   )
 }

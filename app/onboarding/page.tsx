@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { SearchableSelect } from '@/components/searchable-select'
 
 type Subject = { id: string; name: string }
 const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
@@ -14,6 +15,7 @@ export default function OnboardingPage() {
   const [chosenSubjects, setChosenSubjects] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [openSelectId, setOpenSelectId] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -94,7 +96,7 @@ export default function OnboardingPage() {
           </div>
 
           <div className="mt-8 grid md:grid-cols-2 gap-6">
-            <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">MYP year</label><select className="tsm-input" value={mypYear} onChange={(e) => setMypYear(e.target.value)}><option value="3">MYP 3</option><option value="4">MYP 4</option><option value="5">MYP 5</option><option value="other">Other</option></select></div>
+            <SearchableSelect id="onboarding-myp-year" label="MYP year" value={mypYear} onChange={setMypYear} placeholder="Choose MYP year" clearLabel="Clear year" emptyText="No matching years found." options={[{ value: '3', label: 'MYP 3' }, { value: '4', label: 'MYP 4' }, { value: '5', label: 'MYP 5' }, { value: 'other', label: 'Other' }]} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
             <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">School</label><input className="tsm-input" value={school} onChange={(e) => setSchool(e.target.value)} placeholder="Your school" required /></div>
           </div>
 
@@ -119,7 +121,7 @@ export default function OnboardingPage() {
           </div>
 
           {error && <p className="mt-6 text-sm text-red-700">{error}</p>}
-          <div className="mt-8 flex justify-end"><button className="bg-[#00152a] text-white px-8 py-3 rounded-sm" disabled={loading || !school || chosenSubjects.length === 0} onClick={saveOnboarding}>{loading ? 'Saving...' : 'Finish onboarding'}</button></div>
+          <div className="mt-8 flex justify-end"><button type="button" className="tsm-btn-primary px-8 py-3" disabled={loading || !school || chosenSubjects.length === 0} onClick={saveOnboarding}>{loading ? 'Saving…' : 'Finish onboarding'}</button></div>
         </section>
       </div>
     </main>
