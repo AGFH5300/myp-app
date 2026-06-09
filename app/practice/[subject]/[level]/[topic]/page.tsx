@@ -18,6 +18,7 @@ type QuestionRow = {
 }
 
 type LinkRow = { topic_id: string; questions?: QuestionRow | QuestionRow[] | null }
+type PreviewAssetRow = { question_id: string; storage_path: string | null; public_url: string | null }
 
 function firstRelation<T>(relation: T | T[] | null | undefined) {
   return Array.isArray(relation) ? relation[0] : relation
@@ -90,9 +91,27 @@ export default async function PracticeTopicPage({ params }: { params: Promise<{ 
     .filter((question): question is QuestionRow => Boolean(question))
     .sort((a, b) => (firstRelation(a.papers)?.year ?? 0) - (firstRelation(b.papers)?.year ?? 0) || (a.question_order ?? 9999) - (b.question_order ?? 9999) || a.question_number.localeCompare(b.question_number))
 
+  let previewAssets: PreviewAssetRow[] = []
+  if (questions.length) {
+    const { data: assetRows } = await supabase
+      .from('question_assets')
+      .select('question_id,storage_path,public_url,sort_order,created_at')
+      .in('question_id', questions.map((question) => question.id))
+      .eq('asset_type', 'question')
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true })
+    previewAssets = (assetRows ?? []) as PreviewAssetRow[]
+  }
+
+  const firstPreviewAssetByQuestion = new Map<string, PreviewAssetRow>()
+  previewAssets.forEach((asset) => {
+    if (!firstPreviewAssetByQuestion.has(asset.question_id)) firstPreviewAssetByQuestion.set(asset.question_id, asset)
+  })
+
   const previewUrls = new Map<string, string | null>()
   for (const question of questions) {
-    previewUrls.set(question.id, await resolveQuestionAssetUrl(supabase, question.question_image_path || question.image_url))
+    const firstAsset = firstPreviewAssetByQuestion.get(question.id)
+    previewUrls.set(question.id, await resolveQuestionAssetUrl(supabase, firstAsset ? firstAsset.storage_path || firstAsset.public_url : question.question_image_path || question.image_url))
   }
 
   return (
@@ -114,7 +133,7 @@ export default async function PracticeTopicPage({ params }: { params: Promise<{ 
                   <h2 className="font-headline text-2xl text-[#00152a]">{paper?.title} Q{question.question_number}</h2>
                   <p className="mt-1 font-body text-sm text-[#43474d]">{paper?.year} {firstRelation(paper?.exam_sessions)?.session_month} · {question.marks ?? '—'} marks · {primary?.name || topicRow.name}</p>
                   {secondaryTopics.length ? <div className="mt-2 flex flex-wrap gap-2">{secondaryTopics.map((topic) => <span key={topic?.name} className="rounded-full bg-[#f5f3ee] px-2 py-1 font-body text-xs text-[#735b2b]">{topic?.name}</span>)}</div> : null}
-                  <span className="mt-3 inline-block font-body text-sm font-semibold text-[#735b2b]">Practise</span>
+                  <span className="mt-3 inline-block font-body text-sm font-semibold text-[#735b2b]">Practice</span>
                 </div>
                 {previewUrl ? <Image src={previewUrl} alt={`Question ${question.question_number} preview`} width={64} height={64} unoptimized className="h-16 w-16 rounded-sm border border-[#c3c6ce66] object-cover" /> : null}
               </Link>

@@ -26,6 +26,28 @@ export async function resolveQuestionAssetUrl(supabase: SupabaseLike, value: str
   return data.signedUrl
 }
 
+export type QuestionAssetRow = {
+  storage_path: string | null
+  public_url: string | null
+  label?: string | null
+  sort_order?: number | null
+}
+
+export type ResolvedQuestionAsset = {
+  url: string
+  label: string | null
+}
+
+export async function resolveQuestionAssetImages(supabase: SupabaseLike, assets: QuestionAssetRow[], fallbackValue: string | null | undefined) {
+  const sourceAssets = assets.length ? assets : fallbackValue ? [{ storage_path: fallbackValue, public_url: null, label: null }] : []
+  const resolved = await Promise.all(sourceAssets.map(async (asset) => {
+    const url = await resolveQuestionAssetUrl(supabase, asset.storage_path || asset.public_url)
+    return url ? { url, label: asset.label ?? null } : null
+  }))
+
+  return resolved.filter((asset): asset is ResolvedQuestionAsset => Boolean(asset))
+}
+
 export async function uploadQuestionAsset(supabase: SupabaseLike, file: File | null, folder: 'questions' | 'markschemes') {
   if (!file || file.size === 0) return null
 

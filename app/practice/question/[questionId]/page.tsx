@@ -1,9 +1,9 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { BrandWordmark } from '@/components/brand-wordmark'
 import { createClient } from '@/lib/supabase/server'
-import { resolveQuestionAssetUrl } from '@/lib/question-assets'
+import { resolveQuestionAssetImages, type QuestionAssetRow } from '@/lib/question-assets'
+import { QuestionImageViewer } from '@/components/question-image-viewer'
 import { PendingSubmitButton } from '@/components/pending-submit-button'
 
 function firstRelation<T>(relation: T | T[] | null | undefined) {
@@ -42,8 +42,18 @@ export default async function PracticeQuestionPage({ params }: { params: Promise
     await supabase.from('recent_question_views').insert({ student_id: user.id, question_id: question.id })
   }
 
-  const questionImageUrl = await resolveQuestionAssetUrl(supabase, question.question_image_path || question.image_url)
-  const markschemeImageUrl = await resolveQuestionAssetUrl(supabase, question.markscheme_image_path || question.markscheme_image_url)
+  const { data: assetRows } = await supabase
+    .from('question_assets')
+    .select('asset_type,storage_path,public_url,label,sort_order,created_at')
+    .eq('question_id', question.id)
+    .in('asset_type', ['question', 'markscheme'])
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
+
+  type QuestionAssetWithType = QuestionAssetRow & { asset_type: 'question' | 'markscheme' }
+  const assets = (assetRows ?? []) as QuestionAssetWithType[]
+  const questionImages = await resolveQuestionAssetImages(supabase, assets.filter((asset) => asset.asset_type === 'question'), question.question_image_path || question.image_url)
+  const markschemeImages = await resolveQuestionAssetImages(supabase, assets.filter((asset) => asset.asset_type === 'markscheme'), question.markscheme_image_path || question.markscheme_image_url)
   const paper = firstRelation(question.papers)
   if (!paper) notFound()
   const subject = firstRelation(paper.subjects)
@@ -65,8 +75,8 @@ export default async function PracticeQuestionPage({ params }: { params: Promise
         <section className="mt-6 rounded-md border border-[#c3c6ce66] bg-white p-6">
           <h2 className="font-headline text-2xl text-[#00152a]">Try the question</h2>
           <div className="mt-5 max-w-4xl">
-            {questionImageUrl ? (
-              <Image src={questionImageUrl} alt={`Question ${question.question_number}`} width={1200} height={800} unoptimized className="h-auto max-w-full rounded-md border border-[#c3c6ce66] bg-white" />
+            {questionImages.length ? (
+              <QuestionImageViewer labelPrefix="Question image" images={questionImages.map((image, imageIndex) => ({ url: image.url, alt: image.label || `Question ${question.question_number} image ${imageIndex + 1}` }))} />
             ) : (
               <p className="font-body whitespace-pre-wrap text-[#00152a]">{question.prompt_text}</p>
             )}
@@ -74,10 +84,10 @@ export default async function PracticeQuestionPage({ params }: { params: Promise
         </section>
 
         <details className="mt-6 rounded-md border border-[#c3c6ce66] bg-white p-6">
-          <summary className="cursor-pointer font-body font-semibold text-[#735b2b]">Reveal mark scheme</summary>
+          <summary className="cursor-pointer font-body font-semibold text-[#735b2b]">Show mark scheme</summary>
           <div className="mt-5 max-w-4xl">
-            {markschemeImageUrl ? (
-              <Image src={markschemeImageUrl} alt={`Question ${question.question_number} mark scheme`} width={1200} height={800} unoptimized className="h-auto max-w-full rounded-md border border-[#c3c6ce66] bg-white" />
+            {markschemeImages.length ? (
+              <QuestionImageViewer labelPrefix="Mark scheme image" images={markschemeImages.map((image, imageIndex) => ({ url: image.url, alt: image.label || `Question ${question.question_number} mark scheme image ${imageIndex + 1}` }))} />
             ) : question.markscheme_text ? (
               <p className="font-body whitespace-pre-wrap text-[#43474d]">{question.markscheme_text}</p>
             ) : (
