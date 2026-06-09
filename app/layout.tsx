@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Newsreader, Manrope } from 'next/font/google'
 import './globals.css'
+import { Toaster } from '@/components/ui/sonner'
 
 const newsreader = Newsreader({ subsets: ['latin'], variable: '--font-newsreader' })
 const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' })
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${newsreader.variable} ${manrope.variable} min-h-screen bg-[#fbf9f4] text-[#1b1c19] antialiased`}>
         <style>{`.font-headline{font-family:var(--font-newsreader),serif}.font-body,.font-label{font-family:var(--font-manrope),sans-serif}`}</style>
         {children}
+        <Toaster richColors closeButton position="top-right" />
       </body>
     </html>
   )

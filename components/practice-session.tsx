@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AppIcon } from '@/components/app-icon'
+import { SearchableSelect } from '@/components/searchable-select'
 
 type Question = {
   id: string
@@ -27,6 +28,7 @@ export function PracticeSession({ paper, questions, studentId, bookmarkedQuestio
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [bookmarks, setBookmarks] = useState(new Set(bookmarkedQuestionIds))
+  const [openSelectId, setOpenSelectId] = useState<string | null>(null)
   const q = questions[index]
   const progress = useMemo(() => (questions.length ? ((index + 1) / questions.length) * 100 : 0), [index, questions.length])
 
@@ -44,7 +46,7 @@ export function PracticeSession({ paper, questions, studentId, bookmarkedQuestio
       })}</div>
     }
     if (q.answer_mode === 'dropdown' && q.options_json?.length) {
-      return <select aria-label={`Answer for question ${q.question_number}`} className={common} value={value} onChange={(e) => onChange(e.target.value)}><option value="">Select an option</option>{q.options_json.map((opt) => <option key={opt}>{opt}</option>)}</select>
+      return <div className="mt-8"><SearchableSelect id={`practice-answer-${q.id}`} label={`Answer for question ${q.question_number}`} value={value} onChange={onChange} placeholder="Select an option" clearLabel="Clear answer" emptyText="No matching options found." options={q.options_json.map((opt) => ({ value: opt, label: opt }))} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} /></div>
     }
     if (q.answer_mode === 'short_text') return <input aria-label={`Answer for question ${q.question_number}`} className={common} value={value} onChange={(e) => onChange(e.target.value)} placeholder="Type your response" />
     if (q.answer_mode === 'numeric') return <input aria-label={`Answer for question ${q.question_number}`} type="number" className={common} value={value} onChange={(e) => onChange(e.target.value)} placeholder="Enter a numeric answer" />

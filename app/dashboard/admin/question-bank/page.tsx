@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { AdminQuestionBankFilterForm } from './filter-form'
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
@@ -87,19 +88,13 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
         </div>
       </header>
 
-      <form className="rounded-md border border-blue-100 bg-white p-5 shadow-sm" action="/dashboard/admin/question-bank">
-        <p className="mb-4 font-body text-sm font-semibold text-[#00152a]">Filter the admin question list</p>
-        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
-          <label htmlFor="admin-qb-filter-search" className="md:col-span-2 font-body text-sm text-[#43474d]">Search<input id="admin-qb-filter-search" name="q" className="tsm-input mt-1 w-full" defaultValue={stringParam(params, 'q')} placeholder="Paper, topic, or Q1a" /></label>
-          <label htmlFor="admin-qb-filter-subject" className="font-body text-sm text-[#43474d]">Subject<select id="admin-qb-filter-subject" name="subject" className="tsm-input mt-1 w-full" defaultValue={subjectFilter}><option value="">All subjects</option>{subjects?.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
-          <label htmlFor="admin-qb-filter-level" className="font-body text-sm text-[#43474d]">Level<select id="admin-qb-filter-level" name="level" className="tsm-input mt-1 w-full" defaultValue={levelFilter}><option value="">All levels</option>{levels.map((level) => <option key={level} value={level}>{level}</option>)}</select></label>
-          <label htmlFor="admin-qb-filter-paper" className="font-body text-sm text-[#43474d]">Paper<select id="admin-qb-filter-paper" name="paper" className="tsm-input mt-1 w-full" defaultValue={paperFilter}><option value="">All papers</option>{papers?.map((paper) => <option key={paper.id} value={paper.id}>{paper.title} — {relationName(paper.exam_sessions, 'session_month')} {paper.year}</option>)}</select></label>
-          <label htmlFor="admin-qb-filter-topic" className="font-body text-sm text-[#43474d]">Topic<select id="admin-qb-filter-topic" name="topic" className="tsm-input mt-1 w-full" defaultValue={topicFilter}><option value="">All topics</option>{topics?.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></label>
-          <label htmlFor="admin-qb-filter-published" className="font-body text-sm text-[#43474d]">Shown<select id="admin-qb-filter-published" name="published" className="tsm-input mt-1 w-full" defaultValue={publishedFilter}><option value="">Any</option><option value="true">Show to students</option><option value="false">Hidden</option></select></label>
-          <label htmlFor="admin-qb-filter-reviewed" className="font-body text-sm text-[#43474d]">Checked<select id="admin-qb-filter-reviewed" name="reviewed" className="tsm-input mt-1 w-full" defaultValue={reviewedFilter}><option value="">Any</option><option value="true">Checked/ready</option><option value="false">Needs review</option></select></label>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-3"><button type="submit" className="tsm-btn-primary">Apply filters</button><Link href="/dashboard/admin/question-bank" className="tsm-btn-secondary">Clear</Link></div>
-      </form>
+      <AdminQuestionBankFilterForm
+        initial={{ q: stringParam(params, 'q'), subject: subjectFilter, level: levelFilter, paper: paperFilter, topic: topicFilter, published: publishedFilter, reviewed: reviewedFilter }}
+        subjects={(subjects ?? []).map((subject) => ({ value: subject.id, label: subject.name }))}
+        levels={levels.map((level) => ({ value: level, label: level }))}
+        papers={(papers ?? []).map((paper) => ({ value: paper.id, label: `${paper.title} — ${relationName(paper.exam_sessions, 'session_month')} ${paper.year}` }))}
+        topics={(topics ?? []).map((topic) => ({ value: topic.id, label: topic.name }))}
+      />
 
       <section className="rounded-md border border-[#c3c6ce66] bg-white p-6">
         <div className="mb-4 flex items-center justify-between gap-3">

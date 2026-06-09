@@ -88,3 +88,17 @@ button:disabled,
   outline: 2px solid color-mix(in srgb, var(--secondary) 45%, transparent);
   outline-offset: 2px;
 }
+
+.tsm-btn-primary:disabled,
+.tsm-btn-secondary:disabled,
+button:disabled {
+  opacity: .6;
+}
+
+.tsm-btn-primary:disabled:hover,
+.tsm-btn-secondary:disabled:hover,
+button:disabled:hover {
+  border-color: inherit;
+  color: inherit;
+  opacity: .6;
+}
