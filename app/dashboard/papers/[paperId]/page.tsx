@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { PaperTopicFilterForm } from '@/components/paper-topic-filter-form'
 
 function firstRelation<T>(relation: T | T[] | null | undefined) {
   return Array.isArray(relation) ? relation[0] : relation
@@ -74,22 +75,14 @@ export default async function PaperDetailPage({
       <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-headline text-2xl text-[#00152a]">Questions from this paper</h2>
-          {paperTopics.length > 0 ? (
-            <form>
-              <select name="topic" defaultValue={selectedTopic} className="tsm-input text-sm">
-                <option value="">All topics</option>
-                {paperTopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}
-              </select>
-              <button className="sr-only">Filter</button>
-            </form>
-          ) : null}
+          {paperTopics.length > 0 ? <PaperTopicFilterForm selectedTopic={selectedTopic} topics={paperTopics.map((topic) => ({ value: topic.id, label: topic.name }))} /> : null}
         </div>
         <div className="space-y-3">
           {filteredQuestions.map((question) => {
             const previewImage = question.context_image_url || question.image_url || question.secondary_image_url
             const questionTopics = question.question_topics?.map((row) => firstRelation(row.topics)).filter((topic): topic is { id: string; name: string } => Boolean(topic?.id && topic?.name)) ?? []
             return (
-              <Link key={question.id} href={`/dashboard/questions/${question.id}`} className="flex items-center justify-between gap-3 p-4 bg-[#f5f3ee] rounded-sm">
+              <Link key={question.id} href={`/dashboard/papers/question/${question.id}`} className="flex items-center justify-between gap-3 p-4 bg-[#f5f3ee] rounded-sm">
                 <div className="min-w-0">
                   <p className="font-headline text-lg text-[#00152a]">Q{question.question_number} · {question.marks} marks</p>
                   {questionTopics.length > 0 ? (
