@@ -43,7 +43,7 @@ export default async function PracticeSubjectPage({ params }: { params: Promise<
       <main className="tsm-shell py-12">
         <Link href="/practice" className="font-body text-sm text-[#735b2b] underline">← Subjects</Link>
         <h1 className="mt-4 font-headline text-5xl text-[#00152a]">{subject.name}</h1>
-        <p className="mt-3 font-body text-[#43474d]">Choose a topic group to practise.</p>
+        <p className="mt-3 font-body text-[#43474d]">Choose a topic group to practice.</p>
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           {topics.map((topic) => (
             <Link key={topic.id} href={`/practice/${encodeURIComponent(subject.name)}/${topic.id}`} className="cursor-pointer rounded-md border border-[#c3c6ce66] bg-white p-6 transition hover:border-[#735b2b] hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#735b2b]/30">

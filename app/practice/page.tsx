@@ -25,7 +25,7 @@ export default async function PracticeHomePage() {
       <main className="tsm-shell py-12">
         <section className="max-w-3xl">
           <p className="font-label text-xs uppercase tracking-[.16em] text-[#735b2b]">Past paper practice</p>
-          <h1 className="mt-4 font-headline text-5xl text-[#00152a]">Practise questions by topic.</h1>
+          <h1 className="mt-4 font-headline text-5xl text-[#00152a]">Practice questions by topic.</h1>
           <p className="mt-4 font-body text-lg text-[#43474d]">Choose a subject, then a topic group and subtopic to open individual past paper questions.</p>
         </section>
         <section className="mt-10 grid gap-4 md:grid-cols-2">
