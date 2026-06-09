@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { DragEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { Eye, GripVertical, Trash2, Upload, ChevronUp, ChevronDown } from 'lucide-react'
 import { useFormStatus } from 'react-dom'
 import { createQuestion, updateQuestion } from './actions'
 
@@ -50,10 +51,6 @@ function topicMatchesMainScope(topic: Topic, subjectId: string) {
   return topic.is_active !== false && Boolean(subjectId) && topic.subject_id === subjectId
 }
 
-function topicMatchesLegacyScope(topic: Topic, subjectId: string) {
-  return topic.is_active !== false && topic.subject_id !== subjectId
-}
-
 function statusBadgeClasses(state: StepState) {
   if (state === 'complete') return 'border-emerald-200 bg-emerald-50 text-emerald-700'
   if (state === 'current') return 'border-blue-200 bg-blue-50 text-blue-700'
@@ -92,27 +89,48 @@ function ChoiceCard({ active, title, helper, onClick }: { active: boolean; title
   )
 }
 
-function SearchableSelect({ id, name, label, value, options, placeholder, emptyText, onChange, required }: { id: string; name?: string; label: string; value: string; options: SelectOption[]; placeholder: string; emptyText: string; onChange: (value: string) => void; required?: boolean }) {
-  const [open, setOpen] = useState(false)
+function SearchableSelect({ id, name, label, value, options, placeholder, emptyText, onChange, required, openSelectId, setOpenSelectId }: { id: string; name?: string; label: string; value: string; options: SelectOption[]; placeholder: string; emptyText: string; onChange: (value: string) => void; required?: boolean; openSelectId: string | null; setOpenSelectId: (id: string | null) => void }) {
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const open = openSelectId === id
   const selected = options.find((option) => option.value === value)
   const filtered = options.filter((option) => `${option.label} ${option.helper ?? ''}`.toLowerCase().includes(query.toLowerCase()))
 
   useEffect(() => {
-    if (open) setActiveIndex(0)
+    if (!open) return
+    setActiveIndex(0)
+    const focusTimer = window.setTimeout(() => searchRef.current?.focus(), 0)
+    return () => window.clearTimeout(focusTimer)
   }, [open, query])
+
+  useEffect(() => {
+    if (!open) return
+    function closeOnOutside(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpenSelectId(null)
+    }
+    function closeOnEsc(event: globalThis.KeyboardEvent) {
+      if (event.key === 'Escape') setOpenSelectId(null)
+    }
+    document.addEventListener('mousedown', closeOnOutside)
+    window.addEventListener('keydown', closeOnEsc)
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutside)
+      window.removeEventListener('keydown', closeOnEsc)
+    }
+  }, [open, setOpenSelectId])
 
   function choose(nextValue: string) {
     onChange(nextValue)
-    setOpen(false)
+    setOpenSelectId(null)
     setQuery('')
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
-      setOpen(true)
+      setOpenSelectId(id)
       setActiveIndex((current) => {
         const next = event.key === 'ArrowDown' ? current + 1 : current - 1
         return Math.max(0, Math.min(filtered.length - 1, next))
@@ -122,21 +140,21 @@ function SearchableSelect({ id, name, label, value, options, placeholder, emptyT
       event.preventDefault()
       choose(filtered[activeIndex].value)
     }
-    if (event.key === 'Escape') setOpen(false)
+    if (event.key === 'Escape') setOpenSelectId(null)
   }
 
   return (
-    <div className="relative font-body text-sm text-[#43474d]">
+    <div ref={rootRef} className="relative font-body text-sm text-[#43474d]">
       {name ? <input type="hidden" name={name} value={value} /> : null}
       <label id={`${id}-label`} className="block">{label}</label>
-      <button id={id} type="button" aria-labelledby={`${id}-label`} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)} onKeyDown={handleKeyDown} className="tsm-input mt-1 flex w-full cursor-pointer items-center justify-between gap-3 text-left">
+      <button id={id} type="button" aria-labelledby={`${id}-label`} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpenSelectId(open ? null : id)} onKeyDown={handleKeyDown} className="tsm-input mt-1 flex w-full cursor-pointer items-center justify-between gap-3 text-left">
         <span className={selected ? 'text-[#00152a]' : 'text-[#6f737b]'}>{selected?.label || placeholder}</span>
         <span className="text-[#735b2b]" aria-hidden="true">⌄</span>
       </button>
       {required && !value ? <span className="sr-only">Required</span> : null}
       {open ? (
         <div className="absolute z-30 mt-2 w-full rounded-md border border-[#c3c6ce66] bg-white p-2 shadow-lg">
-          <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search..." className="tsm-input mb-2 w-full" />
+          <input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search..." className="tsm-input mb-2 w-full" />
           <div role="listbox" aria-labelledby={`${id}-label`} className="max-h-64 overflow-y-auto">
             {filtered.map((option, index) => (
               <button key={option.value} type="button" role="option" aria-selected={option.value === value} onMouseDown={(event) => event.preventDefault()} onClick={() => choose(option.value)} className={`block w-full rounded-sm px-3 py-2 text-left transition ${option.value === value ? 'bg-blue-600 text-white' : index === activeIndex ? 'bg-blue-50 text-[#00152a]' : 'text-[#00152a] hover:bg-blue-50'}`}>
@@ -166,8 +184,24 @@ function moveToken(tokens: string[], token: string, direction: -1 | 1) {
   return next
 }
 
+function previewFileName(item: PreviewItem) {
+  return item.subtitle?.split('/').pop() || item.title
+}
+
+function PreviewImage({ item, className, sizes = '88px' }: { item: PreviewItem; className: string; sizes?: string }) {
+  if (item.url.startsWith('blob:')) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={item.url} alt={item.title} className={className} />
+  }
+  return <Image src={item.url} alt={item.title} width={1400} height={900} sizes={sizes} unoptimized className={className} />
+}
+
 function ImageUploadGroup({ title, name, fileKeyName, assetOrderName, existingAssets, fallbackUrl, fallbackTitle, files, setFiles, order, setOrder, onPreview }: { title: string; name: string; fileKeyName: string; assetOrderName: string; existingAssets: QuestionAsset[]; fallbackUrl?: string | null; fallbackTitle: string; files: LocalPreview[]; setFiles: (files: LocalPreview[]) => void; order: string[]; setOrder: (order: string[]) => void; onPreview: (index: number) => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const [dropActive, setDropActive] = useState(false)
+  const [draggedToken, setDraggedToken] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<{ token: string; position: 'before' | 'after' } | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
   const existingTokens = existingAssets.map((asset) => `existing:${asset.id}`)
   const fileTokens = files.map((file) => `new:${file.id}`)
   const itemsByToken = new Map<string, PreviewItem>()
@@ -192,6 +226,8 @@ function ImageUploadGroup({ title, name, fileKeyName, assetOrderName, existingAs
 
   function addFiles(nextFiles: File[]) {
     const imageFiles = nextFiles.filter((file) => file.type.startsWith('image/'))
+    const rejectedCount = nextFiles.length - imageFiles.length
+    setMessage(rejectedCount ? `${rejectedCount} non-image file${rejectedCount === 1 ? '' : 's'} ignored.` : null)
     if (!imageFiles.length) return
     const previews = filesToPreviews(imageFiles)
     setFiles([...files, ...previews])
@@ -209,41 +245,82 @@ function ImageUploadGroup({ title, name, fileKeyName, assetOrderName, existingAs
 
   function handleDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault()
+    setDropActive(false)
     addFiles(Array.from(event.dataTransfer.files))
+  }
+
+  function handleItemDragOver(event: DragEvent<HTMLDivElement>, token: string) {
+    event.preventDefault()
+    if (!draggedToken || draggedToken === token) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    const position = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+    setDropTarget({ token, position })
+  }
+
+  function handleItemDrop(event: DragEvent<HTMLDivElement>, targetToken: string) {
+    event.preventDefault()
+    if (!draggedToken || draggedToken === targetToken) {
+      setDraggedToken(null)
+      setDropTarget(null)
+      return
+    }
+    const target = dropTarget?.token === targetToken ? dropTarget : { token: targetToken, position: 'after' as const }
+    const next = normalizedOrder.filter((token) => token !== draggedToken)
+    const targetIndex = next.indexOf(target.token)
+    next.splice(target.position === 'before' ? targetIndex : targetIndex + 1, 0, draggedToken)
+    setOrder(next)
+    setDraggedToken(null)
+    setDropTarget(null)
   }
 
   return (
     <div>
-      <label htmlFor={`${name}-input`} onDragOver={(event) => event.preventDefault()} onDrop={handleDrop} className="block cursor-pointer rounded-lg border-2 border-dashed border-blue-200 bg-blue-50/50 p-5 text-center font-body text-sm text-[#43474d] transition hover:border-blue-400 hover:bg-blue-50 focus-within:ring-2 focus-within:ring-blue-300">
+      <label htmlFor={`${name}-input`} onDragEnter={() => setDropActive(true)} onDragOver={(event) => { event.preventDefault(); setDropActive(true) }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropActive(false) }} onDrop={handleDrop} className={`relative block cursor-pointer overflow-hidden rounded-lg border-2 border-dashed p-5 text-center font-body text-sm text-[#43474d] transition focus-within:ring-2 focus-within:ring-blue-300 ${dropActive ? 'border-blue-500 bg-blue-100 shadow-inner' : 'border-blue-200 bg-blue-50/50 hover:border-blue-400 hover:bg-blue-50'}`}>
         <span className="block font-semibold text-[#00152a]">{title}</span>
         <span className="mt-2 block text-base font-semibold text-blue-800">Drag images here or click to upload</span>
         <span className="mt-1 block">Use multiple images if the question spans prompt, table, graph, or continuation.</span>
+        {dropActive ? (
+          <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#00152a]/75 text-white backdrop-blur-[1px]">
+            <Upload className="size-8" aria-hidden="true" />
+            <span className="font-body text-base font-semibold">Drop images to upload</span>
+          </span>
+        ) : null}
         <input ref={inputRef} id={`${name}-input`} name={name} type="file" accept="image/*" multiple className="sr-only" onChange={(event) => addFiles(Array.from(event.target.files ?? []))} />
       </label>
+      {message ? <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 font-body text-sm text-amber-800">{message}</p> : null}
       {files.map((file) => <input key={file.id} type="hidden" name={fileKeyName} value={file.id} />)}
       {normalizedOrder.map((token) => <input key={token} type="hidden" name={assetOrderName} value={token} />)}
+      <p className="mt-3 font-body text-xs text-[#6f737b]">Use the arrows or drag handle to reorder images. Drop an image onto another image to swap, or between images to move it.</p>
       <div className="mt-3 space-y-2">
-        {orderedItems.map((item, index) => (
-          <div key={item.token} draggable onDragStart={(event) => event.dataTransfer.setData('text/plain', item.token)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const dragged = event.dataTransfer.getData('text/plain'); const next = normalizedOrder.filter((token) => token !== dragged); next.splice(index, 0, dragged); setOrder(next) }} className="flex items-center gap-3 rounded-md border border-[#c3c6ce66] bg-white p-2">
-            <button type="button" className="cursor-grab rounded-sm px-2 py-1 text-[#735b2b]" aria-label={`Drag to reorder ${item.title}`}>☰</button>
-            <button type="button" onClick={() => onPreview(index)} className="shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-300">
-              <Image src={item.url} alt={item.title} width={88} height={64} unoptimized className="h-16 w-22 rounded-sm border border-[#f0eee9] bg-[#f8f6f1] object-cover" />
-            </button>
-            <div className="min-w-0 flex-1">
-              <p className="font-body text-sm font-semibold text-[#00152a]">{title} {index + 1}</p>
-              {item.subtitle ? <p className="truncate font-body text-xs text-[#6f737b]">{item.subtitle}</p> : null}
+        {orderedItems.map((item, index) => {
+          const targetBefore = dropTarget?.token === item.token && dropTarget.position === 'before'
+          const targetAfter = dropTarget?.token === item.token && dropTarget.position === 'after'
+          return (
+            <div key={item.token} draggable onDragStart={(event) => { setDraggedToken(item.token); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', item.token) }} onDragEnd={() => { setDraggedToken(null); setDropTarget(null) }} onDragOver={(event) => handleItemDragOver(event, item.token)} onDrop={(event) => handleItemDrop(event, item.token)} className={`relative flex items-center gap-3 rounded-md border bg-white p-2 transition motion-reduce:transition-none ${draggedToken === item.token ? 'cursor-grabbing border-blue-300 opacity-70' : 'border-[#c3c6ce66]'} ${dropTarget?.token === item.token ? 'bg-blue-50 ring-2 ring-blue-100' : ''}`}>
+              {targetBefore ? <span className="absolute -top-1 left-2 right-2 h-0.5 rounded-full bg-blue-600" aria-hidden="true" /> : null}
+              <button type="button" className="cursor-grab rounded-sm p-2 text-[#5f471f] hover:bg-[#f5f3ee] active:cursor-grabbing" aria-label={`Drag to reorder ${item.title}`}>
+                <GripVertical className="size-5" aria-hidden="true" />
+              </button>
+              <button type="button" onClick={() => onPreview(index)} className="shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-300" aria-label={`Preview ${title.toLowerCase()} ${index + 1}`}>
+                <PreviewImage item={item} className="h-16 w-20 rounded-sm border border-[#f0eee9] bg-[#f8f6f1] object-cover" />
+              </button>
+              <div className="min-w-0 flex-1">
+                <p className="font-body text-sm font-semibold text-[#00152a]">{title} {index + 1}</p>
+                {item.subtitle ? <p className="truncate font-body text-xs text-[#6f737b]">{previewFileName(item)}</p> : null}
+              </div>
+              <div className="flex flex-wrap justify-end gap-1">
+                <button type="button" onClick={() => onPreview(index)} className="rounded-sm border border-blue-200 p-2 text-blue-700 hover:bg-blue-50" aria-label={`Preview ${title.toLowerCase()} ${index + 1}`}><Eye className="size-4" aria-hidden="true" /></button>
+                <button type="button" onClick={() => setOrder(moveToken(normalizedOrder, item.token, -1))} disabled={index === 0} className="rounded-sm border border-slate-200 p-2 text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Move ${title.toLowerCase()} ${index + 1} up`}><ChevronUp className="size-4" aria-hidden="true" /></button>
+                <button type="button" onClick={() => setOrder(moveToken(normalizedOrder, item.token, 1))} disabled={index === orderedItems.length - 1} className="rounded-sm border border-slate-200 p-2 text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Move ${title.toLowerCase()} ${index + 1} down`}><ChevronDown className="size-4" aria-hidden="true" /></button>
+                {item.canRemove ? <button type="button" onClick={() => removeFile(item.token)} className="rounded-sm border border-red-200 p-2 text-red-700 hover:bg-red-50" aria-label={`Remove ${title.toLowerCase()} ${index + 1}`}><Trash2 className="size-4" aria-hidden="true" /></button> : null}
+              </div>
+              {targetAfter ? <span className="absolute -bottom-1 left-2 right-2 h-0.5 rounded-full bg-blue-600" aria-hidden="true" /> : null}
             </div>
-            <div className="flex flex-wrap justify-end gap-1">
-              <button type="button" onClick={() => onPreview(index)} className="rounded-sm border border-blue-200 px-2 py-1 font-body text-xs font-semibold text-blue-700 hover:bg-blue-50">Preview</button>
-              <button type="button" onClick={() => setOrder(moveToken(normalizedOrder, item.token, -1))} disabled={index === 0} className="rounded-sm border border-slate-200 px-2 py-1 font-body text-xs font-semibold text-slate-600 disabled:opacity-40">Up</button>
-              <button type="button" onClick={() => setOrder(moveToken(normalizedOrder, item.token, 1))} disabled={index === orderedItems.length - 1} className="rounded-sm border border-slate-200 px-2 py-1 font-body text-xs font-semibold text-slate-600 disabled:opacity-40">Down</button>
-              {item.canRemove ? <button type="button" onClick={() => removeFile(item.token)} className="rounded-sm border border-red-200 px-2 py-1 font-body text-xs font-semibold text-red-700 hover:bg-red-50">Remove</button> : null}
-            </div>
-          </div>
-        ))}
+          )
+        })}
         {!orderedItems.length && fallbackUrl ? (
           <button type="button" onClick={() => onPreview(0)} className="flex w-full items-center gap-3 rounded-md border border-[#c3c6ce66] bg-white p-2 text-left">
-            <Image src={fallbackUrl} alt={fallbackTitle} width={88} height={64} unoptimized className="h-16 w-22 rounded-sm border border-[#f0eee9] object-cover" />
+            <PreviewImage item={{ token: 'fallback', title: fallbackTitle, url: fallbackUrl }} className="h-16 w-20 rounded-sm border border-[#f0eee9] object-cover" />
             <span className="font-body text-sm font-semibold text-[#00152a]">{fallbackTitle}</span>
           </button>
         ) : null}
@@ -265,25 +342,27 @@ function Lightbox({ state, questionItems, markschemeItems, onClose, onMove }: { 
     return () => window.removeEventListener('keydown', closeOnEsc)
   }, [state, onClose])
 
-  if (!state || !item) return null
+  if (!state || !item?.url) return null
   const label = state.group === 'question' ? 'Question image' : 'Mark scheme image'
+  const fileName = previewFileName(item)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-label={`${label} preview`}>
-      <div className="max-h-[92vh] w-full max-w-5xl rounded-lg bg-white p-4 shadow-xl">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-3 sm:p-4" role="dialog" aria-modal="true" aria-label={`${label} preview`} onMouseDown={onClose}>
+      <div className="flex max-h-[94vh] w-full max-w-6xl flex-col rounded-lg bg-white p-4 shadow-xl" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <p className="font-body text-sm font-semibold text-[#735b2b]">{label} {state.index + 1} of {items.length}</p>
-            <h3 className="font-headline text-2xl text-[#00152a]">{item.subtitle || item.title}</h3>
+            <h3 className="truncate font-headline text-2xl text-[#00152a]">{item.title}</h3>
+            {fileName ? <p className="truncate font-body text-sm text-[#6f737b]">{fileName}</p> : null}
           </div>
           <button type="button" onClick={onClose} className="rounded-md border border-slate-200 px-3 py-2 font-body text-sm font-semibold text-slate-700 hover:bg-slate-50">Close</button>
         </div>
-        <div className="flex items-center gap-3">
-          <button type="button" onClick={() => onMove((state.index - 1 + items.length) % items.length)} disabled={items.length < 2} className="rounded-md border border-slate-200 px-3 py-2 font-body text-sm font-semibold disabled:opacity-40">Previous</button>
-          <div className="flex min-h-[55vh] flex-1 items-center justify-center rounded-md bg-[#f8f6f1] p-2">
-            <Image src={item.url} alt={item.title} width={1400} height={900} unoptimized className="max-h-[70vh] w-auto max-w-full object-contain" />
+        <div className="flex min-h-0 flex-1 items-center gap-2 sm:gap-3">
+          {items.length > 1 ? <button type="button" onClick={() => onMove((state.index - 1 + items.length) % items.length)} className="rounded-md border border-slate-200 px-3 py-2 font-body text-sm font-semibold hover:bg-slate-50">Previous</button> : null}
+          <div className="flex min-h-[50vh] flex-1 items-center justify-center overflow-hidden rounded-md bg-[#f8f6f1] p-2 sm:min-h-[62vh]">
+            <PreviewImage item={item} className="max-h-[76vh] w-auto max-w-full object-contain" sizes="100vw" />
           </div>
-          <button type="button" onClick={() => onMove((state.index + 1) % items.length)} disabled={items.length < 2} className="rounded-md border border-slate-200 px-3 py-2 font-body text-sm font-semibold disabled:opacity-40">Next</button>
+          {items.length > 1 ? <button type="button" onClick={() => onMove((state.index + 1) % items.length)} className="rounded-md border border-slate-200 px-3 py-2 font-body text-sm font-semibold hover:bg-slate-50">Next</button> : null}
         </div>
       </div>
     </div>
@@ -349,14 +428,22 @@ export function QuestionBankForm({
   const [questionOrder, setQuestionOrder] = useState(existingQuestionAssets.map((asset) => `existing:${asset.id}`))
   const [markschemeOrder, setMarkschemeOrder] = useState(existingMarkschemeAssets.map((asset) => `existing:${asset.id}`))
   const [lightbox, setLightbox] = useState<LightboxState>(null)
+  const [openSelectId, setOpenSelectId] = useState<string | null>(null)
+  const questionFilesRef = useRef(questionFiles)
+  const markschemeFilesRef = useRef(markschemeFiles)
 
-  useEffect(() => () => {
-    questionFiles.forEach((file) => URL.revokeObjectURL(file.url))
+  useEffect(() => {
+    questionFilesRef.current = questionFiles
   }, [questionFiles])
 
-  useEffect(() => () => {
-    markschemeFiles.forEach((file) => URL.revokeObjectURL(file.url))
+  useEffect(() => {
+    markschemeFilesRef.current = markschemeFiles
   }, [markschemeFiles])
+
+  useEffect(() => () => {
+    questionFilesRef.current.forEach((file) => URL.revokeObjectURL(file.url))
+    markschemeFilesRef.current.forEach((file) => URL.revokeObjectURL(file.url))
+  }, [])
 
   useEffect(() => {
     if (selectedSubtopicIds.length === 1) setPrimaryTopicId(selectedSubtopicIds[0])
@@ -384,9 +471,6 @@ export function QuestionBankForm({
     .filter((topic) => topic.parent_topic_id === topicGroupId && topicMatchesMainScope(topic, subjectId))
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name)), [topics, topicGroupId, subjectId])
 
-  const legacyTopics = useMemo(() => topics
-    .filter((topic) => !selectedSubtopicIds.includes(topic.id) && topic.id !== topicGroupId && topicMatchesLegacyScope(topic, subjectId))
-    .sort((a, b) => a.name.localeCompare(b.name)), [topics, selectedSubtopicIds, topicGroupId, subjectId])
 
   const questionLightboxItems = orderedPreviewItems(existingQuestionAssets, questionFiles, questionOrder, 'Question image', questionPreviewUrl, 'Question image 1')
   const markschemeLightboxItems = orderedPreviewItems(existingMarkschemeAssets, markschemeFiles, markschemeOrder, 'Mark scheme image', markschemePreviewUrl, 'Mark scheme image 1')
@@ -404,6 +488,14 @@ export function QuestionBankForm({
   const step3State: StepState = !step1Complete || !step2Complete ? 'locked' : step3Complete ? 'complete' : 'missing'
   const step4State: StepState = !step1Complete || !step2Complete || !step3Complete ? 'locked' : step4Complete ? 'complete' : 'current'
 
+  function openQuestionLightbox(index: number) {
+    if (questionLightboxItems[index]?.url) setLightbox({ group: 'question', index })
+  }
+
+  function openMarkschemeLightbox(index: number) {
+    if (markschemeLightboxItems[index]?.url) setLightbox({ group: 'markscheme', index })
+  }
+
   return (
     <form action={action} className="space-y-8" onSubmit={(event) => { if (!readyToSubmit) event.preventDefault() }}>
       {question ? <input type="hidden" name="question_id" value={question.id} /> : null}
@@ -419,18 +511,18 @@ export function QuestionBankForm({
           <ChoiceCard active={paperMode === 'new'} title="Create new paper" helper="Create a simple paper record first, then attach this question." onClick={() => { setPaperMode('new'); setPaperId('') }} />
         </div>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <SearchableSelect id="admin-question-subject" name="new_paper_subject_id" label="Subject" value={subjectId} onChange={updateSubject} placeholder="Choose subject" emptyText="No matching subjects found." options={subjects.map((subject) => ({ value: subject.id, label: subject.name }))} required />
+          <SearchableSelect id="admin-question-subject" name="new_paper_subject_id" label="Subject" value={subjectId} onChange={updateSubject} placeholder="Choose subject" emptyText="No matching subjects found." options={subjects.map((subject) => ({ value: subject.id, label: subject.name }))} required openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
         </div>
         {paperMode === 'existing' ? (
           <div className="mt-5 rounded-md border border-blue-100 bg-blue-50/40 p-4">
-            <SearchableSelect id="admin-question-paper" label="Matching existing paper" value={paperId} onChange={setPaperId} placeholder="Choose a paper" emptyText="No matching papers found." options={filteredPapers.map((paper) => ({ value: paper.id, label: paperLabel(paper), helper: paper.level || undefined }))} />
+            <SearchableSelect id="admin-question-paper" label="Matching existing paper" value={paperId} onChange={setPaperId} placeholder="Choose a paper" emptyText="No matching papers found." options={filteredPapers.map((paper) => ({ value: paper.id, label: paperLabel(paper), helper: paper.level || undefined }))} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
             {!filteredPapers.length ? <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 font-body text-sm text-amber-800">No papers found for this subject. Create a new paper first. <button type="button" className="cursor-pointer font-semibold underline" onClick={() => setPaperMode('new')}>Create a new paper instead.</button></div> : null}
           </div>
         ) : (
           <div className="mt-5 rounded-md border border-blue-100 bg-blue-50/40 p-4">
             <div className="grid gap-4 md:grid-cols-3">
               <label htmlFor="admin-question-new-paper-year" className="font-body text-sm text-[#43474d]">Year<input id="admin-question-new-paper-year" name="new_paper_year" type="number" min="2016" max="2030" className="tsm-input mt-1 w-full" value={newPaperYear} onChange={(event) => setNewPaperYear(event.target.value)} /></label>
-              <SearchableSelect id="admin-question-new-paper-session" name="new_paper_session" label="Session" value={newPaperSession} onChange={setNewPaperSession} placeholder="Choose session" emptyText="No matching sessions found." options={[{ value: 'May', label: 'May' }, { value: 'November', label: 'November' }]} />
+              <SearchableSelect id="admin-question-new-paper-session" name="new_paper_session" label="Session" value={newPaperSession} onChange={setNewPaperSession} placeholder="Choose session" emptyText="No matching sessions found." options={[{ value: 'May', label: 'May' }, { value: 'November', label: 'November' }]} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
               <label htmlFor="admin-question-new-paper-title" className="font-body text-sm text-[#43474d]">Paper title/code<input id="admin-question-new-paper-title" name="new_paper_title" className="tsm-input mt-1 w-full" value={newPaperTitle} onChange={(event) => setNewPaperTitle(event.target.value)} placeholder="M25 Maths Extended" /></label>
             </div>
             <details className="mt-4 rounded-sm border border-[#c3c6ce66] bg-white p-4">
@@ -456,8 +548,8 @@ export function QuestionBankForm({
       <StepCard step={3} title="Images" state={step3State} helper="Upload one or more question crops, plus any matching mark scheme images.">
         {!hasQuestionImage ? <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 font-body text-sm text-amber-800">At least one question image is required before topics and publishing unlock.</p> : null}
         <div className="grid gap-5 md:grid-cols-2">
-          <ImageUploadGroup title="Question image" name="question_image_file" fileKeyName="question_file_key" assetOrderName="question_asset_order" existingAssets={existingQuestionAssets} fallbackUrl={existingQuestionAssets.length ? null : questionPreviewUrl} fallbackTitle="Question image 1" files={questionFiles} setFiles={setQuestionFiles} order={questionOrder} setOrder={setQuestionOrder} onPreview={(index) => setLightbox({ group: 'question', index })} />
-          <ImageUploadGroup title="Mark scheme image" name="markscheme_image_file" fileKeyName="markscheme_file_key" assetOrderName="markscheme_asset_order" existingAssets={existingMarkschemeAssets} fallbackUrl={existingMarkschemeAssets.length ? null : markschemePreviewUrl} fallbackTitle="Mark scheme image 1" files={markschemeFiles} setFiles={setMarkschemeFiles} order={markschemeOrder} setOrder={setMarkschemeOrder} onPreview={(index) => setLightbox({ group: 'markscheme', index })} />
+          <ImageUploadGroup title="Question image" name="question_image_file" fileKeyName="question_file_key" assetOrderName="question_asset_order" existingAssets={existingQuestionAssets} fallbackUrl={existingQuestionAssets.length ? null : questionPreviewUrl} fallbackTitle="Question image 1" files={questionFiles} setFiles={setQuestionFiles} order={questionOrder} setOrder={setQuestionOrder} onPreview={openQuestionLightbox} />
+          <ImageUploadGroup title="Mark scheme image" name="markscheme_image_file" fileKeyName="markscheme_file_key" assetOrderName="markscheme_asset_order" existingAssets={existingMarkschemeAssets} fallbackUrl={existingMarkschemeAssets.length ? null : markschemePreviewUrl} fallbackTitle="Mark scheme image 1" files={markschemeFiles} setFiles={setMarkschemeFiles} order={markschemeOrder} setOrder={setMarkschemeOrder} onPreview={openMarkschemeLightbox} />
         </div>
         <details className="mt-5 rounded-sm bg-[#f5f3ee] p-4">
           <summary className="cursor-pointer font-body font-semibold text-[#735b2b]">Advanced image and text options</summary>
@@ -472,10 +564,10 @@ export function QuestionBankForm({
         </details>
       </StepCard>
 
-      <StepCard step={4} title="Topics & publish" state={step4State} helper="Choose a topic group, then one or more exact subtopics. Publish only when checked.">
+      <StepCard step={4} title="Topics and publishing" state={step4State} helper="Choose the subject-scoped topic group and exact subtopic tags for this question.">
         <div className="grid gap-4 md:grid-cols-2">
-          <SearchableSelect id="admin-question-topic-group" label="Topic group" value={topicGroupId} onChange={(value) => { setTopicGroupId(value); setSelectedSubtopicIds([]); setPrimaryTopicId('') }} placeholder="Choose topic group" emptyText="No matching topic groups found." options={mainTopicGroups.map((topic) => ({ value: topic.id, label: topic.name }))} />
-          <SearchableSelect id="admin-question-primary-topic" label="Add exact subtopic" value="" onChange={(value) => { if (value && !selectedSubtopicIds.includes(value)) setSelectedSubtopicIds([...selectedSubtopicIds, value]) }} placeholder={topicGroupId ? 'Search subtopics to add' : 'Choose a topic group first'} emptyText="No matching subtopics found." options={subtopics.filter((topic) => !selectedSubtopicIds.includes(topic.id)).map((topic) => ({ value: topic.id, label: topic.name }))} />
+          <SearchableSelect id="admin-question-topic-group" label="Topic group" value={topicGroupId} onChange={(value) => { setTopicGroupId(value); setSelectedSubtopicIds([]); setPrimaryTopicId('') }} placeholder="Choose topic group" emptyText="No matching topic groups found." options={mainTopicGroups.map((topic) => ({ value: topic.id, label: topic.name }))} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
+          <SearchableSelect id="admin-question-primary-topic" label="Add exact subtopic" value="" onChange={(value) => { if (value && !selectedSubtopicIds.includes(value)) setSelectedSubtopicIds([...selectedSubtopicIds, value]) }} placeholder={topicGroupId ? 'Search subtopics to add' : 'Choose a topic group first'} emptyText="No matching subtopics found." options={subtopics.filter((topic) => !selectedSubtopicIds.includes(topic.id)).map((topic) => ({ value: topic.id, label: topic.name }))} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
         </div>
         <p className="mt-3 font-body text-sm text-[#43474d]">Need a new subtopic? Ask the topic manager/admin to add it first.</p>
         <div className="mt-4 rounded-md border border-[#c3c6ce66] bg-[#fbf9f4] p-4">
@@ -495,15 +587,7 @@ export function QuestionBankForm({
             {!selectedSubtopicIds.length ? <p className="font-body text-sm text-[#6f737b]">No exact subtopics selected yet.</p> : null}
           </div>
         </div>
-        {!mainTopicGroups.length ? <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 font-body text-sm text-amber-800">No active topic groups match this subject. Create the group first, or use the legacy secondary section only for old data.</p> : null}
-        <details className="mt-5 rounded-sm bg-[#f5f3ee] p-4">
-          <summary className="cursor-pointer font-body font-semibold text-[#735b2b]">Legacy/global secondary topics</summary>
-          <p className="mt-2 font-body text-sm text-[#43474d]">These are old/global topics. They are available only as secondary tags, not as the main topic.</p>
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {legacyTopics.map((topic) => <label key={topic.id} htmlFor={`admin-question-legacy-topic-${topic.id}`} className="flex cursor-pointer items-center gap-2 rounded-sm bg-white px-3 py-2 font-body text-sm text-[#43474d] hover:bg-blue-50"><input id={`admin-question-legacy-topic-${topic.id}`} type="checkbox" name="topic_ids" value={topic.id} defaultChecked={selectedTopics.has(topic.id)} /> {topic.name}</label>)}
-            {!legacyTopics.length ? <p className="font-body text-sm text-[#43474d]">No legacy/global topics match this scope.</p> : null}
-          </div>
-        </details>
+        {!mainTopicGroups.length ? <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 font-body text-sm text-amber-800">No active topic groups match this subject. Ask the topic manager/admin to add the group first.</p> : null}
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <label htmlFor="admin-question-published" className={`cursor-pointer rounded-md border p-4 font-body text-sm transition hover:shadow-sm focus-within:ring-2 focus-within:ring-emerald-300 ${published ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}><span className="mb-2 inline-flex rounded-full bg-white px-2 py-1 text-xs font-semibold">{published ? 'Show to students' : 'Save as draft'}</span><span className="flex items-center gap-2"><input id="admin-question-published" type="checkbox" name="is_published" checked={published} onChange={(event) => setPublished(event.target.checked)} /> Published</span><span className="mt-1 block text-xs">Draft questions stay hidden from student practice pages.</span></label>
           <label htmlFor="admin-question-reviewed" className={`cursor-pointer rounded-md border p-4 font-body text-sm transition hover:shadow-sm focus-within:ring-2 focus-within:ring-blue-300 ${reviewed ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}><span className="mb-2 inline-flex rounded-full bg-white px-2 py-1 text-xs font-semibold">{reviewed ? 'Checked and ready' : 'Not checked'}</span><span className="flex items-center gap-2"><input id="admin-question-reviewed" type="checkbox" name="is_reviewed" checked={reviewed} onChange={(event) => setReviewed(event.target.checked)} /> Reviewed</span><span className="mt-1 block text-xs">Use this after the image, mark scheme, and topic have been checked.</span></label>
