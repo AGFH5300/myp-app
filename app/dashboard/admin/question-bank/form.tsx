@@ -36,6 +36,8 @@ type SelectOption = { value: string; label: string; helper?: string }
 type PreviewItem = { token: string; title: string; url: string; subtitle?: string; canRemove?: boolean }
 type LightboxState = { group: 'question' | 'markscheme'; index: number } | null
 
+const IMAGE_FILE_SIZE_LIMIT_BYTES = 8 * 1024 * 1024
+
 function relationLabel(relation: unknown, key: 'id' | 'name' | 'session_month') {
   const item = Array.isArray(relation) ? relation[0] : relation
   return (item as Record<string, string | null | undefined> | null | undefined)?.[key] || ''
@@ -174,6 +176,10 @@ function filesToPreviews(files: File[]) {
   return files.map((file) => ({ id: crypto.randomUUID(), file, name: file.name, url: URL.createObjectURL(file) }))
 }
 
+function fileSizeLabel(bytes: number) {
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
 function moveToken(tokens: string[], token: string, direction: -1 | 1) {
   const index = tokens.indexOf(token)
   const nextIndex = index + direction
@@ -226,10 +232,16 @@ function ImageUploadGroup({ title, name, fileKeyName, assetOrderName, existingAs
 
   function addFiles(nextFiles: File[]) {
     const imageFiles = nextFiles.filter((file) => file.type.startsWith('image/'))
-    const rejectedCount = nextFiles.length - imageFiles.length
-    setMessage(rejectedCount ? `${rejectedCount} non-image file${rejectedCount === 1 ? '' : 's'} ignored.` : null)
-    if (!imageFiles.length) return
-    const previews = filesToPreviews(imageFiles)
+    const nonImageCount = nextFiles.length - imageFiles.length
+    const acceptedFiles = imageFiles.filter((file) => file.size <= IMAGE_FILE_SIZE_LIMIT_BYTES)
+    const oversizedFiles = imageFiles.filter((file) => file.size > IMAGE_FILE_SIZE_LIMIT_BYTES)
+    const messages = [
+      nonImageCount ? `${nonImageCount} non-image file${nonImageCount === 1 ? '' : 's'} ignored.` : null,
+      oversizedFiles.length ? `${oversizedFiles.length} image${oversizedFiles.length === 1 ? '' : 's'} over ${fileSizeLabel(IMAGE_FILE_SIZE_LIMIT_BYTES)} ignored. Please crop or export a smaller PNG/JPG first.` : null,
+    ].filter((item): item is string => Boolean(item))
+    setMessage(messages.length ? messages.join(' ') : null)
+    if (!acceptedFiles.length) return
+    const previews = filesToPreviews(acceptedFiles)
     setFiles([...files, ...previews])
     setOrder([...normalizedOrder, ...previews.map((file) => `new:${file.id}`)])
   }
@@ -279,6 +291,7 @@ function ImageUploadGroup({ title, name, fileKeyName, assetOrderName, existingAs
         <span className="block font-semibold text-[#00152a]">{title}</span>
         <span className="mt-2 block text-base font-semibold text-blue-800">Drag images here or click to upload</span>
         <span className="mt-1 block">Use multiple images if the question spans prompt, table, graph, or continuation.</span>
+        <span className="mt-1 block text-xs text-[#5f646c]">For best results, use cropped PNG/JPG images under 5 MB each.</span>
         {dropActive ? (
           <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#00152a]/75 text-white backdrop-blur-[1px]">
             <Upload className="size-8" aria-hidden="true" />
@@ -298,8 +311,8 @@ function ImageUploadGroup({ title, name, fileKeyName, assetOrderName, existingAs
           return (
             <div key={item.token} draggable onDragStart={(event) => { setDraggedToken(item.token); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', item.token) }} onDragEnd={() => { setDraggedToken(null); setDropTarget(null) }} onDragOver={(event) => handleItemDragOver(event, item.token)} onDrop={(event) => handleItemDrop(event, item.token)} className={`relative flex items-center gap-3 rounded-md border bg-white p-2 transition motion-reduce:transition-none ${draggedToken === item.token ? 'cursor-grabbing border-blue-300 opacity-70' : 'border-[#c3c6ce66]'} ${dropTarget?.token === item.token ? 'bg-blue-50 ring-2 ring-blue-100' : ''}`}>
               {targetBefore ? <span className="absolute -top-1 left-2 right-2 h-0.5 rounded-full bg-blue-600" aria-hidden="true" /> : null}
-              <button type="button" className="cursor-grab rounded-sm p-2 text-[#5f471f] hover:bg-[#f5f3ee] active:cursor-grabbing" aria-label={`Drag to reorder ${item.title}`}>
-                <GripVertical className="size-5" aria-hidden="true" />
+              <button type="button" title="Drag to reorder image" className={`shrink-0 cursor-grab rounded-md border border-[#735b2b] bg-[#fff7e6] p-2 text-[#00152a] shadow-sm hover:bg-[#f8e7bc] active:cursor-grabbing ${draggedToken === item.token ? 'cursor-grabbing ring-2 ring-blue-200' : ''}`} aria-label={`Drag to reorder image: ${item.title}`}>
+                <GripVertical className="size-6 stroke-[2.5]" aria-hidden="true" />
               </button>
               <button type="button" onClick={() => onPreview(index)} className="shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-300" aria-label={`Preview ${title.toLowerCase()} ${index + 1}`}>
                 <PreviewImage item={item} className="h-16 w-20 rounded-sm border border-[#f0eee9] bg-[#f8f6f1] object-cover" />

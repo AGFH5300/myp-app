@@ -1,4 +1,9 @@
 const nextConfig = {
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '25mb',
+    },
+  },
   allowedDevOrigins: [
     '2d8981c9-f99d-4043-8880-85049be7b28c-00-z27w62z5pzs8.pike.replit.dev',
     '*.pike.replit.dev',
