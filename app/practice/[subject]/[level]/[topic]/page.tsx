@@ -107,11 +107,13 @@ export default async function PracticeTopicPage({ params }: { params: Promise<{ 
             const previewUrl = previewUrls.get(question.id)
             const paper = firstRelation(question.papers)
             const primary = question.question_topics?.find((row) => row.is_primary)?.topics ?? question.question_topics?.[0]?.topics
+            const secondaryTopics = (question.question_topics ?? []).map((row) => row.topics).filter((item) => item?.name && item.name !== primary?.name).slice(0, 3)
             return (
               <Link key={question.id} href={`/practice/question/${question.id}`} className="flex cursor-pointer items-center justify-between gap-4 rounded-md border border-[#c3c6ce66] bg-white p-5 transition hover:border-[#735b2b] hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#735b2b]/30">
                 <div>
                   <h2 className="font-headline text-2xl text-[#00152a]">{paper?.title} Q{question.question_number}</h2>
                   <p className="mt-1 font-body text-sm text-[#43474d]">{paper?.year} {firstRelation(paper?.exam_sessions)?.session_month} · {question.marks ?? '—'} marks · {primary?.name || topicRow.name}</p>
+                  {secondaryTopics.length ? <div className="mt-2 flex flex-wrap gap-2">{secondaryTopics.map((topic) => <span key={topic?.name} className="rounded-full bg-[#f5f3ee] px-2 py-1 font-body text-xs text-[#735b2b]">{topic?.name}</span>)}</div> : null}
                   <span className="mt-3 inline-block font-body text-sm font-semibold text-[#735b2b]">Practise</span>
                 </div>
                 {previewUrl ? <Image src={previewUrl} alt={`Question ${question.question_number} preview`} width={64} height={64} unoptimized className="h-16 w-16 rounded-sm border border-[#c3c6ce66] object-cover" /> : null}

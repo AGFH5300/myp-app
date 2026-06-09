@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { ChangeEvent, ReactNode, useEffect, useMemo, useState } from 'react'
+import { DragEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { createQuestion, updateQuestion } from './actions'
 
@@ -30,7 +30,10 @@ type Question = {
 }
 
 type StepState = 'complete' | 'current' | 'locked' | 'missing'
-type LocalPreview = { name: string; url: string }
+type LocalPreview = { id: string; file: File; name: string; url: string }
+type SelectOption = { value: string; label: string; helper?: string }
+type PreviewItem = { token: string; title: string; url: string; subtitle?: string; canRemove?: boolean }
+type LightboxState = { group: 'question' | 'markscheme'; index: number } | null
 
 function relationLabel(relation: unknown, key: 'id' | 'name' | 'session_month') {
   const item = Array.isArray(relation) ? relation[0] : relation
@@ -89,21 +92,214 @@ function ChoiceCard({ active, title, helper, onClick }: { active: boolean; title
   )
 }
 
-function UploadBox({ name, label, helper, onFiles }: { name: string; label: string; helper: string; onFiles: (files: File[]) => void }) {
-  const inputId = `${name}-input`
+function SearchableSelect({ id, name, label, value, options, placeholder, emptyText, onChange, required }: { id: string; name?: string; label: string; value: string; options: SelectOption[]; placeholder: string; emptyText: string; onChange: (value: string) => void; required?: boolean }) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [activeIndex, setActiveIndex] = useState(0)
+  const selected = options.find((option) => option.value === value)
+  const filtered = options.filter((option) => `${option.label} ${option.helper ?? ''}`.toLowerCase().includes(query.toLowerCase()))
+
+  useEffect(() => {
+    if (open) setActiveIndex(0)
+  }, [open, query])
+
+  function choose(nextValue: string) {
+    onChange(nextValue)
+    setOpen(false)
+    setQuery('')
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      setOpen(true)
+      setActiveIndex((current) => {
+        const next = event.key === 'ArrowDown' ? current + 1 : current - 1
+        return Math.max(0, Math.min(filtered.length - 1, next))
+      })
+    }
+    if (event.key === 'Enter' && open && filtered[activeIndex]) {
+      event.preventDefault()
+      choose(filtered[activeIndex].value)
+    }
+    if (event.key === 'Escape') setOpen(false)
+  }
 
   return (
-    <label htmlFor={inputId} className="block cursor-pointer rounded-md border-2 border-dashed border-blue-200 bg-blue-50/50 p-5 font-body text-sm text-[#43474d] transition hover:border-blue-400 hover:bg-blue-50 focus-within:ring-2 focus-within:ring-blue-300">
-      <span className="block font-semibold text-[#00152a]">{label}</span>
-      <span className="mt-1 block">{helper}</span>
-      <span className="mt-4 inline-flex rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white">Upload images</span>
-      <input id={inputId} name={name} type="file" accept="image/*" multiple className="sr-only" onChange={(event) => onFiles(Array.from(event.target.files ?? []))} />
-    </label>
+    <div className="relative font-body text-sm text-[#43474d]">
+      {name ? <input type="hidden" name={name} value={value} /> : null}
+      <label id={`${id}-label`} className="block">{label}</label>
+      <button id={id} type="button" aria-labelledby={`${id}-label`} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((current) => !current)} onKeyDown={handleKeyDown} className="tsm-input mt-1 flex w-full cursor-pointer items-center justify-between gap-3 text-left">
+        <span className={selected ? 'text-[#00152a]' : 'text-[#6f737b]'}>{selected?.label || placeholder}</span>
+        <span className="text-[#735b2b]" aria-hidden="true">⌄</span>
+      </button>
+      {required && !value ? <span className="sr-only">Required</span> : null}
+      {open ? (
+        <div className="absolute z-30 mt-2 w-full rounded-md border border-[#c3c6ce66] bg-white p-2 shadow-lg">
+          <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search..." className="tsm-input mb-2 w-full" />
+          <div role="listbox" aria-labelledby={`${id}-label`} className="max-h-64 overflow-y-auto">
+            {filtered.map((option, index) => (
+              <button key={option.value} type="button" role="option" aria-selected={option.value === value} onMouseDown={(event) => event.preventDefault()} onClick={() => choose(option.value)} className={`block w-full rounded-sm px-3 py-2 text-left transition ${option.value === value ? 'bg-blue-600 text-white' : index === activeIndex ? 'bg-blue-50 text-[#00152a]' : 'text-[#00152a] hover:bg-blue-50'}`}>
+                <span className="block font-semibold">{option.label}</span>
+                {option.helper ? <span className={`block text-xs ${option.value === value ? 'text-blue-50' : 'text-[#6f737b]'}`}>{option.helper}</span> : null}
+              </button>
+            ))}
+            {!filtered.length ? <p className="px-3 py-4 text-sm text-[#6f737b]">{emptyText}</p> : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
   )
 }
 
-function buildLocalPreviews(files: File[]) {
-  return files.map((file) => ({ name: file.name, url: URL.createObjectURL(file) }))
+function filesToPreviews(files: File[]) {
+  return files.map((file) => ({ id: crypto.randomUUID(), file, name: file.name, url: URL.createObjectURL(file) }))
+}
+
+function moveToken(tokens: string[], token: string, direction: -1 | 1) {
+  const index = tokens.indexOf(token)
+  const nextIndex = index + direction
+  if (index < 0 || nextIndex < 0 || nextIndex >= tokens.length) return tokens
+  const next = [...tokens]
+  const [item] = next.splice(index, 1)
+  next.splice(nextIndex, 0, item)
+  return next
+}
+
+function ImageUploadGroup({ title, name, fileKeyName, assetOrderName, existingAssets, fallbackUrl, fallbackTitle, files, setFiles, order, setOrder, onPreview }: { title: string; name: string; fileKeyName: string; assetOrderName: string; existingAssets: QuestionAsset[]; fallbackUrl?: string | null; fallbackTitle: string; files: LocalPreview[]; setFiles: (files: LocalPreview[]) => void; order: string[]; setOrder: (order: string[]) => void; onPreview: (index: number) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const existingTokens = existingAssets.map((asset) => `existing:${asset.id}`)
+  const fileTokens = files.map((file) => `new:${file.id}`)
+  const itemsByToken = new Map<string, PreviewItem>()
+
+  existingAssets.forEach((asset, index) => {
+    if (asset.preview_url) {
+      itemsByToken.set(`existing:${asset.id}`, { token: `existing:${asset.id}`, title: asset.label || `${title} ${index + 1}`, url: asset.preview_url, subtitle: asset.storage_path || asset.public_url || undefined })
+    }
+  })
+  files.forEach((file, index) => {
+    itemsByToken.set(`new:${file.id}`, { token: `new:${file.id}`, title: `New ${title.toLowerCase()} ${index + 1}`, url: file.url, subtitle: file.name, canRemove: true })
+  })
+
+  const normalizedOrder = [...order.filter((token) => itemsByToken.has(token)), ...[...existingTokens, ...fileTokens].filter((token) => !order.includes(token) && itemsByToken.has(token))]
+  const orderedItems = normalizedOrder.map((token) => itemsByToken.get(token)).filter((item): item is PreviewItem => Boolean(item))
+
+  useEffect(() => {
+    const dataTransfer = new DataTransfer()
+    files.forEach((file) => dataTransfer.items.add(file.file))
+    if (inputRef.current) inputRef.current.files = dataTransfer.files
+  }, [files])
+
+  function addFiles(nextFiles: File[]) {
+    const imageFiles = nextFiles.filter((file) => file.type.startsWith('image/'))
+    if (!imageFiles.length) return
+    const previews = filesToPreviews(imageFiles)
+    setFiles([...files, ...previews])
+    setOrder([...normalizedOrder, ...previews.map((file) => `new:${file.id}`)])
+  }
+
+  function removeFile(token: string) {
+    const id = token.replace('new:', '')
+    const nextFiles = files.filter((file) => file.id !== id)
+    const removed = files.find((file) => file.id === id)
+    if (removed) URL.revokeObjectURL(removed.url)
+    setFiles(nextFiles)
+    setOrder(normalizedOrder.filter((item) => item !== token))
+  }
+
+  function handleDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault()
+    addFiles(Array.from(event.dataTransfer.files))
+  }
+
+  return (
+    <div>
+      <label htmlFor={`${name}-input`} onDragOver={(event) => event.preventDefault()} onDrop={handleDrop} className="block cursor-pointer rounded-lg border-2 border-dashed border-blue-200 bg-blue-50/50 p-5 text-center font-body text-sm text-[#43474d] transition hover:border-blue-400 hover:bg-blue-50 focus-within:ring-2 focus-within:ring-blue-300">
+        <span className="block font-semibold text-[#00152a]">{title}</span>
+        <span className="mt-2 block text-base font-semibold text-blue-800">Drag images here or click to upload</span>
+        <span className="mt-1 block">Use multiple images if the question spans prompt, table, graph, or continuation.</span>
+        <input ref={inputRef} id={`${name}-input`} name={name} type="file" accept="image/*" multiple className="sr-only" onChange={(event) => addFiles(Array.from(event.target.files ?? []))} />
+      </label>
+      {files.map((file) => <input key={file.id} type="hidden" name={fileKeyName} value={file.id} />)}
+      {normalizedOrder.map((token) => <input key={token} type="hidden" name={assetOrderName} value={token} />)}
+      <div className="mt-3 space-y-2">
+        {orderedItems.map((item, index) => (
+          <div key={item.token} draggable onDragStart={(event) => event.dataTransfer.setData('text/plain', item.token)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const dragged = event.dataTransfer.getData('text/plain'); const next = normalizedOrder.filter((token) => token !== dragged); next.splice(index, 0, dragged); setOrder(next) }} className="flex items-center gap-3 rounded-md border border-[#c3c6ce66] bg-white p-2">
+            <button type="button" className="cursor-grab rounded-sm px-2 py-1 text-[#735b2b]" aria-label={`Drag to reorder ${item.title}`}>☰</button>
+            <button type="button" onClick={() => onPreview(index)} className="shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-300">
+              <Image src={item.url} alt={item.title} width={88} height={64} unoptimized className="h-16 w-22 rounded-sm border border-[#f0eee9] bg-[#f8f6f1] object-cover" />
+            </button>
+            <div className="min-w-0 flex-1">
+              <p className="font-body text-sm font-semibold text-[#00152a]">{title} {index + 1}</p>
+              {item.subtitle ? <p className="truncate font-body text-xs text-[#6f737b]">{item.subtitle}</p> : null}
+            </div>
+            <div className="flex flex-wrap justify-end gap-1">
+              <button type="button" onClick={() => onPreview(index)} className="rounded-sm border border-blue-200 px-2 py-1 font-body text-xs font-semibold text-blue-700 hover:bg-blue-50">Preview</button>
+              <button type="button" onClick={() => setOrder(moveToken(normalizedOrder, item.token, -1))} disabled={index === 0} className="rounded-sm border border-slate-200 px-2 py-1 font-body text-xs font-semibold text-slate-600 disabled:opacity-40">Up</button>
+              <button type="button" onClick={() => setOrder(moveToken(normalizedOrder, item.token, 1))} disabled={index === orderedItems.length - 1} className="rounded-sm border border-slate-200 px-2 py-1 font-body text-xs font-semibold text-slate-600 disabled:opacity-40">Down</button>
+              {item.canRemove ? <button type="button" onClick={() => removeFile(item.token)} className="rounded-sm border border-red-200 px-2 py-1 font-body text-xs font-semibold text-red-700 hover:bg-red-50">Remove</button> : null}
+            </div>
+          </div>
+        ))}
+        {!orderedItems.length && fallbackUrl ? (
+          <button type="button" onClick={() => onPreview(0)} className="flex w-full items-center gap-3 rounded-md border border-[#c3c6ce66] bg-white p-2 text-left">
+            <Image src={fallbackUrl} alt={fallbackTitle} width={88} height={64} unoptimized className="h-16 w-22 rounded-sm border border-[#f0eee9] object-cover" />
+            <span className="font-body text-sm font-semibold text-[#00152a]">{fallbackTitle}</span>
+          </button>
+        ) : null}
+        {!orderedItems.length && !fallbackUrl ? <p className="rounded-md border border-dashed border-slate-200 p-4 font-body text-sm text-slate-500">No images selected yet.</p> : null}
+      </div>
+    </div>
+  )
+}
+
+function Lightbox({ state, questionItems, markschemeItems, onClose, onMove }: { state: LightboxState; questionItems: PreviewItem[]; markschemeItems: PreviewItem[]; onClose: () => void; onMove: (index: number) => void }) {
+  const items = state?.group === 'question' ? questionItems : markschemeItems
+  const item = state ? items[state.index] : null
+
+  useEffect(() => {
+    function closeOnEsc(event: globalThis.KeyboardEvent) {
+      if (event.key === 'Escape') onClose()
+    }
+    if (state) window.addEventListener('keydown', closeOnEsc)
+    return () => window.removeEventListener('keydown', closeOnEsc)
+  }, [state, onClose])
+
+  if (!state || !item) return null
+  const label = state.group === 'question' ? 'Question image' : 'Mark scheme image'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-label={`${label} preview`}>
+      <div className="max-h-[92vh] w-full max-w-5xl rounded-lg bg-white p-4 shadow-xl">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <p className="font-body text-sm font-semibold text-[#735b2b]">{label} {state.index + 1} of {items.length}</p>
+            <h3 className="font-headline text-2xl text-[#00152a]">{item.subtitle || item.title}</h3>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-md border border-slate-200 px-3 py-2 font-body text-sm font-semibold text-slate-700 hover:bg-slate-50">Close</button>
+        </div>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => onMove((state.index - 1 + items.length) % items.length)} disabled={items.length < 2} className="rounded-md border border-slate-200 px-3 py-2 font-body text-sm font-semibold disabled:opacity-40">Previous</button>
+          <div className="flex min-h-[55vh] flex-1 items-center justify-center rounded-md bg-[#f8f6f1] p-2">
+            <Image src={item.url} alt={item.title} width={1400} height={900} unoptimized className="max-h-[70vh] w-auto max-w-full object-contain" />
+          </div>
+          <button type="button" onClick={() => onMove((state.index + 1) % items.length)} disabled={items.length < 2} className="rounded-md border border-slate-200 px-3 py-2 font-body text-sm font-semibold disabled:opacity-40">Next</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function orderedPreviewItems(assets: QuestionAsset[], files: LocalPreview[], order: string[], label: string, fallbackUrl?: string | null, fallbackTitle?: string): PreviewItem[] {
+  const map = new Map<string, PreviewItem>()
+  assets.forEach((asset, index) => {
+    if (asset.preview_url) map.set(`existing:${asset.id}`, { token: `existing:${asset.id}`, title: asset.label || `${label} ${index + 1}`, url: asset.preview_url, subtitle: asset.storage_path || asset.public_url || undefined })
+  })
+  files.forEach((file, index) => map.set(`new:${file.id}`, { token: `new:${file.id}`, title: `New ${label.toLowerCase()} ${index + 1}`, url: file.url, subtitle: file.name }))
+  const tokens = [...order.filter((token) => map.has(token)), ...[...map.keys()].filter((token) => !order.includes(token))]
+  const items = tokens.map((token) => map.get(token)).filter((item): item is PreviewItem => Boolean(item))
+  if (!items.length && fallbackUrl) return [{ token: 'fallback', title: fallbackTitle || label, url: fallbackUrl }]
+  return items
 }
 
 export function QuestionBankForm({
@@ -127,8 +323,10 @@ export function QuestionBankForm({
 }) {
   const currentPaper = papers.find((paper) => paper.id === question?.paper_id)
   const defaultSubjectId = relationLabel(currentPaper?.subjects, 'id') || subjects.find((subject) => subject.name === 'Mathematics Extended')?.id || subjects.find((subject) => subject.name === 'Mathematics')?.id || subjects[0]?.id || ''
+  const selectedTopics = useMemo(() => new Set(question?.question_topics?.map((row) => row.topic_id) ?? []), [question])
   const primaryTopicIdFromQuestion = question?.question_topics?.find((row) => row.is_primary)?.topic_id || ''
   const primaryTopic = topics.find((topic) => topic.id === primaryTopicIdFromQuestion)
+  const initialTopicGroupId = primaryTopic?.parent_topic_id || primaryTopic?.id || ''
   const action = mode === 'new' ? createQuestion : updateQuestion
 
   const [paperMode, setPaperMode] = useState<'existing' | 'new'>(question?.paper_id ? 'existing' : 'existing')
@@ -139,14 +337,18 @@ export function QuestionBankForm({
   const [newPaperYear, setNewPaperYear] = useState('2025')
   const [newPaperSession, setNewPaperSession] = useState('May')
   const [questionNumber, setQuestionNumber] = useState(question?.question_number || '')
-  const [topicGroupId, setTopicGroupId] = useState(primaryTopic?.parent_topic_id || primaryTopic?.id || '')
+  const [topicGroupId, setTopicGroupId] = useState(initialTopicGroupId)
+  const [selectedSubtopicIds, setSelectedSubtopicIds] = useState(() => Array.from(selectedTopics).filter((topicId) => topics.find((topic) => topic.id === topicId)?.parent_topic_id === initialTopicGroupId))
   const [primaryTopicId, setPrimaryTopicId] = useState(primaryTopicIdFromQuestion)
-  const [newTopicName, setNewTopicName] = useState('')
   const [published, setPublished] = useState(question?.is_published ?? false)
   const [reviewed, setReviewed] = useState(question?.is_reviewed ?? false)
   const [questionFiles, setQuestionFiles] = useState<LocalPreview[]>([])
   const [markschemeFiles, setMarkschemeFiles] = useState<LocalPreview[]>([])
-  const selectedTopics = new Set(question?.question_topics?.map((row) => row.topic_id) ?? [])
+  const existingQuestionAssets = questionAssets.filter((asset) => asset.asset_type === 'question')
+  const existingMarkschemeAssets = questionAssets.filter((asset) => asset.asset_type === 'markscheme')
+  const [questionOrder, setQuestionOrder] = useState(existingQuestionAssets.map((asset) => `existing:${asset.id}`))
+  const [markschemeOrder, setMarkschemeOrder] = useState(existingMarkschemeAssets.map((asset) => `existing:${asset.id}`))
+  const [lightbox, setLightbox] = useState<LightboxState>(null)
 
   useEffect(() => () => {
     questionFiles.forEach((file) => URL.revokeObjectURL(file.url))
@@ -156,23 +358,18 @@ export function QuestionBankForm({
     markschemeFiles.forEach((file) => URL.revokeObjectURL(file.url))
   }, [markschemeFiles])
 
-  function updateQuestionFiles(files: File[]) {
-    questionFiles.forEach((file) => URL.revokeObjectURL(file.url))
-    setQuestionFiles(buildLocalPreviews(files))
-  }
+  useEffect(() => {
+    if (selectedSubtopicIds.length === 1) setPrimaryTopicId(selectedSubtopicIds[0])
+    if (selectedSubtopicIds.length > 1 && !selectedSubtopicIds.includes(primaryTopicId)) setPrimaryTopicId(selectedSubtopicIds[0])
+  }, [selectedSubtopicIds, primaryTopicId])
 
-  function updateMarkschemeFiles(files: File[]) {
-    markschemeFiles.forEach((file) => URL.revokeObjectURL(file.url))
-    setMarkschemeFiles(buildLocalPreviews(files))
-  }
-
-  function updateSubject(event: ChangeEvent<HTMLSelectElement>) {
-    setSubjectId(event.target.value)
+  function updateSubject(value: string) {
+    setSubjectId(value)
     setPaperId('')
     setTopicGroupId('')
+    setSelectedSubtopicIds([])
     setPrimaryTopicId('')
   }
-
 
   const filteredPapers = papers.filter((paper) => {
     const paperSubjectId = relationLabel(paper.subjects, 'id')
@@ -188,18 +385,19 @@ export function QuestionBankForm({
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name)), [topics, topicGroupId, subjectId])
 
   const legacyTopics = useMemo(() => topics
-    .filter((topic) => topic.id !== primaryTopicId && topic.id !== topicGroupId && topicMatchesLegacyScope(topic, subjectId))
-    .sort((a, b) => a.name.localeCompare(b.name)), [topics, primaryTopicId, topicGroupId, subjectId])
+    .filter((topic) => !selectedSubtopicIds.includes(topic.id) && topic.id !== topicGroupId && topicMatchesLegacyScope(topic, subjectId))
+    .sort((a, b) => a.name.localeCompare(b.name)), [topics, selectedSubtopicIds, topicGroupId, subjectId])
 
-  const existingQuestionAssets = questionAssets.filter((asset) => asset.asset_type === 'question')
-  const existingMarkschemeAssets = questionAssets.filter((asset) => asset.asset_type === 'markscheme')
+  const questionLightboxItems = orderedPreviewItems(existingQuestionAssets, questionFiles, questionOrder, 'Question image', questionPreviewUrl, 'Question image 1')
+  const markschemeLightboxItems = orderedPreviewItems(existingMarkschemeAssets, markschemeFiles, markschemeOrder, 'Mark scheme image', markschemePreviewUrl, 'Mark scheme image 1')
   const hasExistingQuestionImage = Boolean(questionPreviewUrl || existingQuestionAssets.length)
   const hasQuestionImage = hasExistingQuestionImage || questionFiles.length > 0
   const step1Complete = paperMode === 'existing' ? Boolean(subjectId && paperId) : Boolean(subjectId && newPaperTitle && newPaperYear && newPaperSession)
   const step2Complete = Boolean(questionNumber.trim())
   const step3Complete = hasQuestionImage
-  const step4Complete = Boolean(topicGroupId)
+  const step4Complete = Boolean(topicGroupId && (selectedSubtopicIds.length || !subtopics.length))
   const readyToSubmit = step1Complete && step2Complete && step3Complete && step4Complete
+  const effectivePrimaryTopicId = selectedSubtopicIds.includes(primaryTopicId) ? primaryTopicId : selectedSubtopicIds[0] || topicGroupId
 
   const step1State: StepState = step1Complete ? 'complete' : 'current'
   const step2State: StepState = !step1Complete ? 'locked' : step2Complete ? 'complete' : 'current'
@@ -210,10 +408,10 @@ export function QuestionBankForm({
     <form action={action} className="space-y-8" onSubmit={(event) => { if (!readyToSubmit) event.preventDefault() }}>
       {question ? <input type="hidden" name="question_id" value={question.id} /> : null}
       <input type="hidden" name="paper_id" value={paperMode === 'existing' ? paperId : ''} />
-      <input type="hidden" name="primary_topic_id" value={primaryTopicId || topicGroupId} />
-      <input type="hidden" name="existing_question_asset_count" value={existingQuestionAssets.length} />
-      <input type="hidden" name="existing_markscheme_asset_count" value={existingMarkschemeAssets.length} />
+      <input type="hidden" name="primary_topic_id" value={effectivePrimaryTopicId} />
+      <input type="hidden" name="topic_group_id" value={topicGroupId} />
       <input type="hidden" name="new_paper_level" value={selectedSubjectName} />
+      {selectedSubtopicIds.length ? selectedSubtopicIds.map((topicId) => <input key={topicId} type="hidden" name="topic_ids" value={topicId} />) : topicGroupId ? <input type="hidden" name="topic_ids" value={topicGroupId} /> : null}
 
       <StepCard step={1} title="Paper setup" state={step1State} helper="Choose whether this question belongs to an existing paper or a new paper record.">
         <div className="grid gap-4 md:grid-cols-2">
@@ -221,18 +419,18 @@ export function QuestionBankForm({
           <ChoiceCard active={paperMode === 'new'} title="Create new paper" helper="Create a simple paper record first, then attach this question." onClick={() => { setPaperMode('new'); setPaperId('') }} />
         </div>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          <label htmlFor="admin-question-subject" className="font-body text-sm text-[#43474d]">Subject<select id="admin-question-subject" name="new_paper_subject_id" value={subjectId} onChange={updateSubject} className="tsm-input mt-1 w-full cursor-pointer" required><option value="">Choose subject</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select></label>
+          <SearchableSelect id="admin-question-subject" name="new_paper_subject_id" label="Subject" value={subjectId} onChange={updateSubject} placeholder="Choose subject" emptyText="No matching subjects found." options={subjects.map((subject) => ({ value: subject.id, label: subject.name }))} required />
         </div>
         {paperMode === 'existing' ? (
           <div className="mt-5 rounded-md border border-blue-100 bg-blue-50/40 p-4">
-            <label htmlFor="admin-question-paper" className="font-body text-sm text-[#43474d]">Matching existing paper<select id="admin-question-paper" value={paperId} onChange={(event) => setPaperId(event.target.value)} className="tsm-input mt-1 w-full cursor-pointer"><option value="">Choose a paper</option>{filteredPapers.map((paper) => <option key={paper.id} value={paper.id}>{paperLabel(paper)}</option>)}</select></label>
+            <SearchableSelect id="admin-question-paper" label="Matching existing paper" value={paperId} onChange={setPaperId} placeholder="Choose a paper" emptyText="No matching papers found." options={filteredPapers.map((paper) => ({ value: paper.id, label: paperLabel(paper), helper: paper.level || undefined }))} />
             {!filteredPapers.length ? <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 font-body text-sm text-amber-800">No papers found for this subject. Create a new paper first. <button type="button" className="cursor-pointer font-semibold underline" onClick={() => setPaperMode('new')}>Create a new paper instead.</button></div> : null}
           </div>
         ) : (
           <div className="mt-5 rounded-md border border-blue-100 bg-blue-50/40 p-4">
             <div className="grid gap-4 md:grid-cols-3">
               <label htmlFor="admin-question-new-paper-year" className="font-body text-sm text-[#43474d]">Year<input id="admin-question-new-paper-year" name="new_paper_year" type="number" min="2016" max="2030" className="tsm-input mt-1 w-full" value={newPaperYear} onChange={(event) => setNewPaperYear(event.target.value)} /></label>
-              <label htmlFor="admin-question-new-paper-session" className="font-body text-sm text-[#43474d]">Session<select id="admin-question-new-paper-session" name="new_paper_session" className="tsm-input mt-1 w-full" value={newPaperSession} onChange={(event) => setNewPaperSession(event.target.value)}><option value="May">May</option><option value="November">November</option></select></label>
+              <SearchableSelect id="admin-question-new-paper-session" name="new_paper_session" label="Session" value={newPaperSession} onChange={setNewPaperSession} placeholder="Choose session" emptyText="No matching sessions found." options={[{ value: 'May', label: 'May' }, { value: 'November', label: 'November' }]} />
               <label htmlFor="admin-question-new-paper-title" className="font-body text-sm text-[#43474d]">Paper title/code<input id="admin-question-new-paper-title" name="new_paper_title" className="tsm-input mt-1 w-full" value={newPaperTitle} onChange={(event) => setNewPaperTitle(event.target.value)} placeholder="M25 Maths Extended" /></label>
             </div>
             <details className="mt-4 rounded-sm border border-[#c3c6ce66] bg-white p-4">
@@ -257,29 +455,9 @@ export function QuestionBankForm({
 
       <StepCard step={3} title="Images" state={step3State} helper="Upload one or more question crops, plus any matching mark scheme images.">
         {!hasQuestionImage ? <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 font-body text-sm text-amber-800">At least one question image is required before topics and publishing unlock.</p> : null}
-        <div className="grid gap-4 md:grid-cols-2">
-          <UploadBox name="question_image_file" label="Question images" helper="Upload multiple screenshots/crops if the question spans more than one image." onFiles={updateQuestionFiles} />
-          <UploadBox name="markscheme_image_file" label="Mark scheme images" helper="Optional, but you can upload multiple matching mark scheme crops." onFiles={updateMarkschemeFiles} />
-        </div>
-        <div className="mt-6 grid gap-5 md:grid-cols-2">
-          <div>
-            <h3 className="font-body text-sm font-semibold text-[#00152a]">Question previews</h3>
-            <div className="mt-3 grid gap-3">
-              {existingQuestionAssets.map((asset, index) => asset.preview_url ? <PreviewCard key={asset.id} title={asset.label || `Question image ${index + 1}`} url={asset.preview_url} order={index + 1} /> : null)}
-              {!existingQuestionAssets.length && questionPreviewUrl ? <PreviewCard title="Question image 1" url={questionPreviewUrl} order={1} /> : null}
-              {questionFiles.map((file, index) => <PreviewCard key={file.url} title={`New question image ${index + 1}`} url={file.url} subtitle={file.name} order={existingQuestionAssets.length + index + 1} />)}
-              {!hasExistingQuestionImage && !questionFiles.length ? <p className="rounded-md border border-dashed border-slate-200 p-4 font-body text-sm text-slate-500">No question images selected yet.</p> : null}
-            </div>
-          </div>
-          <div>
-            <h3 className="font-body text-sm font-semibold text-[#00152a]">Mark scheme previews</h3>
-            <div className="mt-3 grid gap-3">
-              {existingMarkschemeAssets.map((asset, index) => asset.preview_url ? <PreviewCard key={asset.id} title={asset.label || `Mark scheme image ${index + 1}`} url={asset.preview_url} order={index + 1} /> : null)}
-              {!existingMarkschemeAssets.length && markschemePreviewUrl ? <PreviewCard title="Mark scheme image 1" url={markschemePreviewUrl} order={1} /> : null}
-              {markschemeFiles.map((file, index) => <PreviewCard key={file.url} title={`New mark scheme image ${index + 1}`} url={file.url} subtitle={file.name} order={existingMarkschemeAssets.length + index + 1} />)}
-              {!existingMarkschemeAssets.length && !markschemePreviewUrl && !markschemeFiles.length ? <p className="rounded-md border border-dashed border-slate-200 p-4 font-body text-sm text-slate-500">No mark scheme images selected yet.</p> : null}
-            </div>
-          </div>
+        <div className="grid gap-5 md:grid-cols-2">
+          <ImageUploadGroup title="Question image" name="question_image_file" fileKeyName="question_file_key" assetOrderName="question_asset_order" existingAssets={existingQuestionAssets} fallbackUrl={existingQuestionAssets.length ? null : questionPreviewUrl} fallbackTitle="Question image 1" files={questionFiles} setFiles={setQuestionFiles} order={questionOrder} setOrder={setQuestionOrder} onPreview={(index) => setLightbox({ group: 'question', index })} />
+          <ImageUploadGroup title="Mark scheme image" name="markscheme_image_file" fileKeyName="markscheme_file_key" assetOrderName="markscheme_asset_order" existingAssets={existingMarkschemeAssets} fallbackUrl={existingMarkschemeAssets.length ? null : markschemePreviewUrl} fallbackTitle="Mark scheme image 1" files={markschemeFiles} setFiles={setMarkschemeFiles} order={markschemeOrder} setOrder={setMarkschemeOrder} onPreview={(index) => setLightbox({ group: 'markscheme', index })} />
         </div>
         <details className="mt-5 rounded-sm bg-[#f5f3ee] p-4">
           <summary className="cursor-pointer font-body font-semibold text-[#735b2b]">Advanced image and text options</summary>
@@ -294,11 +472,28 @@ export function QuestionBankForm({
         </details>
       </StepCard>
 
-      <StepCard step={4} title="Topics & publish" state={step4State} helper="Choose a topic group, then the exact subtopic. Publish only when checked.">
+      <StepCard step={4} title="Topics & publish" state={step4State} helper="Choose a topic group, then one or more exact subtopics. Publish only when checked.">
         <div className="grid gap-4 md:grid-cols-2">
-          <label htmlFor="admin-question-topic-group" className="font-body text-sm text-[#43474d]">Topic group<select id="admin-question-topic-group" name="topic_group_id" value={topicGroupId} onChange={(event) => { setTopicGroupId(event.target.value); setPrimaryTopicId('') }} className="tsm-input mt-1 w-full cursor-pointer"><option value="">Choose topic group</option>{mainTopicGroups.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></label>
-          <label htmlFor="admin-question-primary-topic" className="font-body text-sm text-[#43474d]">Exact subtopic<select id="admin-question-primary-topic" name="topic_ids" value={primaryTopicId || topicGroupId} onChange={(event) => setPrimaryTopicId(event.target.value)} className="tsm-input mt-1 w-full cursor-pointer"><option value={topicGroupId}>Use the topic group</option>{subtopics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select></label>
-          <label htmlFor="admin-question-new-topic" className="md:col-span-2 font-body text-sm text-[#43474d]">Optional: create new subtopic under selected group<input id="admin-question-new-topic" name="new_topic_name" className="tsm-input mt-1 w-full" value={newTopicName} onChange={(event) => setNewTopicName(event.target.value)} placeholder="e.g. Inequalities and feasible regions" /></label>
+          <SearchableSelect id="admin-question-topic-group" label="Topic group" value={topicGroupId} onChange={(value) => { setTopicGroupId(value); setSelectedSubtopicIds([]); setPrimaryTopicId('') }} placeholder="Choose topic group" emptyText="No matching topic groups found." options={mainTopicGroups.map((topic) => ({ value: topic.id, label: topic.name }))} />
+          <SearchableSelect id="admin-question-primary-topic" label="Add exact subtopic" value="" onChange={(value) => { if (value && !selectedSubtopicIds.includes(value)) setSelectedSubtopicIds([...selectedSubtopicIds, value]) }} placeholder={topicGroupId ? 'Search subtopics to add' : 'Choose a topic group first'} emptyText="No matching subtopics found." options={subtopics.filter((topic) => !selectedSubtopicIds.includes(topic.id)).map((topic) => ({ value: topic.id, label: topic.name }))} />
+        </div>
+        <p className="mt-3 font-body text-sm text-[#43474d]">Need a new subtopic? Ask the topic manager/admin to add it first.</p>
+        <div className="mt-4 rounded-md border border-[#c3c6ce66] bg-[#fbf9f4] p-4">
+          <h3 className="font-body text-sm font-semibold text-[#00152a]">Selected subtopics</h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {selectedSubtopicIds.map((topicId) => {
+              const topic = topics.find((item) => item.id === topicId)
+              const primary = effectivePrimaryTopicId === topicId
+              return (
+                <span key={topicId} className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 font-body text-sm ${primary ? 'border-blue-300 bg-blue-50 text-blue-800' : 'border-slate-200 bg-white text-[#43474d]'}`}>
+                  {topic?.name || 'Selected subtopic'}
+                  {primary ? <strong className="text-xs">Primary</strong> : <button type="button" onClick={() => setPrimaryTopicId(topicId)} className="text-xs font-semibold text-blue-700 underline">Make primary</button>}
+                  <button type="button" onClick={() => setSelectedSubtopicIds(selectedSubtopicIds.filter((id) => id !== topicId))} className="text-xs font-semibold text-red-700">Remove</button>
+                </span>
+              )
+            })}
+            {!selectedSubtopicIds.length ? <p className="font-body text-sm text-[#6f737b]">No exact subtopics selected yet.</p> : null}
+          </div>
         </div>
         {!mainTopicGroups.length ? <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 font-body text-sm text-amber-800">No active topic groups match this subject. Create the group first, or use the legacy secondary section only for old data.</p> : null}
         <details className="mt-5 rounded-sm bg-[#f5f3ee] p-4">
@@ -324,23 +519,8 @@ export function QuestionBankForm({
           </div>
         </div>
       </div>
+      <Lightbox state={lightbox} questionItems={questionLightboxItems} markschemeItems={markschemeLightboxItems} onClose={() => setLightbox(null)} onMove={(index) => setLightbox((current) => current ? { ...current, index } : current)} />
     </form>
-  )
-}
-
-function PreviewCard({ title, url, subtitle, order }: { title: string; url: string; subtitle?: string; order?: number }) {
-  return (
-    <div className="rounded-md border border-[#c3c6ce66] bg-white p-3">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <div>
-          <p className="font-body text-sm font-semibold text-[#00152a]">{title}</p>
-          {order ? <p className="font-body text-xs font-semibold text-[#735b2b]">Order {order}</p> : null}
-          {subtitle ? <p className="font-body text-xs text-[#6f737b]">{subtitle}</p> : null}
-        </div>
-        <a href={url} target="_blank" rel="noreferrer" className="cursor-pointer rounded-md border border-blue-200 px-3 py-1 font-body text-xs font-semibold text-blue-700 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300">Open in new tab</a>
-      </div>
-      <Image src={url} alt={title} width={900} height={600} unoptimized className="max-h-80 w-full rounded-sm border border-[#f0eee9] bg-[#f8f6f1] object-contain" />
-    </div>
   )
 }
 
