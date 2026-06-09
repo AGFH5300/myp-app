@@ -1,29 +1,6 @@
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-
-type NamedRelation = { name?: string | null; title?: string | null; session_month?: string | null; session_year?: number | null }
-
-function relationValue<T extends keyof NamedRelation>(relation: unknown, key: T) {
-  const item = Array.isArray(relation) ? relation[0] : relation
-  return (item as NamedRelation | null | undefined)?.[key]
-}
-
-async function togglePaperPublish(formData: FormData) {
-  'use server'
-  const supabase = await createClient()
-  const paperId = String(formData.get('paper_id'))
-  const nextState = String(formData.get('next_state')) === 'true'
-  await supabase.from('papers').update({ is_published: nextState }).eq('id', paperId)
-}
-
-async function toggleQuestionPublish(formData: FormData) {
-  'use server'
-  const supabase = await createClient()
-  const questionId = String(formData.get('question_id'))
-  const nextState = String(formData.get('next_state')) === 'true'
-  await supabase.from('questions').update({ is_published: nextState }).eq('id', questionId)
-}
+import { createClient } from '@/lib/supabase/server'
 
 export default async function AdminPage() {
   const supabase = await createClient()
@@ -33,43 +10,34 @@ export default async function AdminPage() {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
   if (profile?.role !== 'admin') redirect('/dashboard')
 
-  const [{ data: subjects }, { data: examSessions }, { data: papers }, { data: questions }, { data: topics }] = await Promise.all([
-    supabase.from('subjects').select('id,name,description').order('name').limit(30),
-    supabase.from('exam_sessions').select('id,session_month,session_year,is_published').order('session_year', { ascending: false }).limit(30),
-    supabase.from('papers').select('id,title,is_published,pdf_url,markscheme_url,markscheme_text,subjects(name),exam_sessions(session_month,session_year)').order('created_at', { ascending: false }).limit(30),
-    supabase.from('questions').select('id,question_number,is_published,prompt_text,papers(title)').order('created_at', { ascending: false }).limit(30),
-    supabase.from('topics').select('id,name').order('name').limit(50),
-  ])
-
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><h1 className="font-headline text-4xl text-[#00152a]">Admin content management</h1><Link href="/dashboard/admin/resource-analytics" className="tsm-btn-secondary">Resource analytics</Link><Link href="/dashboard/admin/question-bank" className="tsm-btn-primary">Question bank</Link></div>
+      <header className="rounded-md border border-[#c3c6ce66] bg-white p-8 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+        <p className="font-label text-xs uppercase tracking-[.16em] text-[#735b2b]">Admin workspace</p>
+        <h1 className="mt-3 font-headline text-5xl text-[#00152a]">Admin control center</h1>
+        <p className="mt-3 max-w-2xl font-body text-lg text-[#43474d]">Jump into the real admin tasks for keeping MYP Atlas useful and ready for students.</p>
+      </header>
 
-      <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md"><h2 className="font-headline text-2xl text-[#00152a] mb-3">Subjects</h2><div className="space-y-2">{subjects?.map((item) => <p key={item.id} className="font-body text-sm text-[#43474d]">{item.name}</p>)}</div></section>
-
-      <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md"><h2 className="font-headline text-2xl text-[#00152a] mb-3">Exam sessions</h2><div className="space-y-2">{examSessions?.map((item) => <p key={item.id} className="font-body text-sm text-[#43474d]">{item.session_month} {item.session_year} · {item.is_published ? 'Published' : 'Draft'}</p>)}</div></section>
-
-      <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md">
-        <h2 className="font-headline text-2xl text-[#00152a] mb-3">Papers (publish/unpublish)</h2>
-        <div className="space-y-3">{papers?.map((paper) => (
-          <div key={paper.id} className="bg-[#f5f3ee] rounded-sm p-4 flex items-start justify-between gap-3">
-            <div><p className="font-headline text-lg text-[#00152a]">{paper.title}</p><p className="font-body text-sm text-[#43474d]">{relationValue(paper.subjects, 'name')} · {relationValue(paper.exam_sessions, 'session_month')} {relationValue(paper.exam_sessions, 'session_year')}</p><p className="font-body text-xs text-[#43474d] mt-1">PDF: {paper.pdf_url || 'none'} · Markscheme URL: {paper.markscheme_url || 'none'} · Markscheme text: {paper.markscheme_text ? 'yes' : 'no'}</p></div>
-            <form action={togglePaperPublish}><input type="hidden" name="paper_id" value={paper.id} /><input type="hidden" name="next_state" value={String(!paper.is_published)} /><button className="tsm-btn-secondary">{paper.is_published ? 'Unpublish' : 'Publish'}</button></form>
+      <section className="grid gap-6 lg:grid-cols-2">
+        <article className="rounded-md border border-[#c3c6ce66] bg-white p-6">
+          <p className="font-label text-xs uppercase tracking-[.14em] text-[#735b2b]">Question Bank</p>
+          <h2 className="mt-3 font-headline text-3xl text-[#00152a]">Build and review questions</h2>
+          <p className="mt-3 font-body text-sm text-[#43474d]">Add, edit, review, publish, and manage the questions students use for topic-based practice.</p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link href="/dashboard/admin/question-bank" className="tsm-btn-primary">Open question bank</Link>
+            <Link href="/dashboard/admin/question-bank/new" className="tsm-btn-secondary">Add question</Link>
           </div>
-        ))}</div>
-      </section>
+        </article>
 
-      <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md">
-        <h2 className="font-headline text-2xl text-[#00152a] mb-3">Questions (publish/unpublish)</h2>
-        <div className="space-y-3">{questions?.map((question) => (
-          <div key={question.id} className="bg-[#f5f3ee] rounded-sm p-4 flex items-start justify-between gap-3">
-            <div><p className="font-headline text-lg text-[#00152a]">{relationValue(question.papers, 'title')} · Q{question.question_number}</p><p className="font-body text-sm text-[#43474d] line-clamp-2">{question.prompt_text}</p></div>
-            <form action={toggleQuestionPublish}><input type="hidden" name="question_id" value={question.id} /><input type="hidden" name="next_state" value={String(!question.is_published)} /><button className="tsm-btn-secondary">{question.is_published ? 'Unpublish' : 'Publish'}</button></form>
+        <article className="rounded-md border border-[#c3c6ce66] bg-white p-6">
+          <p className="font-label text-xs uppercase tracking-[.14em] text-[#735b2b]">Resource Analytics</p>
+          <h2 className="mt-3 font-headline text-3xl text-[#00152a]">See resource usage</h2>
+          <p className="mt-3 font-body text-sm text-[#43474d]">Review which resources are being opened or downloaded, and spot what students are using most.</p>
+          <div className="mt-6">
+            <Link href="/dashboard/admin/resource-analytics" className="tsm-btn-primary">View analytics</Link>
           </div>
-        ))}</div>
+        </article>
       </section>
-
-      <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md"><h2 className="font-headline text-2xl text-[#00152a] mb-3">Topics</h2><p className="font-body text-sm text-[#43474d]">{topics?.map((topic) => topic.name).join(', ') || 'No topics yet.'}</p></section>
     </div>
   )
 }

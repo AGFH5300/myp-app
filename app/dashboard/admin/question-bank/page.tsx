@@ -84,8 +84,6 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
         </div>
         <div className="flex flex-wrap gap-3">
           <Link href="/dashboard/admin/question-bank/new" className="tsm-btn-primary">Add question</Link>
-          <Link href="/dashboard/papers" className="tsm-btn-secondary">Manage papers</Link>
-          <button className="tsm-btn-secondary opacity-70" type="button" disabled title="Topic management is planned next.">Manage topics</button>
         </div>
       </header>
 
