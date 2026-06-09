@@ -1,125 +1,191 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { resolveQuestionAssetUrl } from '@/lib/question-assets'
+import { PapersFilterForm } from '@/components/papers-filter-form'
+
+type PaperRelation<T> = T | T[] | null
+
+type PaperOption = {
+  id: string
+  title: string
+  year: number | null
+  subject_id: string | null
+  level: string | null
+  subjects?: PaperRelation<{ id?: string | null; name?: string | null }>
+  exam_sessions?: PaperRelation<{ session_month?: string | null; session_year?: number | null }>
+}
+
+type Topic = { id: string; name: string; subject_id: string | null; parent_topic_id: string | null; sort_order: number | null }
+type QuestionTopic = { is_primary?: boolean | null; topics?: Topic | Topic[] | null }
+type QuestionRow = {
+  id: string
+  paper_id: string
+  question_number: string
+  question_order: number | null
+  marks: number | null
+  image_url: string | null
+  question_image_path: string | null
+  papers?: PaperRelation<PaperOption>
+  question_topics?: QuestionTopic[] | null
+}
+type PreviewAssetRow = { question_id: string; storage_path: string | null; public_url: string | null }
 
 function firstRelation<T>(relation: T | T[] | null | undefined) {
   return Array.isArray(relation) ? relation[0] : relation
 }
 
+function paperLabel(paper: PaperOption) {
+  const session = firstRelation(paper.exam_sessions)?.session_month
+  return `${paper.title}${session ? ` — ${session}` : ''}${paper.year ? ` ${paper.year}` : ''}`
+}
+
+function topicName(topic: Topic | Topic[] | null | undefined) {
+  return firstRelation(topic)?.name || ''
+}
+
 export default async function PapersPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams
   const subject = typeof params.subject === 'string' ? params.subject : ''
-  const year = typeof params.year === 'string' ? params.year : ''
-  const session = typeof params.session === 'string' ? params.session : ''
-  const topic = typeof params.topic === 'string' ? params.topic : ''
-  const topicQuery = typeof params.topic_q === 'string' ? params.topic_q : ''
+  const paper = typeof params.paper === 'string' ? params.paper : ''
+  const topicGroup = typeof params.topicGroup === 'string' ? params.topicGroup : ''
+  const subtopic = typeof params.subtopic === 'string' ? params.subtopic : ''
+  const search = typeof params.q === 'string' ? params.q.trim() : ''
+  const currentQuery = new URLSearchParams()
+  if (subject) currentQuery.set('subject', subject)
+  if (paper) currentQuery.set('paper', paper)
+  if (topicGroup) currentQuery.set('topicGroup', topicGroup)
+  if (subtopic) currentQuery.set('subtopic', subtopic)
+  if (search) currentQuery.set('q', search)
+  const currentBackHref = `/dashboard/papers${currentQuery.toString() ? `?${currentQuery.toString()}` : ''}`
 
   const supabase = await createClient()
 
-  let query = supabase
-    .from('papers')
-    .select('id,title,year,is_published,pdf_url,markscheme_url,subjects(id,name),exam_sessions(id,session_month,session_year)')
+  let questionsQuery = supabase
+    .from('questions')
+    .select('id,paper_id,question_number,question_order,marks,image_url,question_image_path,papers!inner(id,title,year,level,subject_id,is_published,subjects(id,name),exam_sessions(session_month,session_year)),question_topics(is_primary,topics(id,name,subject_id,parent_topic_id,sort_order))')
     .eq('is_published', true)
-    .order('year', { ascending: false })
+    .eq('papers.is_published', true)
 
-  if (subject) query = query.eq('subject_id', subject)
-  if (year) query = query.eq('year', Number(year))
+  if (subject) questionsQuery = questionsQuery.eq('papers.subject_id', subject)
+  if (paper) questionsQuery = questionsQuery.eq('paper_id', paper)
 
-  const [{ data: fetchedPapers }, { data: subjects }, { data: allTopics }] = await Promise.all([
-    query,
+  const [{ data: questionRows }, { data: subjects }, { data: papers }, { data: topics }] = await Promise.all([
+    questionsQuery,
     supabase.from('subjects').select('id,name').order('name'),
-    supabase.from('topics').select('id,name').order('name'),
+    supabase.from('papers').select('id,title,year,level,subject_id,subjects(id,name),exam_sessions(session_month,session_year)').eq('is_published', true).order('year', { ascending: false }).order('title'),
+    supabase.from('topics').select('id,name,subject_id,parent_topic_id,sort_order').eq('is_active', true).order('sort_order').order('name'),
   ])
 
-  const availableTopics = allTopics?.filter((item) => (
-    topicQuery ? item.name.toLowerCase().includes(topicQuery.toLowerCase()) : true
-  )) ?? []
+  const questions = ((questionRows ?? []) as unknown as QuestionRow[])
+    .filter((question) => {
+      const paperRow = firstRelation(question.papers)
+      const haystack = `${question.question_number} ${paperRow?.title ?? ''} ${paperRow?.year ?? ''}`.toLowerCase()
+      const matchesSearch = search ? haystack.includes(search.toLowerCase()) : true
+      const matchesSubtopic = subtopic ? question.question_topics?.some((row) => firstRelation(row.topics)?.id === subtopic) : true
+      const matchesTopicGroup = topicGroup ? question.question_topics?.some((row) => {
+        const currentTopic = firstRelation(row.topics)
+        return currentTopic?.id === topicGroup || currentTopic?.parent_topic_id === topicGroup
+      }) : true
+      return matchesSearch && matchesSubtopic && matchesTopicGroup
+    })
+    .sort((a, b) => {
+      const aPaper = firstRelation(a.papers)
+      const bPaper = firstRelation(b.papers)
+      return (bPaper?.year ?? 0) - (aPaper?.year ?? 0) || (aPaper?.title ?? '').localeCompare(bPaper?.title ?? '') || (a.question_order ?? 9999) - (b.question_order ?? 9999) || a.question_number.localeCompare(b.question_number)
+    })
 
-  let filteredPaperIds: Set<string> | null = null
-  if (topic) {
-    const { data: topicLinks } = await supabase
-      .from('question_topics')
-      .select('questions!inner(paper_id)')
-      .eq('topic_id', topic)
-
-    filteredPaperIds = new Set(
-      topicLinks
-        ?.map((item) => firstRelation(item.questions)?.paper_id)
-        .filter((paperId): paperId is string => Boolean(paperId)),
-    )
+  let previewAssets: PreviewAssetRow[] = []
+  if (questions.length) {
+    const { data: assetRows } = await supabase
+      .from('question_assets')
+      .select('question_id,storage_path,public_url,sort_order,created_at')
+      .in('question_id', questions.map((question) => question.id))
+      .eq('asset_type', 'question')
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true })
+    previewAssets = (assetRows ?? []) as PreviewAssetRow[]
   }
 
-  const papers = fetchedPapers?.filter((paper) => {
-    if (session && firstRelation(paper.exam_sessions)?.session_month !== session) return false
-    if (filteredPaperIds && !filteredPaperIds.has(paper.id)) return false
-    return true
+  const firstPreviewAssetByQuestion = new Map<string, PreviewAssetRow>()
+  previewAssets.forEach((asset) => {
+    if (!firstPreviewAssetByQuestion.has(asset.question_id)) firstPreviewAssetByQuestion.set(asset.question_id, asset)
   })
+
+  const previewUrls = new Map<string, string | null>()
+  for (const question of questions) {
+    const firstAsset = firstPreviewAssetByQuestion.get(question.id)
+    previewUrls.set(question.id, await resolveQuestionAssetUrl(supabase, firstAsset ? firstAsset.storage_path || firstAsset.public_url : question.question_image_path || question.image_url))
+  }
+
+  const topicRows = (topics ?? []) as Topic[]
+  const topicGroups = topicRows.filter((topic) => !topic.parent_topic_id)
+  const subtopics = topicRows.filter((topic) => topic.parent_topic_id)
 
   return (
     <div className="space-y-8">
       <header className="rounded-md border border-[#c3c6ce66] bg-white p-8">
-        <h1 className="font-headline text-4xl text-[#00152a]">Past paper archive</h1>
-        <p className="mt-2 font-body text-[#43474d]">Browse published real MYP eAssessment papers (2016–2025) and move from paper-level browsing to question-level review.</p>
+        <p className="font-label text-xs uppercase tracking-[.16em] text-[#735b2b]">Papers & practice</p>
+        <h1 className="mt-3 font-headline text-4xl text-[#00152a]">Find past paper questions.</h1>
+        <p className="mt-2 font-body text-[#43474d]">Filter by subject, paper, topic group, or subtopic, then open a question without leaving your dashboard.</p>
       </header>
 
-      <form className="grid gap-4 rounded-md border border-[#c3c6ce66] bg-white p-5 md:grid-cols-3">
-        <select name="subject" defaultValue={subject} className="tsm-input">
-          <option value="">All subjects</option>
-          {subjects?.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select>
-        <select name="year" defaultValue={year} className="tsm-input">
-          <option value="">All years</option>
-          {Array.from({ length: 10 }, (_, i) => 2025 - i).map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
-        <select name="session" defaultValue={session} className="tsm-input">
-          <option value="">All sessions</option>
-          <option value="May">May</option>
-          <option value="November">November</option>
-        </select>
-        <input
-          type="search"
-          name="topic_q"
-          defaultValue={topicQuery}
-          className="tsm-input"
-          placeholder="Search topic name"
-        />
-        <select name="topic" defaultValue={topic} className="tsm-input">
-          <option value="">All topics</option>
-          {availableTopics.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select>
-        <button className="tsm-btn-primary w-fit">Apply filters</button>
-      </form>
+      <PapersFilterForm
+        initial={{ subject, paper, topicGroup, subtopic, q: search }}
+        subjects={(subjects ?? []).map((item) => ({ value: item.id, label: item.name }))}
+        papers={((papers ?? []) as PaperOption[]).map((item) => ({ value: item.id, label: paperLabel(item), helper: firstRelation(item.subjects)?.name || undefined, subjectId: item.subject_id }))}
+        topicGroups={topicGroups.map((topic) => ({ value: topic.id, label: topic.name, subjectId: topic.subject_id }))}
+        subtopics={subtopics.map((topic) => ({ value: topic.id, label: topic.name, subjectId: topic.subject_id, parentTopicId: topic.parent_topic_id }))}
+      />
 
-      {availableTopics.length > 0 ? (
-        <section className="rounded-md border border-[#c3c6ce66] bg-white p-5">
-          <h2 className="font-headline text-xl text-[#00152a]">Browse by topic</h2>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {availableTopics.slice(0, 12).map((item) => (
-              <Link
-                key={item.id}
-                href={`/dashboard/papers?subject=${encodeURIComponent(subject)}&year=${encodeURIComponent(year)}&session=${encodeURIComponent(session)}&topic_q=${encodeURIComponent(topicQuery)}&topic=${encodeURIComponent(item.id)}`}
-                className="inline-flex items-center rounded-sm border border-[#c3c6ce66] bg-[#f5f3ee] px-2 py-0.5 font-body text-xs text-[#43474d]"
-              >
-                {item.name}
-              </Link>
-            ))}
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-headline text-2xl text-[#00152a]">Question cards</h2>
+            <p className="font-body text-sm text-[#43474d]">{questions.length} published question{questions.length === 1 ? '' : 's'} match your filters.</p>
           </div>
-        </section>
-      ) : null}
+        </div>
 
-      <div className="space-y-4">
-        {!papers?.length && <div className="rounded-md border border-[#c3c6ce66] bg-white p-6 font-body text-[#43474d]">No papers match these filters.</div>}
-        {papers?.map((paper) => (
-          <article key={paper.id} className="rounded-md border border-[#c3c6ce66] bg-white p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="font-headline text-2xl text-[#00152a]">{paper.title}</h2>
-                <p className="mt-2 font-body text-sm text-[#43474d]">{firstRelation(paper.subjects)?.name} · {paper.year} · {firstRelation(paper.exam_sessions)?.session_month || ''}</p>
-              </div>
-              <Link href={`/dashboard/papers/${paper.id}`} className="tsm-btn-secondary">Open paper</Link>
-            </div>
-          </article>
-        ))}
-      </div>
+        {!questions.length ? (
+          <div className="rounded-md border border-[#c3c6ce66] bg-white p-6 font-body text-[#43474d]">No published questions match these filters. Try a broader subject or topic group.</div>
+        ) : null}
+
+        <div className="grid gap-4">
+          {questions.map((question) => {
+            const paperRow = firstRelation(question.papers)
+            const subjectName = firstRelation(paperRow?.subjects)?.name
+            const session = firstRelation(paperRow?.exam_sessions)?.session_month
+            const primaryTopic = question.question_topics?.find((row) => row.is_primary)?.topics ?? question.question_topics?.[0]?.topics
+            const secondaryTopics = (question.question_topics ?? [])
+              .map((row) => firstRelation(row.topics))
+              .filter((item): item is Topic => Boolean(item?.id && item.name && item.id !== firstRelation(primaryTopic)?.id))
+              .slice(0, 3)
+            const previewUrl = previewUrls.get(question.id)
+
+            return (
+              <article key={question.id} className="rounded-md border border-[#c3c6ce66] bg-white p-5 transition hover:border-[#735b2b] hover:shadow-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-body text-sm text-[#43474d]">{subjectName} · {paperRow?.title} · {session ? `${session} ` : ''}{paperRow?.year}</p>
+                    <h3 className="mt-1 font-headline text-2xl text-[#00152a]">Question {question.question_number}</h3>
+                    <p className="mt-1 font-body text-sm text-[#43474d]">{question.marks ?? '—'} marks{topicName(primaryTopic) ? ` · ${topicName(primaryTopic)}` : ''}</p>
+                    {secondaryTopics.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {secondaryTopics.map((topic) => <span key={topic.id} className="rounded-full bg-[#f5f3ee] px-2 py-1 font-body text-xs text-[#735b2b]">{topic.name}</span>)}
+                      </div>
+                    ) : null}
+                  </div>
+                  {previewUrl ? <Image src={previewUrl} alt={`Question ${question.question_number} preview`} width={72} height={72} unoptimized className="h-16 w-16 shrink-0 rounded-sm border border-[#c3c6ce66] bg-white object-cover" /> : null}
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <Link href={`/dashboard/papers/question/${question.id}?back=${encodeURIComponent(currentBackHref)}`} className="tsm-btn-primary">Open question</Link>
+                  {paperRow?.id ? <Link href={`/dashboard/papers/${paperRow.id}`} className="tsm-btn-secondary">Open full paper</Link> : null}
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      </section>
     </div>
   )
 }
