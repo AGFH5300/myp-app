@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveQuestionAssetImages, type QuestionAssetRow } from '@/lib/question-assets'
 import { QuestionImageViewer } from '@/components/question-image-viewer'
-import { PendingSubmitButton } from '@/components/pending-submit-button'
+import { QuestionBookmarkButton, type BookmarkActionState } from '@/components/question-bookmark-button'
 
 type PaperRelation<T> = T | T[] | null
 
@@ -14,17 +14,41 @@ function firstRelation<T>(relation: T | T[] | null | undefined) {
   return Array.isArray(relation) ? relation[0] : relation
 }
 
-async function saveBookmark(formData: FormData) {
+async function toggleBookmark(state: BookmarkActionState, formData: FormData): Promise<BookmarkActionState> {
   'use server'
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login?next=/dashboard/papers')
 
-  await supabase.from('bookmarks').upsert({
+  const questionId = String(formData.get('question_id') || '')
+  const paperId = String(formData.get('paper_id') || '')
+
+  const { data: existingBookmark, error: lookupError } = await supabase
+    .from('bookmarks')
+    .select('id')
+    .eq('student_id', user.id)
+    .eq('question_id', questionId)
+    .maybeSingle()
+
+  if (lookupError) {
+    return { bookmarked: state.bookmarked, error: 'Could not update bookmark. Please try again.' }
+  }
+
+  if (existingBookmark) {
+    const { error } = await supabase.from('bookmarks').delete().eq('id', existingBookmark.id).eq('student_id', user.id)
+    if (error) return { bookmarked: true, error: 'Could not remove bookmark. Please try again.' }
+    return { bookmarked: false, message: 'Removed from bookmarks' }
+  }
+
+  const { error } = await supabase.from('bookmarks').upsert({
     student_id: user.id,
-    question_id: String(formData.get('question_id')),
-    paper_id: String(formData.get('paper_id')),
+    question_id: questionId,
+    paper_id: paperId,
   })
+
+  if (error) return { bookmarked: false, error: 'Could not save bookmark. Please try again.' }
+
+  return { bookmarked: true, message: 'Added to bookmarks' }
 }
 
 export default async function DashboardPaperQuestionPage({ params, searchParams }: { params: Promise<{ questionId: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -69,9 +93,18 @@ export default async function DashboardPaperQuestionPage({ params, searchParams 
     .map((row) => firstRelation(row.topics))
     .filter((topic): topic is Topic => Boolean(topic?.id && topic.name && topic.id !== primaryTopic?.id))
 
+  const { data: existingBookmark } = user
+    ? await supabase
+      .from('bookmarks')
+      .select('id')
+      .eq('student_id', user.id)
+      .eq('question_id', question.id)
+      .maybeSingle()
+    : { data: null }
+
   return (
     <div className="max-w-4xl space-y-8">
-      <Link href={backHref} className="font-body text-sm text-[#735b2b] underline">← Back to Papers</Link>
+      <Link href={backHref} className="tsm-btn-secondary inline-flex w-fit items-center gap-2">← Back to Papers</Link>
 
       <header className="rounded-md border border-[#c3c6ce66] bg-white p-6">
         <p className="font-body text-sm text-[#43474d]">{subject?.name || 'Subject'} · {paper.title} · {firstRelation(paper.exam_sessions)?.session_month} {paper.year}</p>
@@ -106,11 +139,12 @@ export default async function DashboardPaperQuestionPage({ params, searchParams 
       </details>
 
       {user ? (
-        <form action={saveBookmark}>
-          <input type="hidden" name="question_id" value={question.id} />
-          <input type="hidden" name="paper_id" value={paper.id} />
-          <PendingSubmitButton className="tsm-btn-primary disabled:cursor-not-allowed disabled:opacity-60" label="Bookmark question" pendingLabel="Bookmarking..." />
-        </form>
+        <QuestionBookmarkButton
+          action={toggleBookmark}
+          initialBookmarked={Boolean(existingBookmark)}
+          questionId={question.id}
+          paperId={paper.id}
+        />
       ) : null}
     </div>
   )
