@@ -81,8 +81,8 @@ button:disabled,
   transition: background-color .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease;
 }
 
-.tsm-btn-primary:hover { opacity: .92; }
-.tsm-btn-secondary:hover { border-color: var(--secondary); color: var(--secondary); }
+.tsm-btn-primary:not(:disabled):hover { opacity: .92; }
+.tsm-btn-secondary:not(:disabled):hover { border-color: var(--secondary); color: var(--secondary); }
 .tsm-btn-primary:focus-visible,
 .tsm-btn-secondary:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--secondary) 45%, transparent);
@@ -95,10 +95,20 @@ button:disabled {
   opacity: .6;
 }
 
-.tsm-btn-primary:disabled:hover,
-.tsm-btn-secondary:disabled:hover,
+.tsm-btn-primary:disabled:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  opacity: .6;
+}
+
+.tsm-btn-secondary:disabled:hover {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--outline) 40%, transparent);
+  color: var(--primary);
+  opacity: .6;
+}
+
 button:disabled:hover {
-  border-color: inherit;
-  color: inherit;
   opacity: .6;
 }
