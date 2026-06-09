@@ -84,8 +84,6 @@ export default async function DashboardPaperQuestionPage({ params, searchParams 
         ) : null}
       </header>
 
-      <section className="rounded-md border border-[#c3c6ce66] bg-white p-6">
-        <h2 className="font-headline text-2xl text-[#00152a]">Try the question</h2>
         <div className="mt-5 max-w-4xl">
           {questionImages.length ? (
             <QuestionImageViewer labelPrefix="Question image" images={questionImages.map((image, imageIndex) => ({ url: image.url, alt: image.label || `Question ${question.question_number} image ${imageIndex + 1}` }))} />
@@ -93,7 +91,6 @@ export default async function DashboardPaperQuestionPage({ params, searchParams 
             <p className="font-body whitespace-pre-wrap text-[#00152a]">{question.prompt_text}</p>
           )}
         </div>
-      </section>
 
       <details className="rounded-md border border-[#c3c6ce66] bg-white p-6">
         <summary className="cursor-pointer font-body font-semibold text-[#735b2b]">Show mark scheme</summary>
