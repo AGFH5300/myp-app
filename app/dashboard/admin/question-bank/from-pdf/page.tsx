@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { QuestionFromPdfForm } from '../from-pdf-form'
@@ -18,10 +19,13 @@ export default async function QuestionFromPdfPage() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <p className="font-label text-xs uppercase tracking-[.16em] text-[#735b2b]">Admin question bank</p>
-        <h1 className="font-headline text-4xl text-[#00152a]">Create question from PDF</h1>
-        <p className="mt-2 max-w-3xl font-body text-[#43474d]">Crop the exact parts of the paper and mark scheme needed for one question. Add multiple crops if the question spans text, table, graph, or continuation.</p>
+      <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="font-label text-xs uppercase tracking-[.16em] text-[#735b2b]">Admin question bank</p>
+          <h1 className="font-headline text-4xl text-[#00152a]">Create question from PDF</h1>
+          <p className="mt-2 max-w-3xl font-body text-[#43474d]">Crop the exact parts of the paper and mark scheme needed for one question. Add multiple crops if the question spans text, table, graph, or continuation.</p>
+        </div>
+        <Link href="/dashboard/admin/question-bank" className="tsm-btn-secondary">Back to Question Bank</Link>
       </header>
       <QuestionFromPdfForm papers={papers ?? []} subjects={subjects ?? []} topics={topics ?? []} />
     </div>

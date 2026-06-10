@@ -1,6 +1,6 @@
 "use client"
 
-import { type CSSProperties, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, type FormEvent, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -12,7 +12,6 @@ import {
   Lightbox,
   SearchableSelect,
   StepCard,
-  SubmitButton,
   orderedPreviewItems,
   paperLabel,
   relationLabel,
@@ -425,6 +424,22 @@ function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, 
   )
 }
 
+
+function readableSaveError(error: unknown) {
+  const message = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
+  if (!message || message.includes('NEXT_REDIRECT')) return 'Could not create question.'
+  return message
+}
+
+function FromPdfSubmitButton({ readyToSubmit, saving }: { readyToSubmit: boolean; saving: boolean }) {
+  return (
+    <button type="submit" className="tsm-btn-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50" disabled={!readyToSubmit || saving}>
+      {saving ? <span className="inline-block size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" /> : null}
+      {saving ? 'Saving...' : 'Save question'}
+    </button>
+  )
+}
+
 export function QuestionFromPdfForm({ papers, subjects, topics }: { papers: Paper[]; subjects: Subject[]; topics: Topic[] }) {
   const router = useRouter()
   const defaultSubjectId = subjects.find((subject) => subject.name === 'Mathematics Extended')?.id || subjects.find((subject) => subject.name === 'Mathematics')?.id || subjects[0]?.id || ''
@@ -506,23 +521,45 @@ export function QuestionFromPdfForm({ papers, subjects, topics }: { papers: Pape
   const effectivePrimaryTopicId = selectedSubtopicIds.includes(primaryTopicId) ? primaryTopicId : selectedSubtopicIds[0] || topicGroupId
   const questionLightboxItems = orderedPreviewItems([], questionFiles, questionOrder, 'Question image')
   const markschemeLightboxItems = orderedPreviewItems([], markschemeFiles, markschemeOrder, 'Mark scheme image')
+  const [saving, setSaving] = useState(false)
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!readyToSubmit || saving) return
+
+    setSaving(true)
+    let navigating = false
+
+    try {
+      toast.loading('Creating question…', { id: 'from-pdf-save' })
+      const result = await createQuestionForPdfFlow(new FormData(event.currentTarget))
+
+      if (!result.ok) {
+        toast.error(readableSaveError(result.message), { id: 'from-pdf-save' })
+        return
+      }
+
+      if (!result.questionId) {
+        toast.error('Question created, but the new question ID was missing. Open Question Bank to find it.', { id: 'from-pdf-save' })
+        return
+      }
+
+      navigating = true
+      toast.success('Question created', { id: 'from-pdf-save' })
+      router.push(`/dashboard/admin/question-bank/${result.questionId}/edit`)
+    } catch (error) {
+      toast.error(readableSaveError(error), { id: 'from-pdf-save' })
+    } finally {
+      if (navigating) {
+        window.setTimeout(() => setSaving(false), 3000)
+      } else {
+        setSaving(false)
+      }
+    }
+  }
 
   return (
-    <form action={async (formData) => {
-      try {
-        toast.loading('Creating question…', { id: 'from-pdf-save' })
-        const result = await createQuestionForPdfFlow(formData)
-        if (!result.ok) {
-          toast.error(result.message, { id: 'from-pdf-save' })
-          return
-        }
-        toast.success(result.message, { id: 'from-pdf-save' })
-        router.push(`/dashboard/admin/question-bank/${result.questionId}/edit`)
-      } catch (error) {
-        const message = error instanceof Error && !error.message.includes('NEXT_REDIRECT') ? error.message : 'Could not create question.'
-        toast.error(message, { id: 'from-pdf-save' })
-      }
-    }} className="space-y-8" onSubmit={(event) => { if (!readyToSubmit) event.preventDefault() }}>
+    <form className="space-y-8" onSubmit={handleSubmit}>
       <input type="hidden" name="paper_id" value={paperMode === 'existing' ? paperId : ''} />
       <input type="hidden" name="new_paper_subject_id" value={subjectId} />
       <input type="hidden" name="new_paper_session" value={newPaperSession} />
@@ -602,7 +639,7 @@ export function QuestionFromPdfForm({ papers, subjects, topics }: { papers: Pape
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className={`font-body text-sm font-semibold ${readyToSubmit ? 'text-emerald-700' : 'text-amber-800'}`}>{readyToSubmit ? 'Ready to save: all required steps are complete.' : 'Not ready yet: complete the highlighted required steps.'}</p>
           <div className="flex flex-wrap gap-3">
-            <SubmitButton readyToSubmit={readyToSubmit} label="Save question" />
+            <FromPdfSubmitButton readyToSubmit={readyToSubmit} saving={saving} />
             <Link href="/dashboard/admin/question-bank" className="tsm-btn-secondary">Cancel</Link>
           </div>
         </div>

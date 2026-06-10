@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { resolveQuestionAssetUrl } from '@/lib/question-assets'
@@ -32,9 +33,12 @@ export default async function EditQuestionPage({ params }: { params: Promise<{ i
 
   return (
     <div className="space-y-8">
-      <header>
-        <p className="font-label text-xs uppercase tracking-[.16em] text-[#735b2b]">Admin question bank</p>
-        <h1 className="font-headline text-4xl text-[#00152a]">Edit question {question.question_number}</h1>
+      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="font-label text-xs uppercase tracking-[.16em] text-[#735b2b]">Admin question bank</p>
+          <h1 className="font-headline text-4xl text-[#00152a]">Edit question {question.question_number}</h1>
+        </div>
+        <Link href="/dashboard/admin/question-bank" className="tsm-btn-secondary">Back to Question Bank</Link>
       </header>
       <QuestionBankForm
         mode="edit"
