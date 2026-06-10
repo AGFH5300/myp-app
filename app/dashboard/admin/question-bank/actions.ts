@@ -206,7 +206,7 @@ async function createQuestionRecord(supabase: Awaited<ReturnType<typeof requireA
   const { data: question, error } = await supabase
     .from('questions')
     .insert(questionPayload(formData, paperId, questionAssetPath, markschemeAssetPath))
-    .select('id')
+    .select('id,paper_id,question_number,question_order')
     .single()
 
   if (error || !question) throw new Error('Could not create question.')
@@ -222,13 +222,18 @@ async function createQuestionRecord(supabase: Awaited<ReturnType<typeof requireA
   await syncTopics(supabase, question.id, formData)
   revalidatePath('/dashboard/admin/question-bank')
   revalidatePath(`/dashboard/admin/question-bank/${question.id}/edit`)
-  return question.id as string
+  return {
+    questionId: question.id as string,
+    paperId: question.paper_id as string,
+    questionNumber: question.question_number as string | null,
+    questionOrder: question.question_order as number | null,
+  }
 }
 
 export async function createQuestion(formData: FormData) {
   const supabase = await requireAdmin()
   try {
-    const questionId = await createQuestionRecord(supabase, formData)
+    const { questionId } = await createQuestionRecord(supabase, formData)
     return { ok: true as const, questionId, message: 'Question created' }
   } catch (error) {
     return { ok: false as const, message: error instanceof Error ? error.message : 'Could not create question.' }
@@ -238,8 +243,14 @@ export async function createQuestion(formData: FormData) {
 export async function createQuestionForPdfFlow(formData: FormData) {
   const supabase = await requireAdmin()
   try {
-    const questionId = await createQuestionRecord(supabase, formData)
-    return { ok: true as const, questionId, message: 'Question created' }
+    const created = await createQuestionRecord(supabase, formData)
+    const { data: paper } = await supabase
+      .from('papers')
+      .select('id,title,year,level,subjects(id,name),exam_sessions(session_month)')
+      .eq('id', created.paperId)
+      .maybeSingle()
+
+    return { ok: true as const, ...created, paper: paper ?? null, message: 'Question created' }
   } catch (error) {
     return { ok: false as const, message: error instanceof Error ? error.message : 'Could not create question.' }
   }
