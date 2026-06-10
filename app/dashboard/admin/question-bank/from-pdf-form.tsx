@@ -461,6 +461,108 @@ function FromPdfSubmitButton({ readyToSubmit, savingMode, action, children }: { 
   )
 }
 
+
+type SmartFillConfidence = 'low' | 'medium' | 'high'
+type SmartFillTopicSuggestion = { groupId: string; groupName: string; subtopicId: string; subtopicName: string; confidence: SmartFillConfidence; score: number }
+type SmartFillSuggestions = { text: string; questionNumber: string | null; marks: string | null; topics: SmartFillTopicSuggestion[] }
+
+const SMART_FILL_KEYWORDS: Record<string, string[]> = {
+  algebra: ['equation', 'expression', 'factor', 'expand', 'simplify', 'solve', 'substitute'],
+  angle: ['angle', 'parallel', 'perpendicular', 'bearing', 'triangle', 'polygon'],
+  graph: ['graph', 'axis', 'axes', 'curve', 'line', 'gradient', 'intercept', 'coordinate'],
+  inequalities: ['inequality', 'inequalities', 'region', 'feasible', 'shade', 'linear programming'],
+  statistics: ['mean', 'median', 'mode', 'range', 'frequency', 'histogram', 'box plot', 'quartile'],
+  probability: ['probability', 'chance', 'random', 'spinner', 'dice', 'tree diagram', 'outcome'],
+  functions: ['function', 'domain', 'range', 'inverse', 'composite', 'mapping'],
+  trigonometry: ['sin', 'cos', 'tan', 'sine', 'cosine', 'tangent', 'trigonometry'],
+  calculus: ['differentiate', 'derivative', 'gradient function', 'integrate', 'area under'],
+  vectors: ['vector', 'magnitude', 'direction', 'scalar'],
+  geometry: ['circle', 'area', 'volume', 'surface area', 'length', 'radius', 'diameter'],
+}
+
+function normalizeSmartFillText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function smartFillTokens(value: string) {
+  return normalizeSmartFillText(value).split(' ').filter((token) => token.length > 2)
+}
+
+function detectQuestionNumber(text: string) {
+  const patterns = [
+    /\bquestion\s+(\d{1,2}\s*\(?[a-z]\)?)\b/i,
+    /\bq\s*(\d{1,2}\s*\(?[a-z]\)?)\b/i,
+    /(?:^|\n|\s)(\d{1,2}\s*\([a-z]\))/i,
+    /(?:^|\n|\s)(\d{1,2}[a-z])\b/i,
+    /(?:^|\n)\s*(\d{1,2})[.)\s]/i,
+  ]
+  for (const pattern of patterns) {
+    const match = text.match(pattern)?.[1]
+    if (match) return match.replace(/\s+/g, '').replace(/[()]/g, '')
+  }
+  return null
+}
+
+function detectMarks(text: string) {
+  const patterns = [
+    /\[\s*(\d{1,2})\s*(?:marks?)?\s*\]/i,
+    /\(\s*(\d{1,2})\s*marks?\s*\)/i,
+    /\b(\d{1,2})\s*marks?\b/i,
+  ]
+  for (const pattern of patterns) {
+    const match = text.match(pattern)?.[1]
+    if (match) return match
+  }
+  return null
+}
+
+function confidenceFromScore(score: number): SmartFillConfidence {
+  if (score >= 8) return 'high'
+  if (score >= 4) return 'medium'
+  return 'low'
+}
+
+function suggestSmartFillTopics(text: string, allTopics: Topic[], subjectId: string) {
+  const normalizedText = normalizeSmartFillText(text)
+  const textTokens = new Set(smartFillTokens(text))
+  const groups = allTopics.filter((topic) => !topic.parent_topic_id && topicMatchesMainScope(topic, subjectId))
+  const groupById = new Map(groups.map((topic) => [topic.id, topic]))
+
+  return allTopics
+    .filter((topic) => topic.parent_topic_id && topicMatchesMainScope(topic, subjectId) && groupById.has(topic.parent_topic_id))
+    .map((subtopic) => {
+      const group = groupById.get(subtopic.parent_topic_id || '')
+      if (!group) return null
+      const names = `${group.name} ${subtopic.name}`
+      const nameTokens = smartFillTokens(names)
+      let score = 0
+      for (const token of nameTokens) {
+        if (textTokens.has(token)) score += token.length > 5 ? 2 : 1
+      }
+      if (normalizedText.includes(normalizeSmartFillText(subtopic.name))) score += 5
+      if (normalizedText.includes(normalizeSmartFillText(group.name))) score += 2
+      for (const [topicKey, keywords] of Object.entries(SMART_FILL_KEYWORDS)) {
+        const topicNameMatches = normalizeSmartFillText(names).includes(topicKey)
+        if (!topicNameMatches) continue
+        score += keywords.filter((keyword) => normalizedText.includes(normalizeSmartFillText(keyword))).length * 2
+      }
+      if (score <= 0) return null
+      return { groupId: group.id, groupName: group.name, subtopicId: subtopic.id, subtopicName: subtopic.name, confidence: confidenceFromScore(score), score } satisfies SmartFillTopicSuggestion
+    })
+    .filter((item): item is SmartFillTopicSuggestion => Boolean(item))
+    .sort((a, b) => b.score - a.score || a.subtopicName.localeCompare(b.subtopicName))
+    .slice(0, 3)
+}
+
+function buildSmartFillSuggestions(text: string, allTopics: Topic[], subjectId: string): SmartFillSuggestions {
+  return {
+    text,
+    questionNumber: detectQuestionNumber(text),
+    marks: detectMarks(text),
+    topics: suggestSmartFillTopics(text, allTopics, subjectId),
+  }
+}
+
 export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions = [] }: { papers: Paper[]; subjects: Subject[]; topics: Topic[]; paperQuestions?: PaperQuestion[] }) {
   const router = useRouter()
   const defaultSubjectId = subjects.find((subject) => subject.name === 'Mathematics Extended')?.id || subjects.find((subject) => subject.name === 'Mathematics')?.id || subjects[0]?.id || ''
@@ -491,6 +593,9 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
   const [lightbox, setLightbox] = useState<LightboxState>(null)
   const [cropResetToken, setCropResetToken] = useState(0)
   const [savingMode, setSavingMode] = useState<SavingMode>(null)
+  const [smartFillCropId, setSmartFillCropId] = useState('')
+  const [smartFillLoading, setSmartFillLoading] = useState(false)
+  const [smartFillSuggestions, setSmartFillSuggestions] = useState<SmartFillSuggestions | null>(null)
 
   const step3Ref = useRef<HTMLDivElement>(null)
   const savingModeRef = useRef<SavingMode>(null)
@@ -518,18 +623,67 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
     setTopicGroupId('')
     setSelectedSubtopicIds([])
     setPrimaryTopicId('')
+    setSmartFillSuggestions(null)
   }
 
   function addQuestionCrop(file: File) {
     const preview = makeCropPreview(file)
+    if (!questionFiles.length) setSmartFillCropId(preview.id)
+    setSmartFillSuggestions(null)
     setQuestionFiles((files) => [...files, preview])
     setQuestionOrder((order) => [...order, `new:${preview.id}`])
+  }
+
+  function updateQuestionFiles(files: LocalPreview[]) {
+    setQuestionFiles(files)
+    setSmartFillSuggestions(null)
+    if (!files.length) setSmartFillCropId('')
   }
 
   function addMarkschemeCrop(file: File) {
     const preview = makeCropPreview(file)
     setMarkschemeFiles((files) => [...files, preview])
     setMarkschemeOrder((order) => [...order, `new:${preview.id}`])
+  }
+
+  async function runSmartFill() {
+    const crop = questionFiles.find((file) => file.id === effectiveSmartFillCropId) || questionFiles[0]
+    if (!crop || smartFillLoading) return
+    setSmartFillLoading(true)
+    setSmartFillSuggestions(null)
+    try {
+      const { recognize } = await import('tesseract.js')
+      const result = await recognize(crop.file, 'eng')
+      const text = result.data.text.trim()
+      if (!text) throw new Error('No OCR text returned')
+      setSmartFillSuggestions(buildSmartFillSuggestions(text, topics, subjectId))
+      toast.success('Smart Fill suggestions ready.')
+    } catch {
+      toast.error('Could not read this crop. Try a clearer crop.')
+    } finally {
+      setSmartFillLoading(false)
+    }
+  }
+
+  function applySmartFillQuestionNumber() {
+    if (smartFillSuggestions?.questionNumber) setQuestionNumber(smartFillSuggestions.questionNumber)
+  }
+
+  function applySmartFillMarks() {
+    if (smartFillSuggestions?.marks) setMarks(smartFillSuggestions.marks)
+  }
+
+  function applySmartFillTopic(suggestion = smartFillSuggestions?.topics[0]) {
+    if (!suggestion) return
+    setTopicGroupId(suggestion.groupId)
+    setSelectedSubtopicIds((current) => current.includes(suggestion.subtopicId) ? current : [suggestion.subtopicId])
+    setPrimaryTopicId(suggestion.subtopicId)
+  }
+
+  function applyAllSmartFillSuggestions() {
+    applySmartFillQuestionNumber()
+    applySmartFillMarks()
+    applySmartFillTopic()
   }
 
   const filteredPapers = availablePapers.filter((paper) => !subjectId || relationLabel(paper.subjects, 'id') === subjectId)
@@ -551,6 +705,7 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
   const markschemeLightboxItems = orderedPreviewItems([], markschemeFiles, markschemeOrder, 'Mark scheme image')
   const suggestedOrder = suggestedQuestionOrder(paperMode, paperId, availablePaperQuestions)
   const orderReference = paperQuestionReference(paperMode, paperId, availablePaperQuestions)
+  const effectiveSmartFillCropId = questionFiles.some((file) => file.id === smartFillCropId) ? smartFillCropId : questionFiles[0]?.id || ''
 
   function clearCropPreviews() {
     questionFiles.forEach((file) => URL.revokeObjectURL(file.url))
@@ -560,6 +715,8 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
     setQuestionOrder([])
     setMarkschemeOrder([])
     setLightbox(null)
+    setSmartFillCropId('')
+    setSmartFillSuggestions(null)
     setCropResetToken((value) => value + 1)
   }
 
@@ -673,7 +830,7 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
         <StepCard step={3} title="Crop question images" state={!step2Complete ? 'locked' : step3Complete ? 'complete' : 'current'} helper="Crop every part needed to answer this question.">
           <PdfCropPanel title="Paper PDF cropper" helper="Use this for question text, diagrams, tables, graphs, and continuation pages." fileState={paperFile} pdfType="paper" cropLabel="Question crop" addLabel="Add crop to question images" onAddCrop={addQuestionCrop} nextFileName={() => `question-${questionNumber.trim() || 'untitled'}-crop-${questionFiles.length + 1}.png`} resetToken={cropResetToken} />
           <div className="mt-5">
-            <ImageUploadGroup title="Question image" name="question_image_file" fileKeyName="question_file_key" assetOrderName="question_asset_order" existingAssets={[]} files={questionFiles} setFiles={setQuestionFiles} order={questionOrder} setOrder={setQuestionOrder} onPreview={(index) => setLightbox({ group: 'question', index })} />
+            <ImageUploadGroup title="Question image" name="question_image_file" fileKeyName="question_file_key" assetOrderName="question_asset_order" existingAssets={[]} files={questionFiles} setFiles={updateQuestionFiles} order={questionOrder} setOrder={setQuestionOrder} onPreview={(index) => setLightbox({ group: 'question', index })} />
           </div>
         </StepCard>
       </div>
@@ -686,6 +843,64 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
       </StepCard>
 
       <StepCard step={5} title="Question details and topics" state={!step4Complete ? 'locked' : step5Complete ? 'complete' : 'current'} helper="Add the required labels before saving.">
+        <div className="mb-5 rounded-md border border-blue-100 bg-blue-50/60 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="font-body text-sm font-semibold text-[#00152a]">Smart Fill suggestions</h3>
+              <p className="mt-1 font-body text-sm text-[#43474d]">Uses OCR on the selected question crop to suggest question number, marks, and topic tags. Review before saving.</p>
+              {!questionFiles.length ? <p className="mt-2 font-body text-xs font-semibold text-amber-800">Add a question crop first.</p> : null}
+            </div>
+            <button type="button" onClick={runSmartFill} disabled={!questionFiles.length || smartFillLoading} className="tsm-btn-primary disabled:cursor-not-allowed disabled:opacity-50">{smartFillLoading ? 'Reading crop…' : 'Smart fill from question crop'}</button>
+          </div>
+          {questionFiles.length > 1 ? (
+            <div className="mt-4 flex flex-wrap gap-2" aria-label="Choose question crop for Smart Fill">
+              {questionFiles.map((file, index) => {
+                const selected = effectiveSmartFillCropId === file.id
+                return <button key={file.id} type="button" onClick={() => { setSmartFillCropId(file.id); setSmartFillSuggestions(null) }} className={`rounded-full border px-3 py-1 font-body text-xs font-semibold transition enabled:cursor-pointer ${selected ? 'border-blue-500 bg-white text-blue-800 ring-2 ring-blue-100' : 'border-slate-200 bg-white text-[#43474d] hover:border-blue-300 hover:bg-blue-50'}`}>Question image {index + 1}</button>
+              })}
+            </div>
+          ) : null}
+          {smartFillSuggestions ? (
+            <div className="mt-4 rounded-md border border-[#c3c6ce66] bg-white p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="font-body text-sm font-semibold text-emerald-700">OCR complete. Review each suggestion before applying.</p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={applyAllSmartFillSuggestions} className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 font-body text-xs font-semibold text-blue-800 hover:bg-blue-100 enabled:cursor-pointer">Apply all suggestions</button>
+                  <button type="button" onClick={() => setSmartFillSuggestions(null)} className="rounded-md border border-slate-200 px-3 py-2 font-body text-xs font-semibold text-slate-700 hover:bg-slate-50 enabled:cursor-pointer">Dismiss</button>
+                </div>
+              </div>
+              <details className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+                <summary className="cursor-pointer font-body text-sm font-semibold text-[#00152a]">Extracted text preview</summary>
+                <p className="mt-2 whitespace-pre-wrap font-body text-xs text-[#43474d]">{smartFillSuggestions.text.slice(0, 1000)}</p>
+              </details>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="rounded-md border border-slate-200 p-3">
+                  <p className="font-body text-xs font-semibold uppercase tracking-wide text-[#6f737b]">Question number</p>
+                  <p className="mt-1 font-body text-sm text-[#00152a]">{smartFillSuggestions.questionNumber || 'No suggestion found'}</p>
+                  {questionNumber && smartFillSuggestions.questionNumber ? <p className="mt-1 font-body text-xs text-amber-800">Replace current value only if you click Use.</p> : null}
+                  <button type="button" onClick={applySmartFillQuestionNumber} disabled={!smartFillSuggestions.questionNumber} className="mt-3 rounded-md border border-blue-200 px-3 py-2 font-body text-xs font-semibold text-blue-700 hover:bg-blue-50 enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50">Use question number</button>
+                </div>
+                <div className="rounded-md border border-slate-200 p-3">
+                  <p className="font-body text-xs font-semibold uppercase tracking-wide text-[#6f737b]">Marks</p>
+                  <p className="mt-1 font-body text-sm text-[#00152a]">{smartFillSuggestions.marks || 'No suggestion found'}</p>
+                  {marks && smartFillSuggestions.marks ? <p className="mt-1 font-body text-xs text-amber-800">Replace current value only if you click Use.</p> : null}
+                  <button type="button" onClick={applySmartFillMarks} disabled={!smartFillSuggestions.marks} className="mt-3 rounded-md border border-blue-200 px-3 py-2 font-body text-xs font-semibold text-blue-700 hover:bg-blue-50 enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50">Use marks</button>
+                </div>
+                <div className="rounded-md border border-slate-200 p-3">
+                  <p className="font-body text-xs font-semibold uppercase tracking-wide text-[#6f737b]">Topic</p>
+                  {smartFillSuggestions.topics.length ? smartFillSuggestions.topics.map((suggestion) => (
+                    <div key={suggestion.subtopicId} className="mt-2 rounded-md bg-slate-50 p-2">
+                      <p className="font-body text-sm font-semibold text-[#00152a]">{suggestion.groupName}</p>
+                      <p className="font-body text-sm text-[#43474d]">{suggestion.subtopicName}</p>
+                      <p className="mt-1 font-body text-xs text-[#6f737b]">{suggestion.confidence} confidence</p>
+                      <button type="button" onClick={() => applySmartFillTopic(suggestion)} className="mt-2 rounded-md border border-blue-200 px-3 py-2 font-body text-xs font-semibold text-blue-700 hover:bg-blue-50 enabled:cursor-pointer">Use this topic</button>
+                    </div>
+                  )) : <p className="mt-1 font-body text-sm text-[#00152a]">No controlled topic match found</p>}
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
         <div className="grid gap-4 md:grid-cols-3">
           <label className="font-body text-sm text-[#43474d]">Question number<input name="question_number" value={questionNumber} onChange={(event) => setQuestionNumber(event.target.value)} className="tsm-input mt-1 w-full" placeholder="1a" /></label>
           <label className="font-body text-sm text-[#43474d]">Order in paper<input name="question_order" value={questionOrderValue} onChange={(event) => setQuestionOrderValue(event.target.value)} inputMode="decimal" className="tsm-input mt-1 w-full" placeholder="1" /><span className="mt-1 block text-xs text-[#6f737b]">Controls where this question appears in lists. Use 1 for the first question, 2 for the next, and so on.</span><OrderInPaperHelper suggestedOrder={suggestedOrder} questions={orderReference} onUseSuggested={() => setQuestionOrderValue(String(suggestedOrder))} /></label>
