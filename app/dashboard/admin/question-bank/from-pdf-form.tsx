@@ -78,7 +78,7 @@ function PdfFileInput({ id, label, value, onChange }: { id: string; label: strin
         {value ? <button type="button" onClick={() => setFile(undefined)} className="rounded-md border border-red-200 px-3 py-2 font-body text-sm font-semibold text-red-700 hover:bg-red-50">Remove</button> : null}
       </div>
       <p className="mt-3 font-body text-sm text-[#43474d]">{value ? value.file.name : 'No PDF selected yet.'}</p>
-      <p className="mt-1 font-body text-xs text-[#6f737b]">This PDF stays local in your browser. Only cropped images are saved.</p>
+      
     </div>
   )
 }
@@ -401,8 +401,7 @@ function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="font-headline text-2xl text-[#00152a]">{title}</h3>
-          <p className="mt-1 font-body text-sm text-[#43474d]">{helper}</p>
-          <p className="mt-2 font-body text-sm font-semibold text-[#00152a]">Drag to select an area. Adjust the crop, then add it.</p>
+          <p className="mt-1 font-body text-sm text-[#43474d]">Drag to select an area. Adjust the crop, then add it.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" aria-label="Zoom out" onClick={() => changeZoom((value) => Math.max(0.7, Number((value - 0.2).toFixed(1))))} disabled={!canZoomOut} className="rounded-md border border-[#c3c6ce66] bg-white p-2 text-[#00152a] shadow-sm transition hover:bg-slate-50 enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"><ZoomOut className="h-4 w-4" aria-hidden="true" /></button>
@@ -410,9 +409,9 @@ function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, 
           <button type="button" aria-label="Zoom in" onClick={() => changeZoom((value) => Math.min(2.4, Number((value + 0.2).toFixed(1))))} disabled={!canZoomIn} className="rounded-md border border-[#c3c6ce66] bg-white p-2 text-[#00152a] shadow-sm transition hover:bg-slate-50 enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"><ZoomIn className="h-4 w-4" aria-hidden="true" /></button>
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-3 font-body text-sm text-[#43474d]">
-        <span>{pageCount ? `${pageCount} page${pageCount === 1 ? '' : 's'}` : 'No pages loaded'}</span>
-        <span>Zoom {Math.round(zoom * 100)}%</span>
+      <div className="mt-1 flex flex-wrap items-center gap-3 font-body text-sm text-[#43474d]">
+        <span><b>{pageCount ? `${pageCount} page${pageCount === 1 ? '' : 's'}` : 'No pages loaded'}</b></span>
+        <span><b>Zoom {Math.round(zoom * 100)}%</b></span>
         {crop ? <span className="font-semibold text-blue-700">Current crop: page {crop.pageNumber}</span> : null}
         {loading ? <span className="font-semibold text-blue-700">Loading…</span> : null}
       </div>
