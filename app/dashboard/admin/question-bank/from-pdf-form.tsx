@@ -1,6 +1,7 @@
 "use client"
 
-import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { createQuestion } from './actions'
@@ -26,7 +27,17 @@ type PdfDocumentProxy = import('pdfjs-dist').PDFDocumentProxy
 
 type PdfFileState = { file: File; url: string } | null
 type PdfCropType = 'paper' | 'markscheme'
-type CropRect = { pdfType: PdfCropType; pageNumber: number; x: number; y: number; width: number; height: number } | null
+type ActiveCropRect = { pdfType: PdfCropType; pageNumber: number; x: number; y: number; width: number; height: number }
+type CropRect = ActiveCropRect | null
+type CropHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
+type CropInteraction =
+  | { mode: 'draw'; pageNumber: number; startX: number; startY: number }
+  | { mode: 'move'; pageNumber: number; startX: number; startY: number; original: ActiveCropRect }
+  | { mode: 'resize'; pageNumber: number; handle: CropHandle; startX: number; startY: number; original: ActiveCropRect }
+
+const MIN_CROP_SIZE = 16
+const HANDLE_CLASS = 'absolute h-3 w-3 rounded-sm border border-white bg-blue-700 shadow-sm'
+const HANDLE_CURSORS: Record<CropHandle, string> = { nw: 'cursor-nwse-resize', n: 'cursor-ns-resize', ne: 'cursor-nesw-resize', e: 'cursor-ew-resize', se: 'cursor-nwse-resize', s: 'cursor-ns-resize', sw: 'cursor-nesw-resize', w: 'cursor-ew-resize' }
 
 type PdfCropPanelProps = {
   title: string
@@ -67,10 +78,11 @@ function PdfFileInput({ id, label, value, onChange }: { id: string; label: strin
   )
 }
 
-function PdfPageCanvas({ pdf, pageNumber, zoom, canUsePdf, crop, onBeginCrop, onUpdateCrop, onFinishCrop, registerCanvas, onRenderError }: { pdf: PdfDocumentProxy; pageNumber: number; zoom: number; canUsePdf: boolean; crop: CropRect; onBeginCrop: (event: MouseEvent<HTMLDivElement>, pageNumber: number) => void; onUpdateCrop: (event: MouseEvent<HTMLDivElement>, pageNumber: number) => void; onFinishCrop: () => void; registerCanvas: (pageNumber: number, canvas: HTMLCanvasElement | null) => void; onRenderError: () => void }) {
+function PdfPageCanvas({ pdf, pageNumber, zoom, canUsePdf, crop, canAddCrop, addLabel, invalidMessage, onBeginCrop, onBeginMoveCrop, onBeginResizeCrop, onUpdateCrop, onFinishCrop, onAddCrop, registerCanvas, onRenderError }: { pdf: PdfDocumentProxy; pageNumber: number; zoom: number; canUsePdf: boolean; crop: CropRect; canAddCrop: boolean; addLabel: string; invalidMessage: string | null; onBeginCrop: (event: MouseEvent<HTMLDivElement>, pageNumber: number) => void; onBeginMoveCrop: (event: MouseEvent<HTMLDivElement>, crop: ActiveCropRect) => void; onBeginResizeCrop: (event: MouseEvent<HTMLButtonElement>, crop: ActiveCropRect, handle: CropHandle) => void; onUpdateCrop: (event: MouseEvent<HTMLDivElement>, pageNumber: number) => void; onFinishCrop: () => void; onAddCrop: () => void; registerCanvas: (pageNumber: number, canvas: HTMLCanvasElement | null) => void; onRenderError: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null)
   const [rendering, setRendering] = useState(false)
+  const [pageSize, setPageSize] = useState({ width: 0, height: 0 })
 
   useEffect(() => {
     let cancelled = false
@@ -88,8 +100,11 @@ function PdfPageCanvas({ pdf, pageNumber, zoom, canUsePdf, crop, onBeginCrop, on
         if (!context) throw new Error('Missing canvas context')
         canvas.width = Math.round(viewport.width * renderScale)
         canvas.height = Math.round(viewport.height * renderScale)
-        canvas.style.width = `${Math.round(viewport.width)}px`
-        canvas.style.height = `${Math.round(viewport.height)}px`
+        const displayWidth = Math.round(viewport.width)
+        const displayHeight = Math.round(viewport.height)
+        canvas.style.width = `${displayWidth}px`
+        canvas.style.height = `${displayHeight}px`
+        setPageSize({ width: displayWidth, height: displayHeight })
         context.setTransform(renderScale, 0, 0, renderScale, 0, 0)
         const task = page.render({ canvas, canvasContext: context, viewport })
         renderTaskRef.current = task
@@ -108,6 +123,22 @@ function PdfPageCanvas({ pdf, pageNumber, zoom, canUsePdf, crop, onBeginCrop, on
   }, [pdf, pageNumber, zoom, onRenderError])
 
   const activeCrop = crop?.pageNumber === pageNumber ? crop : null
+  const canvasWidth = pageSize.width
+  const canvasHeight = pageSize.height
+  const buttonWidth = 176
+  const floatingLeft = activeCrop ? Math.min(Math.max(activeCrop.x, 4), Math.max(4, canvasWidth - buttonWidth - 4)) : 0
+  const belowCropTop = activeCrop ? activeCrop.y + activeCrop.height + 8 : 0
+  const floatingTop = activeCrop ? (belowCropTop + 36 <= canvasHeight ? belowCropTop : Math.max(4, activeCrop.y - 44)) : 0
+  const cropHandles: Array<{ handle: CropHandle; className: string; style: CSSProperties }> = activeCrop ? [
+    { handle: 'nw', className: '-left-1.5 -top-1.5', style: {} },
+    { handle: 'n', className: 'left-1/2 -top-1.5', style: { transform: 'translateX(-50%)' } },
+    { handle: 'ne', className: '-right-1.5 -top-1.5', style: {} },
+    { handle: 'e', className: '-right-1.5 top-1/2', style: { transform: 'translateY(-50%)' } },
+    { handle: 'se', className: '-bottom-1.5 -right-1.5', style: {} },
+    { handle: 's', className: '-bottom-1.5 left-1/2', style: { transform: 'translateX(-50%)' } },
+    { handle: 'sw', className: '-bottom-1.5 -left-1.5', style: {} },
+    { handle: 'w', className: '-left-1.5 top-1/2', style: { transform: 'translateY(-50%)' } },
+  ] : []
 
   return (
     <div className="mx-auto w-fit rounded-md border border-slate-200 bg-slate-50 p-3 shadow-sm">
@@ -117,7 +148,32 @@ function PdfPageCanvas({ pdf, pageNumber, zoom, canUsePdf, crop, onBeginCrop, on
       </div>
       <div className="relative inline-block select-none" onMouseDown={(event) => onBeginCrop(event, pageNumber)} onMouseMove={(event) => onUpdateCrop(event, pageNumber)} onMouseUp={onFinishCrop} onMouseLeave={onFinishCrop}>
         <canvas ref={(canvas) => { canvasRef.current = canvas; registerCanvas(pageNumber, canvas) }} className={`block bg-white shadow-sm ${canUsePdf && !rendering ? 'cursor-crosshair' : 'cursor-not-allowed opacity-60'}`} />
-        {activeCrop ? <div className="pointer-events-none absolute border-2 border-blue-600 bg-blue-500/15 shadow-[0_0_0_9999px_rgba(15,23,42,0.12)]" style={{ left: activeCrop.x, top: activeCrop.y, width: activeCrop.width, height: activeCrop.height }} /> : null}
+        {activeCrop ? (
+          <>
+            <div
+              className="absolute border-2 border-blue-600 bg-blue-500/15 shadow-[0_0_0_9999px_rgba(15,23,42,0.12)] cursor-move"
+              style={{ left: activeCrop.x, top: activeCrop.y, width: activeCrop.width, height: activeCrop.height }}
+              onMouseDown={(event) => onBeginMoveCrop(event, activeCrop)}
+            >
+              {cropHandles.map(({ handle, className, style }) => (
+                <button
+                  key={handle}
+                  type="button"
+                  aria-label={`Resize crop ${handle}`}
+                  className={`${HANDLE_CLASS} ${HANDLE_CURSORS[handle]} ${className}`}
+                  style={style}
+                  onMouseDown={(event) => onBeginResizeCrop(event, activeCrop, handle)}
+                />
+              ))}
+            </div>
+            <div className="absolute z-10 max-w-[220px]" style={{ left: floatingLeft, top: floatingTop }} onMouseDown={(event) => event.stopPropagation()}>
+              <button type="button" onClick={onAddCrop} disabled={!canAddCrop} className="rounded-md bg-blue-700 px-3 py-2 font-body text-xs font-semibold text-white shadow-lg transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600">
+                {addLabel}
+              </button>
+              {invalidMessage ? <p className="mt-1 rounded bg-white/95 px-2 py-1 font-body text-xs font-semibold text-amber-800 shadow-sm">{invalidMessage}</p> : null}
+            </div>
+          </>
+        ) : null}
       </div>
     </div>
   )
@@ -129,9 +185,21 @@ function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, 
   const [pageCount, setPageCount] = useState(0)
   const [zoom, setZoom] = useState(1.2)
   const [crop, setCrop] = useState<CropRect>(null)
-  const [dragStart, setDragStart] = useState<{ pageNumber: number; x: number; y: number } | null>(null)
+  const [interaction, setInteraction] = useState<CropInteraction | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!crop) return
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setCrop(null)
+        setInteraction(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [crop])
 
   useEffect(() => {
     // Reset PDF viewer state when the local object URL changes.
@@ -168,7 +236,7 @@ function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, 
 
   function changeZoom(nextZoom: (current: number) => number) {
     setCrop(null)
-    setDragStart(null)
+    setInteraction(null)
     setZoom(nextZoom)
   }
 
@@ -183,7 +251,12 @@ function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, 
     setError('Could not render a PDF page. Try changing zoom or selecting another PDF.')
   }, [])
 
-  function pointFromEvent(event: MouseEvent<HTMLDivElement>, pageNumber: number) {
+  function pageBounds(pageNumber: number) {
+    const rect = canvasRefs.current.get(pageNumber)?.getBoundingClientRect()
+    return { width: rect?.width ?? 0, height: rect?.height ?? 0 }
+  }
+
+  function pointFromEvent(event: MouseEvent<HTMLElement>, pageNumber: number) {
     const rect = canvasRefs.current.get(pageNumber)?.getBoundingClientRect()
     if (!rect) return { x: 0, y: 0 }
     return {
@@ -192,33 +265,90 @@ function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, 
     }
   }
 
+  function clampCrop(nextCrop: ActiveCropRect): ActiveCropRect {
+    const bounds = pageBounds(nextCrop.pageNumber)
+    const width = Math.min(Math.max(2, nextCrop.width), bounds.width || nextCrop.width)
+    const height = Math.min(Math.max(2, nextCrop.height), bounds.height || nextCrop.height)
+    return {
+      ...nextCrop,
+      width,
+      height,
+      x: Math.max(0, Math.min(nextCrop.x, Math.max(0, bounds.width - width))),
+      y: Math.max(0, Math.min(nextCrop.y, Math.max(0, bounds.height - height))),
+    }
+  }
+
+  function cropFromResize(interactionState: Extract<CropInteraction, { mode: 'resize' }>, point: { x: number; y: number }) {
+    const { original, handle } = interactionState
+    const right = original.x + original.width
+    const bottom = original.y + original.height
+    let left = original.x
+    let top = original.y
+    let nextRight = right
+    let nextBottom = bottom
+
+    if (handle.includes('w')) left = Math.min(point.x, right - 2)
+    if (handle.includes('e')) nextRight = Math.max(point.x, left + 2)
+    if (handle.includes('n')) top = Math.min(point.y, bottom - 2)
+    if (handle.includes('s')) nextBottom = Math.max(point.y, top + 2)
+
+    return clampCrop({ ...original, x: left, y: top, width: nextRight - left, height: nextBottom - top })
+  }
+
   function beginCrop(event: MouseEvent<HTMLDivElement>, pageNumber: number) {
-    if (!pdf || loading) return
+    if (!pdf || loading || event.button !== 0) return
     const point = pointFromEvent(event, pageNumber)
-    setDragStart({ pageNumber, ...point })
+    setInteraction({ mode: 'draw', pageNumber, startX: point.x, startY: point.y })
     setCrop({ pdfType, pageNumber, x: point.x, y: point.y, width: 0, height: 0 })
   }
 
+  function beginMoveCrop(event: MouseEvent<HTMLDivElement>, activeCrop: ActiveCropRect) {
+    if (!pdf || loading || event.button !== 0) return
+    event.stopPropagation()
+    const point = pointFromEvent(event, activeCrop.pageNumber)
+    setInteraction({ mode: 'move', pageNumber: activeCrop.pageNumber, startX: point.x, startY: point.y, original: activeCrop })
+  }
+
+  function beginResizeCrop(event: MouseEvent<HTMLButtonElement>, activeCrop: ActiveCropRect, handle: CropHandle) {
+    if (!pdf || loading || event.button !== 0) return
+    event.stopPropagation()
+    const point = pointFromEvent(event, activeCrop.pageNumber)
+    setInteraction({ mode: 'resize', pageNumber: activeCrop.pageNumber, handle, startX: point.x, startY: point.y, original: activeCrop })
+  }
+
   function updateCrop(event: MouseEvent<HTMLDivElement>, pageNumber: number) {
-    if (!dragStart || dragStart.pageNumber !== pageNumber) return
+    if (!interaction || interaction.pageNumber !== pageNumber) return
     const point = pointFromEvent(event, pageNumber)
-    setCrop({
-      pdfType,
-      pageNumber,
-      x: Math.min(dragStart.x, point.x),
-      y: Math.min(dragStart.y, point.y),
-      width: Math.abs(point.x - dragStart.x),
-      height: Math.abs(point.y - dragStart.y),
-    })
+
+    if (interaction.mode === 'draw') {
+      setCrop(clampCrop({
+        pdfType,
+        pageNumber,
+        x: Math.min(interaction.startX, point.x),
+        y: Math.min(interaction.startY, point.y),
+        width: Math.abs(point.x - interaction.startX),
+        height: Math.abs(point.y - interaction.startY),
+      }))
+      return
+    }
+
+    if (interaction.mode === 'move') {
+      const dx = point.x - interaction.startX
+      const dy = point.y - interaction.startY
+      setCrop(clampCrop({ ...interaction.original, x: interaction.original.x + dx, y: interaction.original.y + dy }))
+      return
+    }
+
+    setCrop(cropFromResize(interaction, point))
   }
 
   function finishCrop() {
-    setDragStart(null)
-    setCrop((current) => current && current.width > 8 && current.height > 8 ? current : null)
+    setInteraction(null)
+    setCrop((current) => current && current.width >= 2 && current.height >= 2 ? current : null)
   }
 
   function addCrop() {
-    if (!crop) return
+    if (!canAddCrop || !crop) return
     const canvas = canvasRefs.current.get(crop.pageNumber)
     if (!canvas) return
     const cssWidth = Number.parseFloat(canvas.style.width) || canvas.width
@@ -245,7 +375,12 @@ function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, 
   }
 
   const canUsePdf = Boolean(pdf && !loading && !error)
-  const canAddCrop = Boolean(crop && crop.width > 8 && crop.height > 8 && canUsePdf)
+  const canAddCrop = Boolean(crop && crop.width >= MIN_CROP_SIZE && crop.height >= MIN_CROP_SIZE && canUsePdf)
+  const canZoomOut = canUsePdf && zoom > 0.7
+  const canResetZoom = canUsePdf && zoom !== 1.2
+  const canZoomIn = canUsePdf && zoom < 2.4
+  const cropInvalidMessage = crop && !canAddCrop ? 'Crop area is too small.' : null
+  const floatingAddLabel = pdfType === 'paper' ? 'Add question crop' : 'Add mark scheme crop'
 
   return (
     <div className="rounded-md border border-[#c3c6ce66] bg-[#fbf9f4] p-4">
@@ -253,12 +388,12 @@ function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, 
         <div>
           <h3 className="font-headline text-2xl text-[#00152a]">{title}</h3>
           <p className="mt-1 font-body text-sm text-[#43474d]">{helper}</p>
-          <p className="mt-2 font-body text-sm font-semibold text-[#00152a]">Scroll through the PDF, then drag over a page to crop the exact area needed.</p>
+          <p className="mt-2 font-body text-sm font-semibold text-[#00152a]">Drag to select an area. Adjust the crop, then add it.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => changeZoom((value) => Math.max(0.7, Number((value - 0.2).toFixed(1))))} disabled={!canUsePdf} className="tsm-btn-secondary disabled:cursor-not-allowed disabled:opacity-50">Zoom out</button>
-          <button type="button" onClick={() => changeZoom(() => 1.2)} disabled={!canUsePdf} className="tsm-btn-secondary disabled:cursor-not-allowed disabled:opacity-50">Reset zoom</button>
-          <button type="button" onClick={() => changeZoom((value) => Math.min(2.4, Number((value + 0.2).toFixed(1))))} disabled={!canUsePdf} className="tsm-btn-secondary disabled:cursor-not-allowed disabled:opacity-50">Zoom in</button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" aria-label="Zoom out" onClick={() => changeZoom((value) => Math.max(0.7, Number((value - 0.2).toFixed(1))))} disabled={!canZoomOut} className="rounded-md border border-[#c3c6ce66] bg-white p-2 text-[#00152a] shadow-sm transition hover:bg-slate-50 enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"><ZoomOut className="h-4 w-4" aria-hidden="true" /></button>
+          <button type="button" aria-label="Reset zoom" onClick={() => changeZoom(() => 1.2)} disabled={!canResetZoom} className="rounded-md border border-[#c3c6ce66] bg-white p-2 text-[#00152a] shadow-sm transition hover:bg-slate-50 enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"><RotateCcw className="h-4 w-4" aria-hidden="true" /></button>
+          <button type="button" aria-label="Zoom in" onClick={() => changeZoom((value) => Math.min(2.4, Number((value + 0.2).toFixed(1))))} disabled={!canZoomIn} className="rounded-md border border-[#c3c6ce66] bg-white p-2 text-[#00152a] shadow-sm transition hover:bg-slate-50 enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"><ZoomIn className="h-4 w-4" aria-hidden="true" /></button>
         </div>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-3 font-body text-sm text-[#43474d]">
@@ -274,7 +409,7 @@ function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, 
           {pdf ? (
             <div className="space-y-5">
               {pageNumbers.map((pageNumber) => (
-                <PdfPageCanvas key={`${fileState.url}-${pageNumber}`} pdf={pdf} pageNumber={pageNumber} zoom={zoom} canUsePdf={canUsePdf} crop={crop} onBeginCrop={beginCrop} onUpdateCrop={updateCrop} onFinishCrop={finishCrop} registerCanvas={registerCanvas} onRenderError={handleRenderError} />
+                <PdfPageCanvas key={`${fileState.url}-${pageNumber}`} pdf={pdf} pageNumber={pageNumber} zoom={zoom} canUsePdf={canUsePdf} crop={crop} canAddCrop={canAddCrop} addLabel={floatingAddLabel} invalidMessage={cropInvalidMessage} onBeginCrop={beginCrop} onBeginMoveCrop={beginMoveCrop} onBeginResizeCrop={beginResizeCrop} onUpdateCrop={updateCrop} onFinishCrop={finishCrop} onAddCrop={addCrop} registerCanvas={registerCanvas} onRenderError={handleRenderError} />
               ))}
             </div>
           ) : <p className="rounded-md border border-slate-200 bg-white px-4 py-8 text-center font-body text-sm text-slate-500">Loading PDF pages…</p>}
