@@ -84,6 +84,7 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
           <p className="mt-2 font-body text-[#43474d]">Manage individual past-paper questions for topic-based practice.</p>
         </div>
         <div className="flex flex-wrap gap-3">
+          <Link href="/dashboard/admin/question-bank/from-pdf" className="tsm-btn-secondary">Create from PDF</Link>
           <Link href="/dashboard/admin/question-bank/new" className="tsm-btn-primary">Add question</Link>
         </div>
       </header>
