@@ -227,8 +227,12 @@ async function createQuestionRecord(supabase: Awaited<ReturnType<typeof requireA
 
 export async function createQuestion(formData: FormData) {
   const supabase = await requireAdmin()
-  const questionId = await createQuestionRecord(supabase, formData)
-  redirect(`/dashboard/admin/question-bank/${questionId}/edit`)
+  try {
+    const questionId = await createQuestionRecord(supabase, formData)
+    return { ok: true as const, questionId, message: 'Question created' }
+  } catch (error) {
+    return { ok: false as const, message: error instanceof Error ? error.message : 'Could not create question.' }
+  }
 }
 
 export async function createQuestionForPdfFlow(formData: FormData) {
@@ -243,31 +247,35 @@ export async function createQuestionForPdfFlow(formData: FormData) {
 
 export async function updateQuestion(formData: FormData) {
   const supabase = await requireAdmin()
-  const questionId = stringValue(formData, 'question_id')
-  const paperId = await ensurePaper(supabase, formData)
-  const questionAssetPaths = await uploadQuestionAssets(supabase, uploadedFiles(formData, 'question_image_file'), 'questions')
-  const markschemeAssetPaths = await uploadQuestionAssets(supabase, uploadedFiles(formData, 'markscheme_image_file'), 'markschemes')
-  const questionAssetPath = questionAssetPaths[0] || null
-  const markschemeAssetPath = markschemeAssetPaths[0] || null
+  try {
+    const questionId = stringValue(formData, 'question_id')
+    const paperId = await ensurePaper(supabase, formData)
+    const questionAssetPaths = await uploadQuestionAssets(supabase, uploadedFiles(formData, 'question_image_file'), 'questions')
+    const markschemeAssetPaths = await uploadQuestionAssets(supabase, uploadedFiles(formData, 'markscheme_image_file'), 'markschemes')
+    const questionAssetPath = questionAssetPaths[0] || null
+    const markschemeAssetPath = markschemeAssetPaths[0] || null
 
-  const { error } = await supabase
-    .from('questions')
-    .update(questionPayload(formData, paperId, questionAssetPath, markschemeAssetPath))
-    .eq('id', questionId)
+    const { error } = await supabase
+      .from('questions')
+      .update(questionPayload(formData, paperId, questionAssetPath, markschemeAssetPath))
+      .eq('id', questionId)
 
-  if (error) throw new Error('Could not update question.')
+    if (error) throw new Error('Could not update question.')
 
-  const insertedQuestionAssets = await insertQuestionAssets(supabase, questionId, 'question', questionAssetPaths)
-  const insertedMarkschemeAssets = await insertQuestionAssets(supabase, questionId, 'markscheme', markschemeAssetPaths)
-  const firstQuestionAssetPath = await applyAssetOrder(supabase, questionId, 'question', 'question_asset_order', 'question_file_key', insertedQuestionAssets, formData)
-  const firstMarkschemeAssetPath = await applyAssetOrder(supabase, questionId, 'markscheme', 'markscheme_asset_order', 'markscheme_file_key', insertedMarkschemeAssets, formData)
-  await supabase.from('questions').update({
-    question_image_path: firstQuestionAssetPath || questionAssetPath || stringValue(formData, 'question_image_path') || null,
-    markscheme_image_path: firstMarkschemeAssetPath || markschemeAssetPath || stringValue(formData, 'markscheme_image_path') || null,
-  }).eq('id', questionId)
-  await syncTopics(supabase, questionId, formData)
-  revalidatePath('/dashboard/admin/question-bank')
-  revalidatePath(`/dashboard/admin/question-bank/${questionId}/edit`)
-  revalidatePath(`/practice/question/${questionId}`)
-  redirect('/dashboard/admin/question-bank')
+    const insertedQuestionAssets = await insertQuestionAssets(supabase, questionId, 'question', questionAssetPaths)
+    const insertedMarkschemeAssets = await insertQuestionAssets(supabase, questionId, 'markscheme', markschemeAssetPaths)
+    const firstQuestionAssetPath = await applyAssetOrder(supabase, questionId, 'question', 'question_asset_order', 'question_file_key', insertedQuestionAssets, formData)
+    const firstMarkschemeAssetPath = await applyAssetOrder(supabase, questionId, 'markscheme', 'markscheme_asset_order', 'markscheme_file_key', insertedMarkschemeAssets, formData)
+    await supabase.from('questions').update({
+      question_image_path: firstQuestionAssetPath || questionAssetPath || stringValue(formData, 'question_image_path') || null,
+      markscheme_image_path: firstMarkschemeAssetPath || markschemeAssetPath || stringValue(formData, 'markscheme_image_path') || null,
+    }).eq('id', questionId)
+    await syncTopics(supabase, questionId, formData)
+    revalidatePath('/dashboard/admin/question-bank')
+    revalidatePath(`/dashboard/admin/question-bank/${questionId}/edit`)
+    revalidatePath(`/practice/question/${questionId}`)
+    return { ok: true as const, questionId, message: 'Question updated' }
+  } catch (error) {
+    return { ok: false as const, message: error instanceof Error ? error.message : 'Could not update question.' }
+  }
 }

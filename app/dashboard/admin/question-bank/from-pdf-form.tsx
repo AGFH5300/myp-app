@@ -10,6 +10,7 @@ import {
   ChoiceCard,
   ImageUploadGroup,
   Lightbox,
+  OrderInPaperHelper,
   SearchableSelect,
   StepCard,
   orderedPreviewItems,
@@ -18,7 +19,10 @@ import {
   topicMatchesMainScope,
   type LightboxState,
   type LocalPreview,
+  paperQuestionReference,
+  suggestedQuestionOrder,
   type Paper,
+  type PaperQuestion,
   type Subject,
   type Topic,
 } from './form'
@@ -440,7 +444,7 @@ function FromPdfSubmitButton({ readyToSubmit, saving }: { readyToSubmit: boolean
   )
 }
 
-export function QuestionFromPdfForm({ papers, subjects, topics }: { papers: Paper[]; subjects: Subject[]; topics: Topic[] }) {
+export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions = [] }: { papers: Paper[]; subjects: Subject[]; topics: Topic[]; paperQuestions?: PaperQuestion[] }) {
   const router = useRouter()
   const defaultSubjectId = subjects.find((subject) => subject.name === 'Mathematics Extended')?.id || subjects.find((subject) => subject.name === 'Mathematics')?.id || subjects[0]?.id || ''
   const [paperMode, setPaperMode] = useState<'existing' | 'new'>('existing')
@@ -521,6 +525,8 @@ export function QuestionFromPdfForm({ papers, subjects, topics }: { papers: Pape
   const effectivePrimaryTopicId = selectedSubtopicIds.includes(primaryTopicId) ? primaryTopicId : selectedSubtopicIds[0] || topicGroupId
   const questionLightboxItems = orderedPreviewItems([], questionFiles, questionOrder, 'Question image')
   const markschemeLightboxItems = orderedPreviewItems([], markschemeFiles, markschemeOrder, 'Mark scheme image')
+  const suggestedOrder = suggestedQuestionOrder(paperMode, paperId, paperQuestions)
+  const orderReference = paperQuestionReference(paperMode, paperId, paperQuestions)
   const [saving, setSaving] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -539,14 +545,9 @@ export function QuestionFromPdfForm({ papers, subjects, topics }: { papers: Pape
         return
       }
 
-      if (!result.questionId) {
-        toast.error('Question created, but the new question ID was missing. Open Question Bank to find it.', { id: 'from-pdf-save' })
-        return
-      }
-
       navigating = true
       toast.success('Question created', { id: 'from-pdf-save' })
-      router.push(`/dashboard/admin/question-bank/${result.questionId}/edit`)
+      router.push('/dashboard/admin/question-bank')
     } catch (error) {
       toast.error(readableSaveError(error), { id: 'from-pdf-save' })
     } finally {
@@ -611,7 +612,7 @@ export function QuestionFromPdfForm({ papers, subjects, topics }: { papers: Pape
       <StepCard step={5} title="Question details and topics" state={!step4Complete ? 'locked' : step5Complete ? 'complete' : 'current'} helper="Add the required labels before saving.">
         <div className="grid gap-4 md:grid-cols-3">
           <label className="font-body text-sm text-[#43474d]">Question number<input name="question_number" value={questionNumber} onChange={(event) => setQuestionNumber(event.target.value)} className="tsm-input mt-1 w-full" placeholder="1a" /></label>
-          <label className="font-body text-sm text-[#43474d]">Order in paper<input name="question_order" value={questionOrderValue} onChange={(event) => setQuestionOrderValue(event.target.value)} inputMode="decimal" className="tsm-input mt-1 w-full" placeholder="1" /><span className="mt-1 block text-xs text-[#6f737b]">Controls where this question appears in lists. Use 1 for the first question, 2 for the next, and so on.</span></label>
+          <label className="font-body text-sm text-[#43474d]">Order in paper<input name="question_order" value={questionOrderValue} onChange={(event) => setQuestionOrderValue(event.target.value)} inputMode="decimal" className="tsm-input mt-1 w-full" placeholder="1" /><span className="mt-1 block text-xs text-[#6f737b]">Controls where this question appears in lists. Use 1 for the first question, 2 for the next, and so on.</span><OrderInPaperHelper suggestedOrder={suggestedOrder} questions={orderReference} onUseSuggested={() => setQuestionOrderValue(String(suggestedOrder))} /></label>
           <label className="font-body text-sm text-[#43474d]">Marks<input name="marks" value={marks} onChange={(event) => setMarks(event.target.value)} inputMode="numeric" className="tsm-input mt-1 w-full" placeholder="6" /></label>
         </div>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
