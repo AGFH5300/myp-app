@@ -11,7 +11,6 @@ type PaperOption = {
   title: string
   year: number | null
   subject_id: string | null
-  level: string | null
   subjects?: PaperRelation<{ id?: string | null; name?: string | null }>
   exam_sessions?: PaperRelation<{ session_month?: string | null; session_year?: number | null }>
 }
@@ -63,7 +62,7 @@ export default async function PapersPage({ searchParams }: { searchParams: Promi
 
   let questionsQuery = supabase
     .from('questions')
-    .select('id,paper_id,question_number,question_order,marks,image_url,question_image_path,papers!inner(id,title,year,level,subject_id,is_published,subjects(id,name),exam_sessions(session_month,session_year)),question_topics(is_primary,topics(id,name,subject_id,parent_topic_id,sort_order))')
+    .select('id,paper_id,question_number,question_order,marks,image_url,question_image_path,papers!inner(id,title,year,subject_id,is_published,subjects(id,name),exam_sessions(session_month,session_year)),question_topics(is_primary,topics(id,name,subject_id,parent_topic_id,sort_order))')
     .eq('is_published', true)
     .eq('papers.is_published', true)
 
@@ -73,7 +72,7 @@ export default async function PapersPage({ searchParams }: { searchParams: Promi
   const [{ data: questionRows }, { data: subjects }, { data: papers }, { data: topics }] = await Promise.all([
     questionsQuery,
     supabase.from('subjects').select('id,name').order('name'),
-    supabase.from('papers').select('id,title,year,level,subject_id,subjects(id,name),exam_sessions(session_month,session_year)').eq('is_published', true).order('year', { ascending: false }).order('title'),
+    supabase.from('papers').select('id,title,year,subject_id,subjects(id,name),exam_sessions(session_month,session_year)').eq('is_published', true).order('year', { ascending: false }).order('title'),
     supabase.from('topics').select('id,name,subject_id,parent_topic_id,sort_order').eq('is_active', true).order('sort_order').order('name'),
   ])
 

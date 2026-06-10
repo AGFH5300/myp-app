@@ -9,10 +9,10 @@ import { toast } from 'sonner'
 import { createQuestion, updateQuestion } from './actions'
 
 export type PaperRelation<T> = T | T[] | null
-export type Paper = { id: string; title: string; year: number; level: string | null; subjects?: PaperRelation<{ id?: string | null; name?: string | null }>; exam_sessions?: PaperRelation<{ session_month?: string | null }> }
+export type Paper = { id: string; title: string; year: number; subjects?: PaperRelation<{ id?: string | null; name?: string | null }>; exam_sessions?: PaperRelation<{ session_month?: string | null }> }
 export type PaperQuestion = { id: string; paper_id: string; question_number: string | null; question_order: number | null }
 export type Subject = { id: string; name: string }
-export type Topic = { id: string; name: string; subject_id?: string | null; parent_topic_id?: string | null; level?: string | null; sort_order?: number | null; is_active?: boolean | null }
+export type Topic = { id: string; name: string; subject_id?: string | null; parent_topic_id?: string | null; sort_order?: number | null; is_active?: boolean | null }
 type QuestionTopic = { topic_id: string; is_primary?: boolean | null }
 export type QuestionAsset = { id: string; asset_type: 'question' | 'markscheme'; storage_path: string | null; public_url: string | null; label: string | null; sort_order: number | null; preview_url?: string | null }
 type Question = {
@@ -476,7 +476,6 @@ export function QuestionBankForm({
   const [paperMode, setPaperMode] = useState<'existing' | 'new'>(question?.paper_id ? 'existing' : 'existing')
   const [subjectId, setSubjectId] = useState(defaultSubjectId)
   const [paperId, setPaperId] = useState(question?.paper_id || '')
-  const selectedSubjectName = subjects.find((subject) => subject.id === subjectId)?.name || ''
   const [newPaperTitle, setNewPaperTitle] = useState('')
   const [newPaperYear, setNewPaperYear] = useState('2025')
   const [newPaperSession, setNewPaperSession] = useState('May')
@@ -600,7 +599,6 @@ export function QuestionBankForm({
       <input type="hidden" name="paper_id" value={paperMode === 'existing' ? paperId : ''} />
       <input type="hidden" name="primary_topic_id" value={effectivePrimaryTopicId} />
       <input type="hidden" name="topic_group_id" value={topicGroupId} />
-      <input type="hidden" name="new_paper_level" value={selectedSubjectName} />
       {selectedSubtopicIds.length ? selectedSubtopicIds.map((topicId) => <input key={topicId} type="hidden" name="topic_ids" value={topicId} />) : topicGroupId ? <input type="hidden" name="topic_ids" value={topicGroupId} /> : null}
 
       <StepCard step={1} title="Paper setup" state={step1State} helper="Choose whether this question belongs to an existing paper or a new paper record.">
@@ -613,7 +611,7 @@ export function QuestionBankForm({
         </div>
         {paperMode === 'existing' ? (
           <div className="mt-5 rounded-md border border-blue-100 bg-blue-50/40 p-4">
-            <SearchableSelect id="admin-question-paper" label="Matching existing paper" value={paperId} onChange={setPaperId} placeholder="Choose a paper" emptyText="No matching papers found." options={filteredPapers.map((paper) => ({ value: paper.id, label: paperLabel(paper), helper: paper.level || undefined }))} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
+            <SearchableSelect id="admin-question-paper" label="Matching existing paper" value={paperId} onChange={setPaperId} placeholder="Choose a paper" emptyText="No matching papers found." options={filteredPapers.map((paper) => ({ value: paper.id, label: paperLabel(paper) }))} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
             {!filteredPapers.length ? <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 font-body text-sm text-amber-800">No papers found for this subject. Create a new paper first. <button type="button" className="cursor-pointer font-semibold underline" onClick={() => setPaperMode('new')}>Create a new paper instead.</button></div> : null}
           </div>
         ) : (

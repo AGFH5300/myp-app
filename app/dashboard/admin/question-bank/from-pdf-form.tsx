@@ -572,7 +572,6 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
   const [subjectId, setSubjectId] = useState(defaultSubjectId)
   const [paperId, setPaperId] = useState('')
   const [newPaperTitle, setNewPaperTitle] = useState('')
-  const [newPaperCode, setNewPaperCode] = useState('')
   const [newPaperYear, setNewPaperYear] = useState('2025')
   const [newPaperSession, setNewPaperSession] = useState('May')
   const [paperFile, setPaperFile] = useState<PdfFileState>(null)
@@ -811,10 +810,8 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
         {paperMode === 'new' ? (
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <label className="font-body text-sm text-[#43474d]">Paper title<input name="new_paper_title" value={newPaperTitle} onChange={(event) => setNewPaperTitle(event.target.value)} className="tsm-input mt-1 w-full" placeholder="Paper 1" /></label>
-            <label className="font-body text-sm text-[#43474d]">Paper code<input value={newPaperCode} onChange={(event) => setNewPaperCode(event.target.value)} className="tsm-input mt-1 w-full" placeholder="Optional code, e.g. 1H" /></label>
             <label className="font-body text-sm text-[#43474d]">Year<input name="new_paper_year" value={newPaperYear} onChange={(event) => setNewPaperYear(event.target.value)} inputMode="numeric" className="tsm-input mt-1 w-full" /></label>
             <SearchableSelect id="pdf-question-session" name="new_paper_session" label="Session" value={newPaperSession} onChange={setNewPaperSession} placeholder="Choose session" emptyText="No sessions found." options={[{ value: 'May', label: 'May' }, { value: 'November', label: 'November' }]} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
-            <input type="hidden" name="new_paper_level" value={newPaperCode} />
           </div>
         ) : null}
       </StepCard>

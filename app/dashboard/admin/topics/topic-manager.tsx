@@ -8,7 +8,7 @@ import { SearchableSelect } from '@/components/searchable-select'
 import { createTopic, mergeSubtopics, renameTopic, reorderTopic, toggleTopicActive, type TopicActionResult } from './actions'
 
 type Subject = { id: string; name: string }
-type Topic = { id: string; subject_id: string | null; parent_topic_id: string | null; name: string; slug: string | null; level: string | null; sort_order: number | null; is_active: boolean | null }
+type Topic = { id: string; subject_id: string | null; parent_topic_id: string | null; name: string; slug: string | null; sort_order: number | null; is_active: boolean | null }
 type QuestionTopic = { question_id: string; topic_id: string }
 
 type TopicManagerProps = {

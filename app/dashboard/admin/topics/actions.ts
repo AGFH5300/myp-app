@@ -96,7 +96,6 @@ export async function createTopic(formData: FormData): Promise<TopicActionResult
     parent_topic_id: parentTopicId,
     name,
     slug,
-    level: null,
     sort_order: sortOrder,
     is_active: true,
   })

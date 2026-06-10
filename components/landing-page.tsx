@@ -5,7 +5,7 @@ import { BrandWordmark } from '@/components/brand-wordmark'
 const archiveTrail = [
   { year: '2016', note: 'Earliest indexed eAssessments in the current archive.' },
   { year: '2019', note: 'Session metadata normalized for faster cross-year browsing.' },
-  { year: '2022', note: 'Question-level indexing expanded across core subjects.' },
+  { year: '2022', note: 'Individual question indexing expanded across core subjects.' },
   { year: '2025', note: 'Latest paper records and markscheme references added.' },
 ] as const
 
@@ -61,7 +61,7 @@ export function LandingPage() {
                 <ul className="space-y-3 font-body text-sm leading-relaxed text-[#43474d]">
                   <li className="flex items-start gap-2"><AppIcon name="check_circle" className="mt-0.5 size-4 text-[#735b2b]" />Real paper records and markscheme references.</li>
                   <li className="flex items-start gap-2"><AppIcon name="check_circle" className="mt-0.5 size-4 text-[#735b2b]" />Filters for year, session, subject, and topic context.</li>
-                  <li className="flex items-start gap-2"><AppIcon name="check_circle" className="mt-0.5 size-4 text-[#735b2b]" />Question-level discovery built for targeted revision.</li>
+                  <li className="flex items-start gap-2"><AppIcon name="check_circle" className="mt-0.5 size-4 text-[#735b2b]" />Individual question discovery built for targeted revision.</li>
                 </ul>
                 <div className="rounded-sm border border-[#d5d8df] bg-[#f8f9fb] p-4">
                   <p className="font-headline text-xl leading-snug text-[#00152a]">Access is common. Structure is rare.</p>
@@ -76,7 +76,7 @@ export function LandingPage() {
             <div>
               <h2 className="font-headline text-4xl text-[#00152a] md:text-5xl">An archive designed for revision decisions, not file storage.</h2>
               <p className="mt-5 max-w-2xl font-body text-base leading-relaxed text-[#43474d]">
-                Paper folders answer one question: “Do I have it?” Revision asks harder ones: “Is it the right level? The right session? The right topic for what I keep missing?”
+                Paper folders answer one question: “Do I have it?” Revision asks harder ones: “Is it the right session? The right topic for what I keep missing?”
               </p>
             </div>
             <aside className="rounded-md border border-[#c3c6ce66] bg-white p-6">
@@ -164,7 +164,7 @@ export function LandingPage() {
         <section className="tsm-shell py-16 lg:py-20">
           <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
             <article className="rounded-md border border-[#c3c6ce66] bg-white p-8">
-              <p className="font-label text-xs uppercase tracking-[.14em] text-[#43474d]">Question-level exploration</p>
+              <p className="font-label text-xs uppercase tracking-[.14em] text-[#43474d]">Question-by-question exploration</p>
               <h3 className="mt-4 font-headline text-3xl text-[#00152a]">Treat each question as a reference point.</h3>
               <p className="mt-5 max-w-xl font-body text-sm leading-relaxed text-[#43474d]">
                 View question text, keep source context nearby, and bookmark items that repeatedly expose the same weakness. Over time, this builds a revision trail you can actually act on.

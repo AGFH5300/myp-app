@@ -14,7 +14,7 @@ export default async function AdminTopicsPage({ searchParams }: { searchParams: 
 
   const [{ data: subjects }, { data: topics }, { data: questionTopics }] = await Promise.all([
     supabase.from('subjects').select('id,name').order('name'),
-    supabase.from('topics').select('id,subject_id,parent_topic_id,name,slug,level,sort_order,is_active').order('sort_order').order('name'),
+    supabase.from('topics').select('id,subject_id,parent_topic_id,name,slug,sort_order,is_active').order('sort_order').order('name'),
     supabase.from('question_topics').select('question_id,topic_id'),
   ])
 
