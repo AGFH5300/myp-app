@@ -1,6 +1,6 @@
 "use client"
 
-import { type CSSProperties, type DragEvent, type FormEvent, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, type DragEvent, type FormEvent, type MouseEvent, type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RotateCcw, Upload, ZoomIn, ZoomOut } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -59,8 +59,18 @@ function makeCropPreview(file: File): LocalPreview {
   return { id: crypto.randomUUID(), file, name: file.name, url: URL.createObjectURL(file) }
 }
 
-function PdfFileInput({ id, label, value, onChange }: { id: string; label: string; value: PdfFileState; onChange: (value: PdfFileState) => void }) {
+function formatFileSize(size: number) {
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function isPdfFile(file: File) {
+  return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+}
+
+function PdfFileInput({ id, label, selectedHelper, value, onChange }: { id: string; label: string; selectedHelper: string; value: PdfFileState; onChange: (value: PdfFileState) => void }) {
   const [dropActive, setDropActive] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   function setFile(file: File | undefined) {
     if (value?.url) URL.revokeObjectURL(value.url)
@@ -68,22 +78,75 @@ function PdfFileInput({ id, label, value, onChange }: { id: string; label: strin
       onChange(null)
       return
     }
-    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) return
+    if (!isPdfFile(file)) {
+      toast.error('Please select a PDF file.')
+      return
+    }
     onChange({ file, url: URL.createObjectURL(file) })
   }
 
-  function handleDrop(event: DragEvent<HTMLLabelElement>) {
+  function chooseDroppedFile(files: FileList) {
+    const allFiles = Array.from(files)
+    const firstPdf = allFiles.find(isPdfFile)
+    if (allFiles.length > 1 && firstPdf) toast.warning('Only one PDF can be selected. Using the first PDF.')
+    if (!firstPdf) {
+      toast.error('Please select a PDF file.')
+      return
+    }
+    setFile(firstPdf)
+  }
+
+  function handleDrop(event: DragEvent<HTMLLabelElement | HTMLDivElement>) {
     event.preventDefault()
     setDropActive(false)
-    setFile(Array.from(event.dataTransfer.files).find((file) => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')))
+    chooseDroppedFile(event.dataTransfer.files)
+  }
+
+  function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setFile(file)
+  }
+
+  const dropHandlers = {
+    onDragEnter: () => setDropActive(true),
+    onDragOver: (event: DragEvent<HTMLLabelElement | HTMLDivElement>) => { event.preventDefault(); setDropActive(true) },
+    onDragLeave: (event: DragEvent<HTMLLabelElement | HTMLDivElement>) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropActive(false) },
+    onDrop: handleDrop,
+  }
+
+  if (value) {
+    return (
+      <div>
+        <div {...dropHandlers} className={`relative overflow-hidden rounded-lg border p-5 font-body text-sm transition focus-within:ring-2 focus-within:ring-blue-300 ${dropActive ? 'border-blue-500 bg-blue-100 shadow-inner' : 'border-blue-200 bg-blue-50/70'}`}>
+          <input ref={inputRef} id={id} type="file" accept="application/pdf,.pdf" className="sr-only" onChange={handleInputChange} />
+          <span className="block font-semibold text-[#00152a]">{label}</span>
+          <span className="mt-2 block text-base font-semibold text-blue-800">{selectedHelper}</span>
+          <span className="mt-1 block break-all text-[#43474d]">{value.file.name}</span>
+          <span className="mt-1 block text-xs text-[#5f646c]">{formatFileSize(value.file.size)}</span>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button type="button" onClick={() => inputRef.current?.click()} className="rounded-md border border-blue-200 bg-white px-3 py-2 font-body text-sm font-semibold text-blue-800 hover:bg-blue-50">Replace PDF</button>
+            <button type="button" onClick={() => setFile(undefined)} className="rounded-md border border-red-200 bg-white px-3 py-2 font-body text-sm font-semibold text-red-700 hover:bg-red-50">Remove</button>
+          </div>
+          <span className="mt-3 block text-xs text-[#5f646c]">Drop another PDF here to replace this file.</span>
+          {dropActive ? (
+            <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#00152a]/75 text-white backdrop-blur-[1px]">
+              <Upload className="size-8" aria-hidden="true" />
+              <span className="font-body text-base font-semibold">Drop PDF to replace</span>
+            </span>
+          ) : null}
+        </div>
+      </div>
+    )
   }
 
   return (
     <div>
-      <label htmlFor={id} onDragEnter={() => setDropActive(true)} onDragOver={(event) => { event.preventDefault(); setDropActive(true) }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropActive(false) }} onDrop={handleDrop} className={`relative block cursor-pointer overflow-hidden rounded-lg border-2 border-dashed p-5 text-center font-body text-sm text-[#43474d] transition focus-within:ring-2 focus-within:ring-blue-300 ${dropActive ? 'border-blue-500 bg-blue-100 shadow-inner' : 'border-blue-200 bg-blue-50/50 hover:border-blue-400 hover:bg-blue-50'}`}>
+      <label htmlFor={id} {...dropHandlers} className={`relative block cursor-pointer overflow-hidden rounded-lg border-2 border-dashed p-5 text-center font-body text-sm text-[#43474d] transition focus-within:ring-2 focus-within:ring-blue-300 ${dropActive ? 'border-blue-500 bg-blue-100 shadow-inner' : 'border-blue-200 bg-blue-50/50 hover:border-blue-400 hover:bg-blue-50'}`}>
         <span className="block font-semibold text-[#00152a]">{label}</span>
         <span className="mt-2 block text-base font-semibold text-blue-800">Drag a PDF here or click to upload</span>
-        <span className="mt-1 block">{value ? value.file.name : 'No PDF selected yet.'}</span>
+        <span className="mt-1 block">No PDF selected yet.</span>
         <span className="mt-1 block text-xs text-[#5f646c]">Use the question paper PDF or mark scheme PDF for cropping.</span>
         {dropActive ? (
           <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#00152a]/75 text-white backdrop-blur-[1px]">
@@ -91,9 +154,8 @@ function PdfFileInput({ id, label, value, onChange }: { id: string; label: strin
             <span className="font-body text-base font-semibold">Drop PDF to upload</span>
           </span>
         ) : null}
-        <input id={id} type="file" accept="application/pdf,.pdf" className="sr-only" onChange={(event) => setFile(event.target.files?.[0])} />
+        <input ref={inputRef} id={id} type="file" accept="application/pdf,.pdf" className="sr-only" onChange={handleInputChange} />
       </label>
-      {value ? <button type="button" onClick={() => setFile(undefined)} className="mt-3 rounded-md border border-red-200 px-3 py-2 font-body text-sm font-semibold text-red-700 hover:bg-red-50">Remove PDF</button> : null}
     </div>
   )
 }
@@ -675,7 +737,8 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
   const [reviewed, setReviewed] = useState(false)
   const [openSelectId, setOpenSelectId] = useState<string | null>(null)
   const [lightbox, setLightbox] = useState<LightboxState>(null)
-  const [cropResetToken, setCropResetToken] = useState(0)
+  const [paperCropResetToken, setPaperCropResetToken] = useState(0)
+  const [markschemeCropResetToken, setMarkschemeCropResetToken] = useState(0)
   const [savingMode, setSavingMode] = useState<SavingMode>(null)
   const [smartFillCropId, setSmartFillCropId] = useState('')
   const [smartFillLoading, setSmartFillLoading] = useState(false)
@@ -736,6 +799,28 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
     setQuestionFiles(files)
     clearSmartFill()
     if (!files.length) setSmartFillCropId('')
+  }
+
+  function updatePaperFile(fileState: PdfFileState) {
+    if (paperFile?.file === fileState?.file) return
+    questionFiles.forEach((file) => URL.revokeObjectURL(file.url))
+    setPaperFile(fileState)
+    setQuestionFiles([])
+    setQuestionOrder([])
+    setSmartFillCropId('')
+    setLightbox((current) => current?.group === 'question' ? null : current)
+    clearSmartFill()
+    setPaperCropResetToken((value) => value + 1)
+  }
+
+  function updateMarkschemeFile(fileState: PdfFileState) {
+    if (markschemeFile?.file === fileState?.file) return
+    markschemeFiles.forEach((file) => URL.revokeObjectURL(file.url))
+    setMarkschemeFile(fileState)
+    setMarkschemeFiles([])
+    setMarkschemeOrder([])
+    setLightbox((current) => current?.group === 'markscheme' ? null : current)
+    setMarkschemeCropResetToken((value) => value + 1)
   }
 
   function addMarkschemeCrop(file: File) {
@@ -861,7 +946,8 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
     setLightbox(null)
     setSmartFillCropId('')
     clearSmartFill()
-    setCropResetToken((value) => value + 1)
+    setPaperCropResetToken((value) => value + 1)
+    setMarkschemeCropResetToken((value) => value + 1)
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -963,14 +1049,14 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
 
       <StepCard step={2} title="Load PDFs" state={!step1Complete ? 'locked' : step2Complete ? 'complete' : 'current'} helper="Select local PDFs. They are not uploaded.">
         <div className="grid gap-4 lg:grid-cols-2">
-          <PdfFileInput id="paper-pdf" label="Paper PDF" value={paperFile} onChange={setPaperFile} />
-          <PdfFileInput id="markscheme-pdf" label="Mark scheme PDF" value={markschemeFile} onChange={setMarkschemeFile} />
+          <PdfFileInput id="paper-pdf" label="Paper PDF" selectedHelper="Question paper selected" value={paperFile} onChange={updatePaperFile} />
+          <PdfFileInput id="markscheme-pdf" label="Mark scheme PDF" selectedHelper="Mark scheme selected" value={markschemeFile} onChange={updateMarkschemeFile} />
         </div>
       </StepCard>
 
       <div ref={step3Ref}>
         <StepCard step={3} title="Crop question images" state={!step2Complete ? 'locked' : step3Complete ? 'complete' : 'current'} helper="Crop every part needed to answer this question.">
-          <PdfCropPanel title="Paper PDF cropper" helper="Use this for question text, diagrams, tables, graphs, and continuation pages." fileState={paperFile} pdfType="paper" cropLabel="Question crop" addLabel="Add crop to question images" onAddCrop={addQuestionCrop} nextFileName={() => `question-${questionNumber.trim() || 'untitled'}-crop-${questionFiles.length + 1}.png`} resetToken={cropResetToken} />
+          <PdfCropPanel title="Paper PDF cropper" helper="Use this for question text, diagrams, tables, graphs, and continuation pages." fileState={paperFile} pdfType="paper" cropLabel="Question crop" addLabel="Add crop to question images" onAddCrop={addQuestionCrop} nextFileName={() => `question-${questionNumber.trim() || 'untitled'}-crop-${questionFiles.length + 1}.png`} resetToken={paperCropResetToken} />
           <div className="mt-5">
             <ImageUploadGroup title="Question image" name="question_image_file" fileKeyName="question_file_key" assetOrderName="question_asset_order" existingAssets={[]} files={questionFiles} setFiles={updateQuestionFiles} order={questionOrder} setOrder={setQuestionOrder} onPreview={(index) => setLightbox({ group: 'question', index })} />
           </div>
@@ -978,7 +1064,7 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
       </div>
 
       <StepCard step={4} title="Crop mark scheme images" state={!step3Complete ? 'locked' : step4Complete ? 'complete' : 'current'} helper="Crop the matching mark scheme parts for this one question.">
-        <PdfCropPanel title="Mark scheme PDF cropper" helper="Use this for mark allocations, method notes, and answer continuations." fileState={markschemeFile} pdfType="markscheme" cropLabel="Mark scheme crop" addLabel="Add crop to mark scheme images" onAddCrop={addMarkschemeCrop} nextFileName={() => `markscheme-${questionNumber.trim() || 'untitled'}-crop-${markschemeFiles.length + 1}.png`} resetToken={cropResetToken} />
+        <PdfCropPanel title="Mark scheme PDF cropper" helper="Use this for mark allocations, method notes, and answer continuations." fileState={markschemeFile} pdfType="markscheme" cropLabel="Mark scheme crop" addLabel="Add crop to mark scheme images" onAddCrop={addMarkschemeCrop} nextFileName={() => `markscheme-${questionNumber.trim() || 'untitled'}-crop-${markschemeFiles.length + 1}.png`} resetToken={markschemeCropResetToken} />
         <div className="mt-5">
           <ImageUploadGroup title="Mark scheme image" name="markscheme_image_file" fileKeyName="markscheme_file_key" assetOrderName="markscheme_asset_order" existingAssets={[]} files={markschemeFiles} setFiles={setMarkschemeFiles} order={markschemeOrder} setOrder={setMarkschemeOrder} onPreview={(index) => setLightbox({ group: 'markscheme', index })} />
         </div>

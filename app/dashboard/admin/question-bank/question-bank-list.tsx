@@ -41,11 +41,23 @@ export function QuestionBankList({ questions }: { questions: QuestionBankRow[] }
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [confirmPublish, setConfirmPublish] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const visibleIds = useMemo(() => questions.map((question) => question.id), [questions])
   const selectedQuestions = useMemo(() => questions.filter((question) => selectedIds.includes(question.id)), [questions, selectedIds])
   const selectedNeedsReview = selectedQuestions.some((question) => question.needsReview)
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id))
 
   function toggleQuestion(questionId: string) {
     setSelectedIds((current) => current.includes(questionId) ? current.filter((id) => id !== questionId) : [...current, questionId])
+    setConfirmPublish(false)
+  }
+
+  function selectAllVisible() {
+    setSelectedIds((current) => Array.from(new Set([...current, ...visibleIds])))
+    setConfirmPublish(false)
+  }
+
+  function clearSelection() {
+    setSelectedIds([])
     setConfirmPublish(false)
   }
 
@@ -72,25 +84,28 @@ export function QuestionBankList({ questions }: { questions: QuestionBankRow[] }
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-blue-100 bg-blue-50/60 p-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <p className="font-body text-sm font-semibold text-[#00152a]">{selectedIds.length} selected</p>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => runBatch(true)} disabled={!selectedIds.length || isPending} className="tsm-btn-primary disabled:cursor-not-allowed disabled:opacity-60">{isPending ? 'Saving…' : 'Publish selected'}</button>
-            <button type="button" onClick={() => runBatch(false)} disabled={!selectedIds.length || isPending} className="tsm-btn-secondary disabled:cursor-not-allowed disabled:opacity-60">{isPending ? 'Saving…' : 'Unpublish selected'}</button>
-            <button type="button" onClick={() => { setSelectedIds([]); setConfirmPublish(false) }} disabled={!selectedIds.length || isPending} className="rounded-md border border-[#c3c6ce66] bg-white px-3 py-2 font-body text-sm font-semibold text-[#43474d] hover:bg-[#f5f3ee] disabled:cursor-not-allowed disabled:opacity-60">Clear selection</button>
-          </div>
-        </div>
-        {confirmPublish ? (
-          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 font-body text-sm text-amber-900">
-            <p className="font-semibold">Some selected questions need review. Publish anyway?</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={() => runBatch(true)} disabled={isPending} className="rounded-md bg-amber-700 px-3 py-2 font-semibold text-white hover:bg-amber-800 disabled:opacity-60">Yes, publish anyway</button>
-              <button type="button" onClick={() => setConfirmPublish(false)} disabled={isPending} className="rounded-md border border-amber-300 bg-white px-3 py-2 font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-60">Cancel</button>
+      {selectedIds.length ? (
+        <div className="rounded-md border border-blue-100 bg-blue-50/60 p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <p className="font-body text-sm font-semibold text-[#00152a]">{selectedIds.length} selected</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={selectAllVisible} disabled={allVisibleSelected || isPending} className="rounded-md border border-blue-200 bg-white px-3 py-2 font-body text-sm font-semibold text-blue-800 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60">{allVisibleSelected ? 'All visible selected' : 'Select all visible'}</button>
+              <button type="button" onClick={clearSelection} disabled={isPending} className="rounded-md border border-[#c3c6ce66] bg-white px-3 py-2 font-body text-sm font-semibold text-[#43474d] hover:bg-[#f5f3ee] disabled:cursor-not-allowed disabled:opacity-60">Clear selection</button>
+              <button type="button" onClick={() => runBatch(true)} disabled={isPending} className="tsm-btn-primary disabled:cursor-not-allowed disabled:opacity-60">{isPending ? 'Saving…' : 'Publish selected'}</button>
+              <button type="button" onClick={() => runBatch(false)} disabled={isPending} className="tsm-btn-secondary disabled:cursor-not-allowed disabled:opacity-60">{isPending ? 'Saving…' : 'Unpublish selected'}</button>
             </div>
           </div>
-        ) : null}
-      </div>
+          {confirmPublish ? (
+            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 font-body text-sm text-amber-900">
+              <p className="font-semibold">Some selected questions need review. Publish anyway?</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={() => runBatch(true)} disabled={isPending} className="rounded-md bg-amber-700 px-3 py-2 font-semibold text-white hover:bg-amber-800 disabled:opacity-60">Yes, publish anyway</button>
+                <button type="button" onClick={() => setConfirmPublish(false)} disabled={isPending} className="rounded-md border border-amber-300 bg-white px-3 py-2 font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-60">Cancel</button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1100px] text-left font-body text-sm">
@@ -113,7 +128,7 @@ export function QuestionBankList({ questions }: { questions: QuestionBankRow[] }
                   <td className="py-4 pr-4">{question.topicSummary || <span className="text-amber-800">Not tagged</span>}</td>
                   <td className="py-4 pr-4"><div className="flex flex-wrap gap-2">{question.isPublished ? statusBadge('Published', 'green') : statusBadge('Draft', 'grey')}{question.needsReview ? statusBadge('Needs review', 'amber') : null}</div></td>
                   <td className="py-4 pr-4"><div className="flex max-w-xs flex-wrap gap-1.5">{question.warnings.length ? question.warnings.map((warning) => warningBadge(warning)) : statusBadge('Ready', 'green')}</div></td>
-                  <td className="py-4 pr-4"><div className="flex flex-wrap gap-2"><Link href={`/dashboard/papers/question/${question.id}`} className="tsm-btn-secondary w-fit">Preview as student</Link><Link href={`/dashboard/admin/question-bank/${question.id}/edit`} className="tsm-btn-secondary w-fit">Edit</Link></div></td>
+                  <td className="py-4 pr-4"><div className="flex flex-wrap gap-2"><Link href={`/dashboard/admin/question-bank/${question.id}/preview`} className="tsm-btn-secondary w-fit">Preview as student</Link><Link href={`/dashboard/admin/question-bank/${question.id}/edit`} className="tsm-btn-secondary w-fit">Edit</Link></div></td>
                 </tr>
               )
             })}
