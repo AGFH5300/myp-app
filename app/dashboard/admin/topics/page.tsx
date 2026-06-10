@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { TopicManager } from './topic-manager'
@@ -30,9 +31,14 @@ export default async function AdminTopicsPage({ searchParams }: { searchParams: 
   return (
     <div className="space-y-8">
       <header className="rounded-md border border-[#c3c6ce66] bg-white p-8 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
-        <p className="font-label text-xs uppercase tracking-[.16em] text-[#735b2b]">Admin workspace</p>
-        <h1 className="mt-3 font-headline text-5xl text-[#00152a]">Topic Manager</h1>
-        <p className="mt-3 max-w-2xl font-body text-lg text-[#43474d]">Manage official topic groups and subtopics. These control the filters students use in Papers.</p>
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="font-label text-xs uppercase tracking-[.16em] text-[#735b2b]">Admin workspace</p>
+            <h1 className="mt-3 font-headline text-5xl text-[#00152a]">Topic Manager</h1>
+            <p className="mt-3 max-w-2xl font-body text-lg text-[#43474d]">Manage official topic groups and subtopics. These control the filters students use in Papers.</p>
+          </div>
+          <Link href="/dashboard/admin" className="tsm-btn-secondary">Back to Admin</Link>
+        </div>
       </header>
 
       <TopicManager
