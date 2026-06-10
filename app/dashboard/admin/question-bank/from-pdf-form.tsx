@@ -464,20 +464,27 @@ function FromPdfSubmitButton({ readyToSubmit, savingMode, action, children }: { 
 
 type SmartFillConfidence = 'low' | 'medium' | 'high'
 type SmartFillTopicSuggestion = { groupId: string; groupName: string; subtopicId: string; subtopicName: string; confidence: SmartFillConfidence; score: number }
-type SmartFillSuggestions = { text: string; questionNumber: string | null; marks: string | null; topics: SmartFillTopicSuggestion[] }
+type SmartFillMarksSuggestion = { value: string; confidence: SmartFillConfidence; candidates: string[]; needsReview: boolean }
+type SmartFillSuggestions = { text: string; questionNumber: string | null; marks: SmartFillMarksSuggestion | null; topics: SmartFillTopicSuggestion[] }
+type SmartFillAppliedState = { questionNumber: string | null; marks: string | null; topicIds: string[] }
+
+const EMPTY_SMART_FILL_APPLIED_STATE: SmartFillAppliedState = { questionNumber: null, marks: null, topicIds: [] }
 
 const SMART_FILL_KEYWORDS: Record<string, string[]> = {
   algebra: ['equation', 'expression', 'factor', 'expand', 'simplify', 'solve', 'substitute'],
   angle: ['angle', 'parallel', 'perpendicular', 'bearing', 'triangle', 'polygon'],
   graph: ['graph', 'axis', 'axes', 'curve', 'line', 'gradient', 'intercept', 'coordinate'],
-  inequalities: ['inequality', 'inequalities', 'region', 'feasible', 'shade', 'linear programming'],
-  statistics: ['mean', 'median', 'mode', 'range', 'frequency', 'histogram', 'box plot', 'quartile'],
-  probability: ['probability', 'chance', 'random', 'spinner', 'dice', 'tree diagram', 'outcome'],
-  functions: ['function', 'domain', 'range', 'inverse', 'composite', 'mapping'],
+  inequalities: ['inequality', 'inequalities', 'constraint', 'constraints', 'feasible region', 'shaded region', 'region', 'feasible', 'shade', 'linear programming'],
+  simultaneous: ['simultaneous', 'solve both equations'],
+  quadratic: ['quadratic', 'quadratics', 'parabola', 'turning point'],
+  statistics: ['mean', 'median', 'mode', 'standard deviation', 'range', 'frequency', 'histogram', 'box plot', 'quartile'],
+  probability: ['probability', 'chance', 'random', 'spinner', 'dice', 'tree diagram', 'outcome', 'venn', 'set', 'intersection', 'union'],
+  venn: ['venn', 'set', 'intersection', 'union'],
+  functions: ['function', 'domain', 'range', 'inverse', 'composite', 'mapping', 'quadratic function'],
   trigonometry: ['sin', 'cos', 'tan', 'sine', 'cosine', 'tangent', 'trigonometry'],
   calculus: ['differentiate', 'derivative', 'gradient function', 'integrate', 'area under'],
   vectors: ['vector', 'magnitude', 'direction', 'scalar'],
-  geometry: ['circle', 'area', 'volume', 'surface area', 'length', 'radius', 'diameter'],
+  geometry: ['circle', 'area', 'volume', 'surface area', 'length', 'radius', 'diameter', 'trigonometry', 'sine', 'cosine', 'tan'],
 }
 
 function normalizeSmartFillText(value: string) {
@@ -488,32 +495,94 @@ function smartFillTokens(value: string) {
   return normalizeSmartFillText(value).split(' ').filter((token) => token.length > 2)
 }
 
-function detectQuestionNumber(text: string) {
-  const patterns = [
-    /\bquestion\s+(\d{1,2}\s*\(?[a-z]\)?)\b/i,
-    /\bq\s*(\d{1,2}\s*\(?[a-z]\)?)\b/i,
-    /(?:^|\n|\s)(\d{1,2}\s*\([a-z]\))/i,
-    /(?:^|\n|\s)(\d{1,2}[a-z])\b/i,
-    /(?:^|\n)\s*(\d{1,2})[.)\s]/i,
-  ]
-  for (const pattern of patterns) {
-    const match = text.match(pattern)?.[1]
-    if (match) return match.replace(/\s+/g, '').replace(/[()]/g, '')
-  }
-  return null
+function normalizeQuestionNumber(value: string) {
+  return value.toLowerCase().replace(/^(?:question|q)\s*/i, '').replace(/\s+/g, '').replace(/[().]/g, '')
 }
 
-function detectMarks(text: string) {
+function collectQuestionMatches(text: string) {
+  const matches: { value: string; index: number; specificity: number }[] = []
   const patterns = [
-    /\[\s*(\d{1,2})\s*(?:marks?)?\s*\]/i,
-    /\(\s*(\d{1,2})\s*marks?\s*\)/i,
-    /\b(\d{1,2})\s*marks?\b/i,
+    /\bquestion\s+(\d{1,2}\s*\(?[a-z]\)?|\d{1,2})\b/gi,
+    /\bq\s*(\d{1,2}\s*\(?[a-z]\)?)\b/gi,
+    /(?:^|[^a-z0-9])(\d{1,2}\s*\([a-z]\))/gi,
+    /(?:^|[^a-z0-9])(\d{1,2}[a-z])\b/gi,
+    /(?:^|\n)\s*(\d{1,2})[.)\s]/gi,
   ]
   for (const pattern of patterns) {
-    const match = text.match(pattern)?.[1]
-    if (match) return match
+    for (const match of text.matchAll(pattern)) {
+      const rawValue = match[1]
+      if (!rawValue) continue
+      const value = normalizeQuestionNumber(rawValue)
+      const specificity = /[a-z]/i.test(value) ? 2 : 1
+      const index = (match.index ?? 0) + match[0].indexOf(rawValue)
+      matches.push({ value, index, specificity })
+    }
   }
-  return null
+  return matches
+    .filter((match, index, all) => all.findIndex((item) => item.value === match.value && item.index === match.index) === index)
+    .sort((a, b) => b.specificity - a.specificity || a.index - b.index)
+}
+
+function detectQuestionNumber(text: string) {
+  return collectQuestionMatches(text)[0]?.value || null
+}
+
+function collectMarksCandidates(text: string) {
+  const candidates: { value: string; index: number; label: string }[] = []
+  const patterns = [
+    { label: 'brackets', pattern: /\[\s*(\d{1,2})\s*(?:marks?)?\s*\]/gi },
+    { label: 'marked parentheses', pattern: /\(\s*(\d{1,2})\s*marks?\s*\)/gi },
+    { label: 'plain marks', pattern: /\b(\d{1,2})\s*marks?\b/gi },
+    { label: 'total marks', pattern: /\btotal\s+(\d{1,2})\s*marks?\b/gi },
+    { label: 'parentheses', pattern: /\(\s*(\d{1,2})\s*\)/gi },
+  ]
+  for (const { label, pattern } of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      const value = match[1]
+      if (!value) continue
+      const index = (match.index ?? 0) + match[0].indexOf(value)
+      candidates.push({ value, index, label })
+    }
+  }
+  return candidates
+    .filter((candidate, index, all) => all.findIndex((item) => item.value === candidate.value && Math.abs(item.index - candidate.index) <= 2) === index)
+    .sort((a, b) => a.index - b.index)
+}
+
+function lineDistance(text: string, from: number, to: number) {
+  return text.slice(Math.min(from, to), Math.max(from, to)).split(/\n/).length - 1
+}
+
+function detectMarks(text: string, questionNumber: string | null): SmartFillMarksSuggestion | null {
+  const candidates = collectMarksCandidates(text)
+  if (!candidates.length) return null
+  const uniqueValues = Array.from(new Set(candidates.map((candidate) => candidate.value)))
+  const questionMatch = questionNumber ? collectQuestionMatches(text).find((match) => match.value === questionNumber) : null
+  if (!questionMatch) {
+    return uniqueValues.length === 1
+      ? { value: uniqueValues[0], confidence: 'medium', candidates: uniqueValues, needsReview: true }
+      : { value: uniqueValues[0], confidence: 'low', candidates: uniqueValues, needsReview: true }
+  }
+  const ranked = candidates
+    .map((candidate) => {
+      const distance = Math.abs(candidate.index - questionMatch.index)
+      const lines = lineDistance(text, candidate.index, questionMatch.index)
+      const afterPenalty = candidate.index >= questionMatch.index ? 0 : 80
+      const totalPenalty = candidate.label === 'total marks' ? 120 : 0
+      return { ...candidate, distance, lines, rank: distance + afterPenalty + totalPenalty }
+    })
+    .sort((a, b) => a.rank - b.rank)
+  const best = ranked[0]
+  const closeCandidates = ranked.filter((candidate) => candidate.lines <= 2 && candidate.distance <= 180 && candidate.rank <= best.rank + 40)
+  const closeValues = Array.from(new Set(closeCandidates.map((candidate) => candidate.value)))
+  if (!best) return null
+  if (closeValues.length === 1 && best.lines <= 2 && best.distance <= 180) {
+    return { value: best.value, confidence: 'high', candidates: uniqueValues, needsReview: false }
+  }
+  if (uniqueValues.length === 1) {
+    return { value: best.value, confidence: 'medium', candidates: uniqueValues, needsReview: true }
+  }
+  return { value: best.value, confidence: 'low', candidates: uniqueValues, needsReview: true }
 }
 
 function confidenceFromScore(score: number): SmartFillConfidence {
@@ -555,10 +624,11 @@ function suggestSmartFillTopics(text: string, allTopics: Topic[], subjectId: str
 }
 
 function buildSmartFillSuggestions(text: string, allTopics: Topic[], subjectId: string): SmartFillSuggestions {
+  const questionNumber = detectQuestionNumber(text)
   return {
     text,
-    questionNumber: detectQuestionNumber(text),
-    marks: detectMarks(text),
+    questionNumber,
+    marks: detectMarks(text, questionNumber),
     topics: suggestSmartFillTopics(text, allTopics, subjectId),
   }
 }
@@ -595,6 +665,7 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
   const [smartFillCropId, setSmartFillCropId] = useState('')
   const [smartFillLoading, setSmartFillLoading] = useState(false)
   const [smartFillSuggestions, setSmartFillSuggestions] = useState<SmartFillSuggestions | null>(null)
+  const [smartFillApplied, setSmartFillApplied] = useState<SmartFillAppliedState>(EMPTY_SMART_FILL_APPLIED_STATE)
 
   const step3Ref = useRef<HTMLDivElement>(null)
   const savingModeRef = useRef<SavingMode>(null)
@@ -616,26 +687,39 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
     markschemeFilesRef.current.forEach((file) => URL.revokeObjectURL(file.url))
   }, [])
 
+  function clearSmartFill() {
+    setSmartFillSuggestions(null)
+    setSmartFillApplied(EMPTY_SMART_FILL_APPLIED_STATE)
+  }
+
+  function markSmartFillApplied(partial: Partial<SmartFillAppliedState>) {
+    setSmartFillApplied((current) => ({
+      questionNumber: partial.questionNumber === undefined ? current.questionNumber : partial.questionNumber,
+      marks: partial.marks === undefined ? current.marks : partial.marks,
+      topicIds: partial.topicIds === undefined ? current.topicIds : partial.topicIds,
+    }))
+  }
+
   function updateSubject(value: string) {
     setSubjectId(value)
     setPaperId('')
     setTopicGroupId('')
     setSelectedSubtopicIds([])
     setPrimaryTopicId('')
-    setSmartFillSuggestions(null)
+    clearSmartFill()
   }
 
   function addQuestionCrop(file: File) {
     const preview = makeCropPreview(file)
     if (!questionFiles.length) setSmartFillCropId(preview.id)
-    setSmartFillSuggestions(null)
+    clearSmartFill()
     setQuestionFiles((files) => [...files, preview])
     setQuestionOrder((order) => [...order, `new:${preview.id}`])
   }
 
   function updateQuestionFiles(files: LocalPreview[]) {
     setQuestionFiles(files)
-    setSmartFillSuggestions(null)
+    clearSmartFill()
     if (!files.length) setSmartFillCropId('')
   }
 
@@ -645,17 +729,46 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
     setMarkschemeOrder((order) => [...order, `new:${preview.id}`])
   }
 
+  function applyDetectedQuestionNumber(value: string, showToast = true) {
+    setQuestionNumber(value)
+    markSmartFillApplied({ questionNumber: value })
+    if (showToast) toast.success('Question number applied.')
+  }
+
+  function applyDetectedMarks(value: string, showToast = true) {
+    setMarks(value)
+    markSmartFillApplied({ marks: value })
+    if (showToast) toast.success('Marks applied.')
+  }
+
+  function autoApplySafeSmartFill(suggestions: SmartFillSuggestions) {
+    const nextApplied: SmartFillAppliedState = { ...EMPTY_SMART_FILL_APPLIED_STATE }
+    if (suggestions.questionNumber && (!questionNumber.trim() || normalizeQuestionNumber(questionNumber) === suggestions.questionNumber)) {
+      setQuestionNumber(suggestions.questionNumber)
+      nextApplied.questionNumber = suggestions.questionNumber
+    }
+    if (suggestions.marks?.confidence === 'high' && (!marks.trim() || marks.trim() === suggestions.marks.value)) {
+      setMarks(suggestions.marks.value)
+      nextApplied.marks = suggestions.marks.value
+    }
+    setSmartFillApplied(nextApplied)
+    if (nextApplied.questionNumber) toast.success('Question number applied.')
+    if (nextApplied.marks) toast.success('Marks applied.')
+  }
+
   async function runSmartFill() {
     const crop = questionFiles.find((file) => file.id === effectiveSmartFillCropId) || questionFiles[0]
     if (!crop || smartFillLoading) return
     setSmartFillLoading(true)
-    setSmartFillSuggestions(null)
+    clearSmartFill()
     try {
       const { recognize } = await import('tesseract.js')
       const result = await recognize(crop.file, 'eng')
       const text = result.data.text.trim()
       if (!text) throw new Error('No OCR text returned')
-      setSmartFillSuggestions(buildSmartFillSuggestions(text, topics, subjectId))
+      const suggestions = buildSmartFillSuggestions(text, topics, subjectId)
+      setSmartFillSuggestions(suggestions)
+      autoApplySafeSmartFill(suggestions)
       toast.success('Smart Fill suggestions ready.')
     } catch {
       toast.error('Could not read this crop. Try a clearer crop.')
@@ -665,24 +778,37 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
   }
 
   function applySmartFillQuestionNumber() {
-    if (smartFillSuggestions?.questionNumber) setQuestionNumber(smartFillSuggestions.questionNumber)
+    if (!smartFillSuggestions?.questionNumber) return
+    applyDetectedQuestionNumber(smartFillSuggestions.questionNumber)
   }
 
   function applySmartFillMarks() {
-    if (smartFillSuggestions?.marks) setMarks(smartFillSuggestions.marks)
+    if (!smartFillSuggestions?.marks) return
+    applyDetectedMarks(smartFillSuggestions.marks.value)
   }
 
-  function applySmartFillTopic(suggestion = smartFillSuggestions?.topics[0]) {
-    if (!suggestion) return
-    setTopicGroupId(suggestion.groupId)
-    setSelectedSubtopicIds((current) => current.includes(suggestion.subtopicId) ? current : [suggestion.subtopicId])
-    setPrimaryTopicId(suggestion.subtopicId)
+  function applySmartFillTopic(suggestion: SmartFillTopicSuggestion, showToast = true) {
+    setTopicGroupId((current) => current || suggestion.groupId)
+    setSelectedSubtopicIds((current) => {
+      const next = current.includes(suggestion.subtopicId) ? current : [...current, suggestion.subtopicId]
+      if (!primaryTopicId && next.includes(suggestion.subtopicId)) setPrimaryTopicId(suggestion.subtopicId)
+      return next
+    })
+    setSmartFillApplied((current) => ({ ...current, topicIds: current.topicIds.includes(suggestion.subtopicId) ? current.topicIds : [...current.topicIds, suggestion.subtopicId] }))
+    if (showToast) toast.success('Topic applied.')
   }
 
   function applyAllSmartFillSuggestions() {
-    applySmartFillQuestionNumber()
-    applySmartFillMarks()
-    applySmartFillTopic()
+    if (!smartFillSuggestions) return
+    if (smartFillSuggestions.questionNumber && (!questionNumber.trim() || normalizeQuestionNumber(questionNumber) === smartFillSuggestions.questionNumber)) {
+      applyDetectedQuestionNumber(smartFillSuggestions.questionNumber, false)
+    }
+    if (smartFillSuggestions.marks?.confidence === 'high' && (!marks.trim() || marks.trim() === smartFillSuggestions.marks.value)) {
+      applyDetectedMarks(smartFillSuggestions.marks.value, false)
+    }
+    const newTopics = smartFillSuggestions.topics.filter((suggestion) => !selectedSubtopicIds.includes(suggestion.subtopicId))
+    for (const suggestion of newTopics) applySmartFillTopic(suggestion, false)
+    if (newTopics.length) toast.success(newTopics.length === 1 ? 'Topic applied.' : 'Topics applied.')
   }
 
   const filteredPapers = availablePapers.filter((paper) => !subjectId || relationLabel(paper.subjects, 'id') === subjectId)
@@ -700,6 +826,10 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
   const step5Complete = Boolean(questionNumber.trim() && topicGroupId && (selectedSubtopicIds.length || !subtopics.length))
   const readyToSubmit = step1Complete && step2Complete && step3Complete && step4Complete && step5Complete
   const effectivePrimaryTopicId = selectedSubtopicIds.includes(primaryTopicId) ? primaryTopicId : selectedSubtopicIds[0] || topicGroupId
+  const smartFillQuestionApplied = Boolean(smartFillSuggestions?.questionNumber && normalizeQuestionNumber(questionNumber) === smartFillSuggestions.questionNumber)
+  const smartFillMarksApplied = Boolean(smartFillSuggestions?.marks && marks.trim() === smartFillSuggestions.marks.value)
+  const suggestedTopicIds = smartFillSuggestions?.topics.map((suggestion) => suggestion.subtopicId) || []
+  const allSuggestedTopicsSelected = suggestedTopicIds.length > 0 && suggestedTopicIds.every((topicId) => selectedSubtopicIds.includes(topicId))
   const questionLightboxItems = orderedPreviewItems([], questionFiles, questionOrder, 'Question image')
   const markschemeLightboxItems = orderedPreviewItems([], markschemeFiles, markschemeOrder, 'Mark scheme image')
   const suggestedOrder = suggestedQuestionOrder(paperMode, paperId, availablePaperQuestions)
@@ -715,7 +845,7 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
     setMarkschemeOrder([])
     setLightbox(null)
     setSmartFillCropId('')
-    setSmartFillSuggestions(null)
+    clearSmartFill()
     setCropResetToken((value) => value + 1)
   }
 
@@ -853,7 +983,7 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
             <div className="mt-4 flex flex-wrap gap-2" aria-label="Choose question crop for Smart Fill">
               {questionFiles.map((file, index) => {
                 const selected = effectiveSmartFillCropId === file.id
-                return <button key={file.id} type="button" onClick={() => { setSmartFillCropId(file.id); setSmartFillSuggestions(null) }} className={`rounded-full border px-3 py-1 font-body text-xs font-semibold transition enabled:cursor-pointer ${selected ? 'border-blue-500 bg-white text-blue-800 ring-2 ring-blue-100' : 'border-slate-200 bg-white text-[#43474d] hover:border-blue-300 hover:bg-blue-50'}`}>Question image {index + 1}</button>
+                return <button key={file.id} type="button" onClick={() => { setSmartFillCropId(file.id); clearSmartFill() }} className={`rounded-full border px-3 py-1 font-body text-xs font-semibold transition enabled:cursor-pointer ${selected ? 'border-blue-500 bg-white text-blue-800 ring-2 ring-blue-100' : 'border-slate-200 bg-white text-[#43474d] hover:border-blue-300 hover:bg-blue-50'}`}>Question image {index + 1}</button>
               })}
             </div>
           ) : null}
@@ -863,7 +993,7 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
                 <p className="font-body text-sm font-semibold text-emerald-700">OCR complete. Review each suggestion before applying.</p>
                 <div className="flex flex-wrap gap-2">
                   <button type="button" onClick={applyAllSmartFillSuggestions} className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 font-body text-xs font-semibold text-blue-800 hover:bg-blue-100 enabled:cursor-pointer">Apply all suggestions</button>
-                  <button type="button" onClick={() => setSmartFillSuggestions(null)} className="rounded-md border border-slate-200 px-3 py-2 font-body text-xs font-semibold text-slate-700 hover:bg-slate-50 enabled:cursor-pointer">Dismiss</button>
+                  <button type="button" onClick={() => clearSmartFill()} className="rounded-md border border-slate-200 px-3 py-2 font-body text-xs font-semibold text-slate-700 hover:bg-slate-50 enabled:cursor-pointer">Dismiss</button>
                 </div>
               </div>
               <details className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
@@ -874,25 +1004,39 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
                 <div className="rounded-md border border-slate-200 p-3">
                   <p className="font-body text-xs font-semibold uppercase tracking-wide text-[#6f737b]">Question number</p>
                   <p className="mt-1 font-body text-sm text-[#00152a]">{smartFillSuggestions.questionNumber || 'No suggestion found'}</p>
-                  {questionNumber && smartFillSuggestions.questionNumber ? <p className="mt-1 font-body text-xs text-amber-800">Replace current value only if you click Use.</p> : null}
-                  <button type="button" onClick={applySmartFillQuestionNumber} disabled={!smartFillSuggestions.questionNumber} className="mt-3 rounded-md border border-blue-200 px-3 py-2 font-body text-xs font-semibold text-blue-700 hover:bg-blue-50 enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50">Use question number</button>
+                  {smartFillQuestionApplied && smartFillSuggestions.questionNumber ? <p className="mt-2 rounded-md bg-emerald-50 px-2 py-1 font-body text-xs font-semibold text-emerald-700">Question number applied: {smartFillSuggestions.questionNumber}</p> : null}
+                  {questionNumber && smartFillSuggestions.questionNumber && !smartFillQuestionApplied ? <p className="mt-1 font-body text-xs text-amber-800">Current value kept. Click Replace to use the OCR value.</p> : null}
+                  <button type="button" onClick={applySmartFillQuestionNumber} disabled={!smartFillSuggestions.questionNumber || smartFillQuestionApplied} className={`mt-3 rounded-md border px-3 py-2 font-body text-xs font-semibold enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-70 ${smartFillQuestionApplied ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-blue-200 text-blue-700 hover:bg-blue-50'}`}>{smartFillQuestionApplied ? 'Applied' : questionNumber ? 'Replace' : 'Use question number'}</button>
                 </div>
                 <div className="rounded-md border border-slate-200 p-3">
                   <p className="font-body text-xs font-semibold uppercase tracking-wide text-[#6f737b]">Marks</p>
-                  <p className="mt-1 font-body text-sm text-[#00152a]">{smartFillSuggestions.marks || 'No suggestion found'}</p>
-                  {marks && smartFillSuggestions.marks ? <p className="mt-1 font-body text-xs text-amber-800">Replace current value only if you click Use.</p> : null}
-                  <button type="button" onClick={applySmartFillMarks} disabled={!smartFillSuggestions.marks} className="mt-3 rounded-md border border-blue-200 px-3 py-2 font-body text-xs font-semibold text-blue-700 hover:bg-blue-50 enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50">Use marks</button>
+                  <p className="mt-1 font-body text-sm text-[#00152a]">{smartFillSuggestions.marks?.value || 'No suggestion found'}</p>
+                  {smartFillSuggestions.marks ? <p className="mt-1 font-body text-xs text-[#6f737b]">{smartFillSuggestions.marks.confidence} confidence{smartFillSuggestions.marks.needsReview ? ' · Marks need review' : ''}</p> : null}
+                  {smartFillSuggestions.marks && smartFillSuggestions.marks.candidates.length > 1 ? <p className="mt-1 font-body text-xs text-amber-800">Candidates: {smartFillSuggestions.marks.candidates.join(', ')}</p> : null}
+                  {smartFillMarksApplied && smartFillSuggestions.marks ? <p className="mt-2 rounded-md bg-emerald-50 px-2 py-1 font-body text-xs font-semibold text-emerald-700">Marks applied: {smartFillSuggestions.marks.value}</p> : null}
+                  {marks && smartFillSuggestions.marks && !smartFillMarksApplied ? <p className="mt-1 font-body text-xs text-amber-800">Current value kept. Click Replace to use the OCR value.</p> : null}
+                  <button type="button" onClick={applySmartFillMarks} disabled={!smartFillSuggestions.marks || smartFillMarksApplied} className={`mt-3 rounded-md border px-3 py-2 font-body text-xs font-semibold enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-70 ${smartFillMarksApplied ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-blue-200 text-blue-700 hover:bg-blue-50'}`}>{smartFillMarksApplied ? 'Applied' : marks ? 'Replace' : 'Use marks'}</button>
                 </div>
                 <div className="rounded-md border border-slate-200 p-3">
-                  <p className="font-body text-xs font-semibold uppercase tracking-wide text-[#6f737b]">Topic</p>
-                  {smartFillSuggestions.topics.length ? smartFillSuggestions.topics.map((suggestion) => (
-                    <div key={suggestion.subtopicId} className="mt-2 rounded-md bg-slate-50 p-2">
-                      <p className="font-body text-sm font-semibold text-[#00152a]">{suggestion.groupName}</p>
-                      <p className="font-body text-sm text-[#43474d]">{suggestion.subtopicName}</p>
-                      <p className="mt-1 font-body text-xs text-[#6f737b]">{suggestion.confidence} confidence</p>
-                      <button type="button" onClick={() => applySmartFillTopic(suggestion)} className="mt-2 rounded-md border border-blue-200 px-3 py-2 font-body text-xs font-semibold text-blue-700 hover:bg-blue-50 enabled:cursor-pointer">Use this topic</button>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="font-body text-xs font-semibold uppercase tracking-wide text-[#6f737b]">Topics</p>
+                      <p className="mt-1 font-body text-xs text-amber-800">Topic suggestions need review.</p>
                     </div>
-                  )) : <p className="mt-1 font-body text-sm text-[#00152a]">No controlled topic match found</p>}
+                    <button type="button" onClick={applyAllSmartFillSuggestions} disabled={!smartFillSuggestions.topics.length || allSuggestedTopicsSelected} className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 font-body text-xs font-semibold text-blue-800 hover:bg-blue-100 enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-60">{allSuggestedTopicsSelected ? 'Applied' : 'Apply all suggested topics'}</button>
+                  </div>
+                  {smartFillSuggestions.topics.length ? smartFillSuggestions.topics.map((suggestion) => {
+                    const topicAlreadySelected = selectedSubtopicIds.includes(suggestion.subtopicId)
+                    const topicApplied = topicAlreadySelected || smartFillApplied.topicIds.includes(suggestion.subtopicId)
+                    return (
+                      <div key={suggestion.subtopicId} className="mt-2 rounded-md bg-slate-50 p-2">
+                        <p className="font-body text-sm font-semibold text-[#00152a]">{suggestion.groupName}</p>
+                        <p className="font-body text-sm text-[#43474d]">{suggestion.subtopicName}</p>
+                        <p className="mt-1 font-body text-xs text-[#6f737b]">{suggestion.confidence} confidence</p>
+                        <button type="button" onClick={() => applySmartFillTopic(suggestion)} disabled={topicAlreadySelected} className={`mt-2 rounded-md border px-3 py-2 font-body text-xs font-semibold enabled:cursor-pointer disabled:cursor-not-allowed disabled:opacity-70 ${topicApplied ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-blue-200 text-blue-700 hover:bg-blue-50'}`}>{topicAlreadySelected ? 'Already selected' : topicApplied ? 'Applied' : 'Apply topic'}</button>
+                      </div>
+                    )
+                  }) : <p className="mt-1 font-body text-sm text-[#00152a]">No controlled topic match found</p>}
                 </div>
               </div>
             </div>
