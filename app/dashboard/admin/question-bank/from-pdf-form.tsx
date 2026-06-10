@@ -79,7 +79,7 @@ function PdfFileInput({ id, label, value, onChange }: { id: string; label: strin
   )
 }
 
-function PdfPageCanvas({ pdf, pageNumber, zoom, canUsePdf, crop, canAddCrop, addLabel, invalidMessage, onBeginCrop, onBeginMoveCrop, onBeginResizeCrop, onUpdateCrop, onFinishCrop, onAddCrop, registerCanvas, onRenderError }: { pdf: PdfDocumentProxy; pageNumber: number; zoom: number; canUsePdf: boolean; crop: CropRect; canAddCrop: boolean; addLabel: string; invalidMessage: string | null; onBeginCrop: (event: MouseEvent<HTMLDivElement>, pageNumber: number) => void; onBeginMoveCrop: (event: MouseEvent<HTMLDivElement>, crop: ActiveCropRect) => void; onBeginResizeCrop: (event: MouseEvent<HTMLButtonElement>, crop: ActiveCropRect, handle: CropHandle) => void; onUpdateCrop: (event: MouseEvent<HTMLDivElement>, pageNumber: number) => void; onFinishCrop: () => void; onAddCrop: () => void; registerCanvas: (pageNumber: number, canvas: HTMLCanvasElement | null) => void; onRenderError: () => void }) {
+function PdfPageCanvas({ pdf, pageNumber, zoom, canUsePdf, crop, canAddCrop, addLabel, invalidMessage, isMovingCrop, onBeginCrop, onBeginMoveCrop, onBeginResizeCrop, onUpdateCrop, onFinishCrop, onAddCrop, registerCanvas, onRenderError }: { pdf: PdfDocumentProxy; pageNumber: number; zoom: number; canUsePdf: boolean; crop: CropRect; canAddCrop: boolean; addLabel: string; invalidMessage: string | null; isMovingCrop: boolean; onBeginCrop: (event: MouseEvent<HTMLDivElement>, pageNumber: number) => void; onBeginMoveCrop: (event: MouseEvent<HTMLDivElement>, crop: ActiveCropRect) => void; onBeginResizeCrop: (event: MouseEvent<HTMLButtonElement>, crop: ActiveCropRect, handle: CropHandle) => void; onUpdateCrop: (event: MouseEvent<HTMLDivElement>, pageNumber: number) => void; onFinishCrop: () => void; onAddCrop: () => void; registerCanvas: (pageNumber: number, canvas: HTMLCanvasElement | null) => void; onRenderError: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null)
   const [rendering, setRendering] = useState(false)
@@ -124,6 +124,7 @@ function PdfPageCanvas({ pdf, pageNumber, zoom, canUsePdf, crop, canAddCrop, add
   }, [pdf, pageNumber, zoom, onRenderError])
 
   const activeCrop = crop?.pageNumber === pageNumber ? crop : null
+  const cropCursorStyle: CSSProperties = { cursor: isMovingCrop ? 'grabbing' : 'grab' }
   const canvasWidth = pageSize.width
   const canvasHeight = pageSize.height
   const buttonWidth = 176
@@ -152,8 +153,8 @@ function PdfPageCanvas({ pdf, pageNumber, zoom, canUsePdf, crop, canAddCrop, add
         {activeCrop ? (
           <>
             <div
-              className="absolute border-2 border-blue-600 bg-blue-500/15 shadow-[0_0_0_9999px_rgba(15,23,42,0.12)] cursor-move"
-              style={{ left: activeCrop.x, top: activeCrop.y, width: activeCrop.width, height: activeCrop.height }}
+              className="absolute border-2 border-blue-600 bg-blue-500/15 shadow-[0_0_0_9999px_rgba(15,23,42,0.12)]"
+              style={{ left: activeCrop.x, top: activeCrop.y, width: activeCrop.width, height: activeCrop.height, ...cropCursorStyle }}
               onMouseDown={(event) => onBeginMoveCrop(event, activeCrop)}
             >
               {cropHandles.map(({ handle, className, style }) => (
@@ -410,7 +411,7 @@ function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, 
           {pdf ? (
             <div className="space-y-5">
               {pageNumbers.map((pageNumber) => (
-                <PdfPageCanvas key={`${fileState.url}-${pageNumber}`} pdf={pdf} pageNumber={pageNumber} zoom={zoom} canUsePdf={canUsePdf} crop={crop} canAddCrop={canAddCrop} addLabel={floatingAddLabel} invalidMessage={cropInvalidMessage} onBeginCrop={beginCrop} onBeginMoveCrop={beginMoveCrop} onBeginResizeCrop={beginResizeCrop} onUpdateCrop={updateCrop} onFinishCrop={finishCrop} onAddCrop={addCrop} registerCanvas={registerCanvas} onRenderError={handleRenderError} />
+                <PdfPageCanvas key={`${fileState.url}-${pageNumber}`} pdf={pdf} pageNumber={pageNumber} zoom={zoom} canUsePdf={canUsePdf} crop={crop} canAddCrop={canAddCrop} addLabel={floatingAddLabel} invalidMessage={cropInvalidMessage} isMovingCrop={interaction?.mode === 'move' && interaction.pageNumber === pageNumber} onBeginCrop={beginCrop} onBeginMoveCrop={beginMoveCrop} onBeginResizeCrop={beginResizeCrop} onUpdateCrop={updateCrop} onFinishCrop={finishCrop} onAddCrop={addCrop} registerCanvas={registerCanvas} onRenderError={handleRenderError} />
               ))}
             </div>
           ) : <p className="rounded-md border border-slate-200 bg-white px-4 py-8 text-center font-body text-sm text-slate-500">Loading PDF pages…</p>}
