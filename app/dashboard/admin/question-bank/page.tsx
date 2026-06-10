@@ -6,7 +6,7 @@ import { QuestionBankList, type QuestionBankRow } from './question-bank-list'
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
-type WarningFilter = 'missing-markscheme' | 'missing-topic' | 'missing-question-image'
+type WarningFilter = 'missing-markscheme' | 'missing-topic' | 'missing-subtopic' | 'missing-question-image'
 
 function relationName(relation: unknown, key: 'id' | 'name' | 'title' | 'session_month' | 'parent_topic_id') {
   const item = Array.isArray(relation) ? relation[0] : relation
@@ -34,7 +34,8 @@ function hasAsset(question: { question_assets?: { asset_type: string | null; sto
 
 function warningKey(warning: string): WarningFilter | null {
   if (warning === 'Missing mark scheme image') return 'missing-markscheme'
-  if (warning === 'Missing topic/subtopic') return 'missing-topic'
+  if (warning === 'Missing topic') return 'missing-topic'
+  if (warning === 'Missing subtopic') return 'missing-subtopic'
   if (warning === 'Missing question image') return 'missing-question-image'
   return null
 }
@@ -79,6 +80,8 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
     const questionTopics = question.question_topics ?? []
     const primary = questionTopics.find((row) => row.is_primary) ?? questionTopics[0]
     const primaryTopic = Array.isArray(primary?.topics) ? primary?.topics[0] : primary?.topics
+    const hasTopicGroup = questionTopics.some((row) => Boolean(relationName(row.topics, 'id')))
+    const hasSubtopic = questionTopics.some((row) => Boolean(relationName(row.topics, 'parent_topic_id')))
     const parentName = primaryTopic?.parent_topic_id ? topicNames.get(primaryTopic.parent_topic_id) : null
     const hasQuestionImage = Boolean(question.question_image_path || question.image_url || hasAsset(question, 'question'))
     const hasMarkschemeImage = Boolean(question.markscheme_image_path || question.markscheme_image_url || hasAsset(question, 'markscheme'))
@@ -86,7 +89,8 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
     const warnings = [
       !hasQuestionImage ? 'Missing question image' : null,
       !hasMarkschemeImage ? 'Missing mark scheme image' : null,
-      !questionTopics.length ? 'Missing topic/subtopic' : null,
+      !hasTopicGroup ? 'Missing topic' : null,
+      hasTopicGroup && !hasSubtopic ? 'Missing subtopic' : null,
       !question.question_number ? 'Missing question number' : null,
       question.marks === null ? 'Missing marks' : null,
       orderKey && (orderCounts.get(orderKey) ?? 0) > 1 ? 'Duplicate order' : null,
