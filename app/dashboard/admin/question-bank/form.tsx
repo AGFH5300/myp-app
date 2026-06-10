@@ -554,7 +554,7 @@ export function QuestionBankForm({
         <div className="grid gap-4 md:grid-cols-3">
           <label htmlFor="admin-question-number" className="font-body text-sm text-[#43474d]">Question number<input id="admin-question-number" name="question_number" required className="tsm-input mt-1 w-full" value={questionNumber} onChange={(event) => setQuestionNumber(event.target.value)} placeholder="1a" /><span className="mt-1 block text-xs text-[#6f737b]">Use the number students see in the paper, for example 1a or 3(b).</span></label>
           <label htmlFor="admin-question-marks" className="font-body text-sm text-[#43474d]">Marks<input id="admin-question-marks" name="marks" type="number" min="0" className="tsm-input mt-1 w-full" defaultValue={question?.marks ?? ''} /></label>
-          <label htmlFor="admin-question-order" className="font-body text-sm text-[#43474d]">Display order<input id="admin-question-order" name="question_order" type="number" className="tsm-input mt-1 w-full" defaultValue={question?.question_order ?? ''} placeholder="Optional" /><span className="mt-1 block text-xs text-[#6f737b]">Display order controls where it appears within the paper.</span></label>
+          <label htmlFor="admin-question-order" className="font-body text-sm text-[#43474d]">Order in paper<input id="admin-question-order" name="question_order" type="number" className="tsm-input mt-1 w-full" defaultValue={question?.question_order ?? ''} placeholder="Optional" /><span className="mt-1 block text-xs text-[#6f737b]">Controls where this question appears in lists. Use 1 for the first question, 2 for the next, and so on.</span></label>
         </div>
       </StepCard>
 

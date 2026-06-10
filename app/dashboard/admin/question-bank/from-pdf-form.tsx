@@ -1,6 +1,6 @@
 "use client"
 
-import { MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { createQuestion } from './actions'
@@ -25,12 +25,14 @@ import {
 type PdfDocumentProxy = import('pdfjs-dist').PDFDocumentProxy
 
 type PdfFileState = { file: File; url: string } | null
-type CropRect = { x: number; y: number; width: number; height: number } | null
+type PdfCropType = 'paper' | 'markscheme'
+type CropRect = { pdfType: PdfCropType; pageNumber: number; x: number; y: number; width: number; height: number } | null
 
 type PdfCropPanelProps = {
   title: string
   helper: string
   fileState: PdfFileState
+  pdfType: PdfCropType
   cropLabel: string
   addLabel: string
   onAddCrop: (file: File) => void
@@ -65,28 +67,80 @@ function PdfFileInput({ id, label, value, onChange }: { id: string; label: strin
   )
 }
 
-function PdfCropPanel({ title, helper, fileState, cropLabel, addLabel, onAddCrop, nextFileName }: PdfCropPanelProps) {
+function PdfPageCanvas({ pdf, pageNumber, zoom, canUsePdf, crop, onBeginCrop, onUpdateCrop, onFinishCrop, registerCanvas, onRenderError }: { pdf: PdfDocumentProxy; pageNumber: number; zoom: number; canUsePdf: boolean; crop: CropRect; onBeginCrop: (event: MouseEvent<HTMLDivElement>, pageNumber: number) => void; onUpdateCrop: (event: MouseEvent<HTMLDivElement>, pageNumber: number) => void; onFinishCrop: () => void; registerCanvas: (pageNumber: number, canvas: HTMLCanvasElement | null) => void; onRenderError: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const wrapRef = useRef<HTMLDivElement>(null)
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null)
+  const [rendering, setRendering] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    async function renderPage() {
+      const canvas = canvasRef.current
+      if (!canvas) return
+      setRendering(true)
+      renderTaskRef.current?.cancel()
+      try {
+        const page = await pdf.getPage(pageNumber)
+        if (cancelled) return
+        const viewport = page.getViewport({ scale: zoom })
+        const renderScale = 2
+        const context = canvas.getContext('2d')
+        if (!context) throw new Error('Missing canvas context')
+        canvas.width = Math.round(viewport.width * renderScale)
+        canvas.height = Math.round(viewport.height * renderScale)
+        canvas.style.width = `${Math.round(viewport.width)}px`
+        canvas.style.height = `${Math.round(viewport.height)}px`
+        context.setTransform(renderScale, 0, 0, renderScale, 0, 0)
+        const task = page.render({ canvas, canvasContext: context, viewport })
+        renderTaskRef.current = task
+        await task.promise
+      } catch (renderError) {
+        if (!cancelled && !(renderError instanceof Error && renderError.name === 'RenderingCancelledException')) onRenderError()
+      } finally {
+        if (!cancelled) setRendering(false)
+      }
+    }
+    renderPage()
+    return () => {
+      cancelled = true
+      renderTaskRef.current?.cancel()
+    }
+  }, [pdf, pageNumber, zoom, onRenderError])
+
+  const activeCrop = crop?.pageNumber === pageNumber ? crop : null
+
+  return (
+    <div className="mx-auto w-fit rounded-md border border-slate-200 bg-slate-50 p-3 shadow-sm">
+      <div className="mb-2 flex items-center justify-between gap-3 font-body text-xs text-[#43474d]">
+        <span className="rounded-full bg-white px-2 py-1 font-semibold text-[#00152a]">Page {pageNumber}</span>
+        {rendering ? <span className="text-blue-700">Rendering…</span> : null}
+      </div>
+      <div className="relative inline-block select-none" onMouseDown={(event) => onBeginCrop(event, pageNumber)} onMouseMove={(event) => onUpdateCrop(event, pageNumber)} onMouseUp={onFinishCrop} onMouseLeave={onFinishCrop}>
+        <canvas ref={(canvas) => { canvasRef.current = canvas; registerCanvas(pageNumber, canvas) }} className={`block bg-white shadow-sm ${canUsePdf && !rendering ? 'cursor-crosshair' : 'cursor-not-allowed opacity-60'}`} />
+        {activeCrop ? <div className="pointer-events-none absolute border-2 border-blue-600 bg-blue-500/15 shadow-[0_0_0_9999px_rgba(15,23,42,0.12)]" style={{ left: activeCrop.x, top: activeCrop.y, width: activeCrop.width, height: activeCrop.height }} /> : null}
+      </div>
+    </div>
+  )
+}
+
+function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, onAddCrop, nextFileName }: PdfCropPanelProps) {
+  const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map())
   const [pdf, setPdf] = useState<PdfDocumentProxy | null>(null)
-  const [pageNumber, setPageNumber] = useState(1)
   const [pageCount, setPageCount] = useState(0)
   const [zoom, setZoom] = useState(1.2)
   const [crop, setCrop] = useState<CropRect>(null)
-  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null)
+  const [dragStart, setDragStart] = useState<{ pageNumber: number; x: number; y: number } | null>(null)
   const [loading, setLoading] = useState(false)
-  const [rendering, setRendering] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     // Reset PDF viewer state when the local object URL changes.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPdf(null)
-    setPageNumber(1)
     setPageCount(0)
     setCrop(null)
     setError(null)
+    canvasRefs.current.clear()
     const pdfUrl = fileState?.url ?? ''
     if (!pdfUrl) return
 
@@ -109,52 +163,28 @@ function PdfCropPanel({ title, helper, fileState, cropLabel, addLabel, onAddCrop
     loadPdf()
     return () => {
       cancelled = true
-      renderTaskRef.current?.cancel()
     }
   }, [fileState?.url])
 
-  useEffect(() => {
-    if (!pdf || !canvasRef.current) return
-    const currentPdf = pdf
-    let cancelled = false
-    async function renderPage() {
-      setRendering(true)
-      setError(null)
-      setCrop(null)
-      renderTaskRef.current?.cancel()
-      try {
-        const page = await currentPdf.getPage(pageNumber)
-        const viewport = page.getViewport({ scale: zoom })
-        const renderScale = 2
-        const canvas = canvasRef.current
-        if (!canvas) return
-        const context = canvas.getContext('2d')
-        if (!context) throw new Error('Missing canvas context')
-        canvas.width = Math.round(viewport.width * renderScale)
-        canvas.height = Math.round(viewport.height * renderScale)
-        canvas.style.width = `${Math.round(viewport.width)}px`
-        canvas.style.height = `${Math.round(viewport.height)}px`
-        context.setTransform(renderScale, 0, 0, renderScale, 0, 0)
-        const task = page.render({ canvas, canvasContext: context, viewport })
-        renderTaskRef.current = task
-        await task.promise
-      } catch (renderError) {
-        if (!cancelled && !(renderError instanceof Error && renderError.name === 'RenderingCancelledException')) {
-          setError('Could not render this PDF page. Try changing page or zoom.')
-        }
-      } finally {
-        if (!cancelled) setRendering(false)
-      }
-    }
-    renderPage()
-    return () => {
-      cancelled = true
-      renderTaskRef.current?.cancel()
-    }
-  }, [pdf, pageNumber, zoom])
+  function changeZoom(nextZoom: (current: number) => number) {
+    setCrop(null)
+    setDragStart(null)
+    setZoom(nextZoom)
+  }
 
-  function pointFromEvent(event: MouseEvent<HTMLDivElement>) {
-    const rect = canvasRef.current?.getBoundingClientRect()
+  const pageNumbers = useMemo(() => Array.from({ length: pageCount }, (_, index) => index + 1), [pageCount])
+
+  function registerCanvas(pageNumber: number, canvas: HTMLCanvasElement | null) {
+    if (canvas) canvasRefs.current.set(pageNumber, canvas)
+    else canvasRefs.current.delete(pageNumber)
+  }
+
+  const handleRenderError = useCallback(() => {
+    setError('Could not render a PDF page. Try changing zoom or selecting another PDF.')
+  }, [])
+
+  function pointFromEvent(event: MouseEvent<HTMLDivElement>, pageNumber: number) {
+    const rect = canvasRefs.current.get(pageNumber)?.getBoundingClientRect()
     if (!rect) return { x: 0, y: 0 }
     return {
       x: Math.max(0, Math.min(event.clientX - rect.left, rect.width)),
@@ -162,17 +192,19 @@ function PdfCropPanel({ title, helper, fileState, cropLabel, addLabel, onAddCrop
     }
   }
 
-  function beginCrop(event: MouseEvent<HTMLDivElement>) {
-    if (!pdf || rendering) return
-    const point = pointFromEvent(event)
-    setDragStart(point)
-    setCrop({ x: point.x, y: point.y, width: 0, height: 0 })
+  function beginCrop(event: MouseEvent<HTMLDivElement>, pageNumber: number) {
+    if (!pdf || loading) return
+    const point = pointFromEvent(event, pageNumber)
+    setDragStart({ pageNumber, ...point })
+    setCrop({ pdfType, pageNumber, x: point.x, y: point.y, width: 0, height: 0 })
   }
 
-  function updateCrop(event: MouseEvent<HTMLDivElement>) {
-    if (!dragStart) return
-    const point = pointFromEvent(event)
+  function updateCrop(event: MouseEvent<HTMLDivElement>, pageNumber: number) {
+    if (!dragStart || dragStart.pageNumber !== pageNumber) return
+    const point = pointFromEvent(event, pageNumber)
     setCrop({
+      pdfType,
+      pageNumber,
       x: Math.min(dragStart.x, point.x),
       y: Math.min(dragStart.y, point.y),
       width: Math.abs(point.x - dragStart.x),
@@ -186,8 +218,9 @@ function PdfCropPanel({ title, helper, fileState, cropLabel, addLabel, onAddCrop
   }
 
   function addCrop() {
-    const canvas = canvasRef.current
-    if (!canvas || !crop) return
+    if (!crop) return
+    const canvas = canvasRefs.current.get(crop.pageNumber)
+    if (!canvas) return
     const cssWidth = Number.parseFloat(canvas.style.width) || canvas.width
     const cssHeight = Number.parseFloat(canvas.style.height) || canvas.height
     const scaleX = canvas.width / cssWidth
@@ -207,12 +240,12 @@ function PdfCropPanel({ title, helper, fileState, cropLabel, addLabel, onAddCrop
       }
       onAddCrop(new File([blob], nextFileName(), { type: 'image/png' }))
       setCrop(null)
-      toast.success(`${cropLabel} added.`)
+      toast.success(`${cropLabel} added from page ${crop.pageNumber}.`)
     }, 'image/png')
   }
 
   const canUsePdf = Boolean(pdf && !loading && !error)
-  const canAddCrop = Boolean(crop && crop.width > 8 && crop.height > 8 && canUsePdf && !rendering)
+  const canAddCrop = Boolean(crop && crop.width > 8 && crop.height > 8 && canUsePdf)
 
   return (
     <div className="rounded-md border border-[#c3c6ce66] bg-[#fbf9f4] p-4">
@@ -220,28 +253,31 @@ function PdfCropPanel({ title, helper, fileState, cropLabel, addLabel, onAddCrop
         <div>
           <h3 className="font-headline text-2xl text-[#00152a]">{title}</h3>
           <p className="mt-1 font-body text-sm text-[#43474d]">{helper}</p>
-          <p className="mt-2 font-body text-sm font-semibold text-[#00152a]">Drag over the PDF page to select the area to crop.</p>
+          <p className="mt-2 font-body text-sm font-semibold text-[#00152a]">Scroll through the PDF, then drag over a page to crop the exact area needed.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => setPageNumber((page) => Math.max(1, page - 1))} disabled={!canUsePdf || pageNumber <= 1} className="tsm-btn-secondary disabled:cursor-not-allowed disabled:opacity-50">Previous</button>
-          <button type="button" onClick={() => setPageNumber((page) => Math.min(pageCount, page + 1))} disabled={!canUsePdf || pageNumber >= pageCount} className="tsm-btn-secondary disabled:cursor-not-allowed disabled:opacity-50">Next</button>
-          <button type="button" onClick={() => setZoom((value) => Math.max(0.7, Number((value - 0.2).toFixed(1))))} disabled={!canUsePdf} className="tsm-btn-secondary disabled:cursor-not-allowed disabled:opacity-50">Zoom out</button>
-          <button type="button" onClick={() => setZoom((value) => Math.min(2.4, Number((value + 0.2).toFixed(1))))} disabled={!canUsePdf} className="tsm-btn-secondary disabled:cursor-not-allowed disabled:opacity-50">Zoom in</button>
+          <button type="button" onClick={() => changeZoom((value) => Math.max(0.7, Number((value - 0.2).toFixed(1))))} disabled={!canUsePdf} className="tsm-btn-secondary disabled:cursor-not-allowed disabled:opacity-50">Zoom out</button>
+          <button type="button" onClick={() => changeZoom(() => 1.2)} disabled={!canUsePdf} className="tsm-btn-secondary disabled:cursor-not-allowed disabled:opacity-50">Reset zoom</button>
+          <button type="button" onClick={() => changeZoom((value) => Math.min(2.4, Number((value + 0.2).toFixed(1))))} disabled={!canUsePdf} className="tsm-btn-secondary disabled:cursor-not-allowed disabled:opacity-50">Zoom in</button>
         </div>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-3 font-body text-sm text-[#43474d]">
-        <span>Page {pageCount ? pageNumber : '—'} of {pageCount || '—'}</span>
+        <span>{pageCount ? `${pageCount} page${pageCount === 1 ? '' : 's'}` : 'No pages loaded'}</span>
         <span>Zoom {Math.round(zoom * 100)}%</span>
-        {loading || rendering ? <span className="font-semibold text-blue-700">Loading…</span> : null}
+        {crop ? <span className="font-semibold text-blue-700">Current crop: page {crop.pageNumber}</span> : null}
+        {loading ? <span className="font-semibold text-blue-700">Loading…</span> : null}
       </div>
       {error ? <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 font-body text-sm text-red-700">{error}</p> : null}
       {!fileState ? <p className="mt-4 rounded-md border border-slate-200 bg-white px-4 py-8 text-center font-body text-sm text-slate-500">Select a local PDF in Step 2 to enable cropping.</p> : null}
       {fileState ? (
-        <div ref={wrapRef} className="mt-4 max-h-[70vh] overflow-auto rounded-md border border-slate-200 bg-white p-3">
-          <div className="relative inline-block select-none" onMouseDown={beginCrop} onMouseMove={updateCrop} onMouseUp={finishCrop} onMouseLeave={finishCrop}>
-            <canvas ref={canvasRef} className={`block bg-white shadow-sm ${canUsePdf ? 'cursor-crosshair' : 'cursor-not-allowed opacity-60'}`} />
-            {crop ? <div className="pointer-events-none absolute border-2 border-blue-600 bg-blue-500/15 shadow-[0_0_0_9999px_rgba(15,23,42,0.12)]" style={{ left: crop.x, top: crop.y, width: crop.width, height: crop.height }} /> : null}
-          </div>
+        <div className="mt-4 max-h-[70vh] overflow-auto rounded-md border border-slate-200 bg-white p-4">
+          {pdf ? (
+            <div className="space-y-5">
+              {pageNumbers.map((pageNumber) => (
+                <PdfPageCanvas key={`${fileState.url}-${pageNumber}`} pdf={pdf} pageNumber={pageNumber} zoom={zoom} canUsePdf={canUsePdf} crop={crop} onBeginCrop={beginCrop} onUpdateCrop={updateCrop} onFinishCrop={finishCrop} registerCanvas={registerCanvas} onRenderError={handleRenderError} />
+              ))}
+            </div>
+          ) : <p className="rounded-md border border-slate-200 bg-white px-4 py-8 text-center font-body text-sm text-slate-500">Loading PDF pages…</p>}
         </div>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-3">
@@ -378,14 +414,14 @@ export function QuestionFromPdfForm({ papers, subjects, topics }: { papers: Pape
       </StepCard>
 
       <StepCard step={3} title="Crop question images" state={!step2Complete ? 'locked' : step3Complete ? 'complete' : 'current'} helper="Crop every part needed to answer this question.">
-        <PdfCropPanel title="Paper PDF cropper" helper="Use this for question text, diagrams, tables, graphs, and continuation pages." fileState={paperFile} cropLabel="Question crop" addLabel="Add crop to question images" onAddCrop={addQuestionCrop} nextFileName={() => `question-${questionNumber.trim() || 'untitled'}-crop-${questionFiles.length + 1}.png`} />
+        <PdfCropPanel title="Paper PDF cropper" helper="Use this for question text, diagrams, tables, graphs, and continuation pages." fileState={paperFile} pdfType="paper" cropLabel="Question crop" addLabel="Add crop to question images" onAddCrop={addQuestionCrop} nextFileName={() => `question-${questionNumber.trim() || 'untitled'}-crop-${questionFiles.length + 1}.png`} />
         <div className="mt-5">
           <ImageUploadGroup title="Question image" name="question_image_file" fileKeyName="question_file_key" assetOrderName="question_asset_order" existingAssets={[]} files={questionFiles} setFiles={setQuestionFiles} order={questionOrder} setOrder={setQuestionOrder} onPreview={(index) => setLightbox({ group: 'question', index })} />
         </div>
       </StepCard>
 
       <StepCard step={4} title="Crop mark scheme images" state={!step3Complete ? 'locked' : step4Complete ? 'complete' : 'current'} helper="Crop the matching mark scheme parts for this one question.">
-        <PdfCropPanel title="Mark scheme PDF cropper" helper="Use this for mark allocations, method notes, and answer continuations." fileState={markschemeFile} cropLabel="Mark scheme crop" addLabel="Add crop to mark scheme images" onAddCrop={addMarkschemeCrop} nextFileName={() => `markscheme-${questionNumber.trim() || 'untitled'}-crop-${markschemeFiles.length + 1}.png`} />
+        <PdfCropPanel title="Mark scheme PDF cropper" helper="Use this for mark allocations, method notes, and answer continuations." fileState={markschemeFile} pdfType="markscheme" cropLabel="Mark scheme crop" addLabel="Add crop to mark scheme images" onAddCrop={addMarkschemeCrop} nextFileName={() => `markscheme-${questionNumber.trim() || 'untitled'}-crop-${markschemeFiles.length + 1}.png`} />
         <div className="mt-5">
           <ImageUploadGroup title="Mark scheme image" name="markscheme_image_file" fileKeyName="markscheme_file_key" assetOrderName="markscheme_asset_order" existingAssets={[]} files={markschemeFiles} setFiles={setMarkschemeFiles} order={markschemeOrder} setOrder={setMarkschemeOrder} onPreview={(index) => setLightbox({ group: 'markscheme', index })} />
         </div>
@@ -394,7 +430,7 @@ export function QuestionFromPdfForm({ papers, subjects, topics }: { papers: Pape
       <StepCard step={5} title="Question details and topics" state={!step4Complete ? 'locked' : step5Complete ? 'complete' : 'current'} helper="Add the required labels before saving.">
         <div className="grid gap-4 md:grid-cols-3">
           <label className="font-body text-sm text-[#43474d]">Question number<input name="question_number" value={questionNumber} onChange={(event) => setQuestionNumber(event.target.value)} className="tsm-input mt-1 w-full" placeholder="1a" /></label>
-          <label className="font-body text-sm text-[#43474d]">Display order<input name="question_order" value={questionOrderValue} onChange={(event) => setQuestionOrderValue(event.target.value)} inputMode="decimal" className="tsm-input mt-1 w-full" placeholder="1" /></label>
+          <label className="font-body text-sm text-[#43474d]">Order in paper<input name="question_order" value={questionOrderValue} onChange={(event) => setQuestionOrderValue(event.target.value)} inputMode="decimal" className="tsm-input mt-1 w-full" placeholder="1" /><span className="mt-1 block text-xs text-[#6f737b]">Controls where this question appears in lists. Use 1 for the first question, 2 for the next, and so on.</span></label>
           <label className="font-body text-sm text-[#43474d]">Marks<input name="marks" value={marks} onChange={(event) => setMarks(event.target.value)} inputMode="numeric" className="tsm-input mt-1 w-full" placeholder="6" /></label>
         </div>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
