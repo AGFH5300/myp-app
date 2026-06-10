@@ -288,3 +288,23 @@ export async function updateQuestion(formData: FormData) {
     return { ok: false as const, message: error instanceof Error ? error.message : 'Could not update question.' }
   }
 }
+
+export async function batchUpdateQuestionPublication(questionIds: string[], publish: boolean) {
+  const supabase = await requireAdmin()
+  try {
+    const ids = questionIds.filter((id) => typeof id === 'string' && id.length > 0)
+    if (!ids.length) return { ok: false as const, message: 'Select at least one question.' }
+
+    const { error } = await supabase
+      .from('questions')
+      .update({ is_published: publish })
+      .in('id', ids)
+
+    if (error) throw new Error(publish ? 'Could not publish selected questions.' : 'Could not unpublish selected questions.')
+    revalidatePath('/dashboard/admin/question-bank')
+    revalidatePath('/dashboard/papers')
+    return { ok: true as const, message: publish ? 'Questions published' : 'Questions unpublished' }
+  } catch (error) {
+    return { ok: false as const, message: error instanceof Error ? error.message : 'Could not update selected questions.' }
+  }
+}

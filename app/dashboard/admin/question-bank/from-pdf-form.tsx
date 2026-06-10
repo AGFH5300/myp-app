@@ -1,7 +1,7 @@
 "use client"
 
-import { type CSSProperties, type FormEvent, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
+import { type CSSProperties, type DragEvent, type FormEvent, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { RotateCcw, Upload, ZoomIn, ZoomOut } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -60,25 +60,40 @@ function makeCropPreview(file: File): LocalPreview {
 }
 
 function PdfFileInput({ id, label, value, onChange }: { id: string; label: string; value: PdfFileState; onChange: (value: PdfFileState) => void }) {
+  const [dropActive, setDropActive] = useState(false)
+
   function setFile(file: File | undefined) {
     if (value?.url) URL.revokeObjectURL(value.url)
     if (!file) {
       onChange(null)
       return
     }
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) return
     onChange({ file, url: URL.createObjectURL(file) })
   }
 
+  function handleDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault()
+    setDropActive(false)
+    setFile(Array.from(event.dataTransfer.files).find((file) => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')))
+  }
+
   return (
-    <div className="rounded-md border border-[#c3c6ce66] bg-[#fbf9f4] p-4">
-      <label htmlFor={id} className="block font-body text-sm font-semibold text-[#00152a]">{label}</label>
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <label htmlFor={id} className="tsm-btn-secondary cursor-pointer">{value ? 'Change PDF' : 'Select PDF'}</label>
+    <div>
+      <label htmlFor={id} onDragEnter={() => setDropActive(true)} onDragOver={(event) => { event.preventDefault(); setDropActive(true) }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropActive(false) }} onDrop={handleDrop} className={`relative block cursor-pointer overflow-hidden rounded-lg border-2 border-dashed p-5 text-center font-body text-sm text-[#43474d] transition focus-within:ring-2 focus-within:ring-blue-300 ${dropActive ? 'border-blue-500 bg-blue-100 shadow-inner' : 'border-blue-200 bg-blue-50/50 hover:border-blue-400 hover:bg-blue-50'}`}>
+        <span className="block font-semibold text-[#00152a]">{label}</span>
+        <span className="mt-2 block text-base font-semibold text-blue-800">Drag a PDF here or click to upload</span>
+        <span className="mt-1 block">{value ? value.file.name : 'No PDF selected yet.'}</span>
+        <span className="mt-1 block text-xs text-[#5f646c]">Use the question paper PDF or mark scheme PDF for cropping.</span>
+        {dropActive ? (
+          <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[#00152a]/75 text-white backdrop-blur-[1px]">
+            <Upload className="size-8" aria-hidden="true" />
+            <span className="font-body text-base font-semibold">Drop PDF to upload</span>
+          </span>
+        ) : null}
         <input id={id} type="file" accept="application/pdf,.pdf" className="sr-only" onChange={(event) => setFile(event.target.files?.[0])} />
-        {value ? <button type="button" onClick={() => setFile(undefined)} className="rounded-md border border-red-200 px-3 py-2 font-body text-sm font-semibold text-red-700 hover:bg-red-50">Remove</button> : null}
-      </div>
-      <p className="mt-3 font-body text-sm text-[#43474d]">{value ? value.file.name : 'No PDF selected yet.'}</p>
-      
+      </label>
+      {value ? <button type="button" onClick={() => setFile(undefined)} className="mt-3 rounded-md border border-red-200 px-3 py-2 font-body text-sm font-semibold text-red-700 hover:bg-red-50">Remove PDF</button> : null}
     </div>
   )
 }
@@ -401,6 +416,7 @@ function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="font-headline text-2xl text-[#00152a]">{title}</h3>
+          <p className="mt-1 font-body text-sm text-[#43474d]">{helper}</p>
           <p className="mt-1 font-body text-sm text-[#43474d]">Drag to select an area. Adjust the crop, then add it.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
