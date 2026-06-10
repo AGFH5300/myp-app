@@ -2,13 +2,15 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { type CSSProperties, DragEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { type CSSProperties, DragEvent, type FormEvent, KeyboardEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { Eye, GripVertical, Trash2, Upload, ChevronUp, ChevronDown } from 'lucide-react'
-import { useFormStatus } from 'react-dom'
+import { toast } from 'sonner'
 import { createQuestion, updateQuestion } from './actions'
 
 export type PaperRelation<T> = T | T[] | null
 export type Paper = { id: string; title: string; year: number; level: string | null; subjects?: PaperRelation<{ id?: string | null; name?: string | null }>; exam_sessions?: PaperRelation<{ session_month?: string | null }> }
+export type PaperQuestion = { id: string; paper_id: string; question_number: string | null; question_order: number | null }
 export type Subject = { id: string; name: string }
 export type Topic = { id: string; name: string; subject_id?: string | null; parent_topic_id?: string | null; level?: string | null; sort_order?: number | null; is_active?: boolean | null }
 type QuestionTopic = { topic_id: string; is_primary?: boolean | null }
@@ -51,6 +53,58 @@ export function paperLabel(paper: Paper) {
 
 export function topicMatchesMainScope(topic: Topic, subjectId: string) {
   return topic.is_active !== false && Boolean(subjectId) && topic.subject_id === subjectId
+}
+
+
+function readableActionError(error: unknown) {
+  const message = typeof error === 'string' ? error : error instanceof Error ? error.message : ''
+  if (!message) return 'Could not save question. Please try again.'
+  if (/NEXT_|digest|failed to fetch|server components/i.test(message)) return 'Could not save question. Please try again.'
+  return message
+}
+
+export function suggestedQuestionOrder(paperMode: 'existing' | 'new', paperId: string, paperQuestions: PaperQuestion[]) {
+  if (paperMode === 'new' || !paperId) return 1
+  const orders = paperQuestions
+    .filter((item) => item.paper_id === paperId && Number.isFinite(item.question_order))
+    .map((item) => item.question_order ?? 0)
+  return orders.length ? Math.max(...orders) + 1 : 1
+}
+
+export function paperQuestionReference(paperMode: 'existing' | 'new', paperId: string, paperQuestions: PaperQuestion[]) {
+  if (paperMode === 'new' || !paperId) return []
+  return paperQuestions
+    .filter((item) => item.paper_id === paperId)
+    .sort((a, b) => (a.question_order ?? Number.MAX_SAFE_INTEGER) - (b.question_order ?? Number.MAX_SAFE_INTEGER) || (a.question_number || '').localeCompare(b.question_number || ''))
+}
+
+export function OrderInPaperHelper({ suggestedOrder, questions, onUseSuggested }: { suggestedOrder: number; questions: PaperQuestion[]; onUseSuggested: () => void }) {
+  const hasLongList = questions.length > 6
+  const list = (
+    <div className="mt-2 space-y-1">
+      {questions.map((item) => (
+        <p key={item.id} className="font-body text-xs text-[#43474d]">
+          <span className="font-semibold text-[#00152a]">{item.question_order ?? '—'}</span> — {item.question_number || 'Untitled question'}
+        </p>
+      ))}
+      {!questions.length ? <p className="font-body text-xs text-[#6f737b]">No questions saved for this paper yet.</p> : null}
+    </div>
+  )
+
+  return (
+    <div className="mt-2 rounded-md border border-blue-100 bg-blue-50/50 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-body text-xs font-semibold text-blue-900">Suggested next order: {suggestedOrder}</p>
+        <button type="button" onClick={onUseSuggested} className="rounded-sm border border-blue-200 bg-white px-2 py-1 font-body text-xs font-semibold text-blue-700 hover:bg-blue-50">Use suggested</button>
+      </div>
+      {hasLongList ? (
+        <details className="mt-2">
+          <summary className="cursor-pointer font-body text-xs font-semibold text-[#735b2b]">Show existing order ({questions.length})</summary>
+          {list}
+        </details>
+      ) : list}
+    </div>
+  )
 }
 
 function statusBadgeClasses(state: StepState) {
@@ -404,6 +458,7 @@ export function QuestionBankForm({
   questionPreviewUrl,
   markschemePreviewUrl,
   questionAssets = [],
+  paperQuestions = [],
 }: {
   mode: 'new' | 'edit'
   papers: Paper[]
@@ -413,6 +468,7 @@ export function QuestionBankForm({
   questionPreviewUrl?: string | null
   markschemePreviewUrl?: string | null
   questionAssets?: QuestionAsset[]
+  paperQuestions?: PaperQuestion[]
 }) {
   const currentPaper = papers.find((paper) => paper.id === question?.paper_id)
   const defaultSubjectId = relationLabel(currentPaper?.subjects, 'id') || subjects.find((subject) => subject.name === 'Mathematics Extended')?.id || subjects.find((subject) => subject.name === 'Mathematics')?.id || subjects[0]?.id || ''
@@ -420,7 +476,7 @@ export function QuestionBankForm({
   const primaryTopicIdFromQuestion = question?.question_topics?.find((row) => row.is_primary)?.topic_id || ''
   const primaryTopic = topics.find((topic) => topic.id === primaryTopicIdFromQuestion)
   const initialTopicGroupId = primaryTopic?.parent_topic_id || primaryTopic?.id || ''
-  const action = mode === 'new' ? createQuestion : updateQuestion
+  const router = useRouter()
 
   const [paperMode, setPaperMode] = useState<'existing' | 'new'>(question?.paper_id ? 'existing' : 'existing')
   const [subjectId, setSubjectId] = useState(defaultSubjectId)
@@ -430,6 +486,7 @@ export function QuestionBankForm({
   const [newPaperYear, setNewPaperYear] = useState('2025')
   const [newPaperSession, setNewPaperSession] = useState('May')
   const [questionNumber, setQuestionNumber] = useState(question?.question_number || '')
+  const [questionOrderValue, setQuestionOrderValue] = useState(question?.question_order?.toString() || '')
   const [topicGroupId, setTopicGroupId] = useState(initialTopicGroupId)
   const [selectedSubtopicIds, setSelectedSubtopicIds] = useState(() => Array.from(selectedTopics).filter((topicId) => topics.find((topic) => topic.id === topicId)?.parent_topic_id === initialTopicGroupId))
   const [primaryTopicId, setPrimaryTopicId] = useState(primaryTopicIdFromQuestion)
@@ -443,6 +500,7 @@ export function QuestionBankForm({
   const [markschemeOrder, setMarkschemeOrder] = useState(existingMarkschemeAssets.map((asset) => `existing:${asset.id}`))
   const [lightbox, setLightbox] = useState<LightboxState>(null)
   const [openSelectId, setOpenSelectId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const questionFilesRef = useRef(questionFiles)
   const markschemeFilesRef = useRef(markschemeFiles)
 
@@ -496,6 +554,8 @@ export function QuestionBankForm({
   const step4Complete = Boolean(topicGroupId && (selectedSubtopicIds.length || !subtopics.length))
   const readyToSubmit = step1Complete && step2Complete && step3Complete && step4Complete
   const effectivePrimaryTopicId = selectedSubtopicIds.includes(primaryTopicId) ? primaryTopicId : selectedSubtopicIds[0] || topicGroupId
+  const suggestedOrder = suggestedQuestionOrder(paperMode, paperId, paperQuestions)
+  const orderReference = paperQuestionReference(paperMode, paperId, paperQuestions)
 
   const step1State: StepState = step1Complete ? 'complete' : 'current'
   const step2State: StepState = !step1Complete ? 'locked' : step2Complete ? 'complete' : 'current'
@@ -510,8 +570,35 @@ export function QuestionBankForm({
     if (markschemeLightboxItems[index]?.url) setLightbox({ group: 'markscheme', index })
   }
 
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!readyToSubmit || saving) return
+
+    setSaving(true)
+    const toastId = mode === 'new' ? 'question-create' : 'question-update'
+    try {
+      toast.loading(mode === 'new' ? 'Creating question…' : 'Saving question…', { id: toastId })
+      const action = mode === 'new' ? createQuestion : updateQuestion
+      const result = await action(new FormData(event.currentTarget))
+      if (!result.ok) {
+        toast.error(readableActionError(result.message), { id: toastId })
+        return
+      }
+      toast.success(mode === 'new' ? 'Question created' : 'Question updated', { id: toastId })
+      if (mode === 'new') {
+        router.push('/dashboard/admin/question-bank')
+      } else {
+        router.refresh()
+      }
+    } catch (error) {
+      toast.error(readableActionError(error), { id: toastId })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
-    <form action={action} className="space-y-8" onSubmit={(event) => { if (!readyToSubmit) event.preventDefault() }}>
+    <form className="space-y-8" onSubmit={handleSubmit}>
       {question ? <input type="hidden" name="question_id" value={question.id} /> : null}
       <input type="hidden" name="paper_id" value={paperMode === 'existing' ? paperId : ''} />
       <input type="hidden" name="primary_topic_id" value={effectivePrimaryTopicId} />
@@ -555,7 +642,7 @@ export function QuestionBankForm({
         <div className="grid gap-4 md:grid-cols-3">
           <label htmlFor="admin-question-number" className="font-body text-sm text-[#43474d]">Question number<input id="admin-question-number" name="question_number" required className="tsm-input mt-1 w-full" value={questionNumber} onChange={(event) => setQuestionNumber(event.target.value)} placeholder="1a" /><span className="mt-1 block text-xs text-[#6f737b]">Use the number students see in the paper, for example 1a or 3(b).</span></label>
           <label htmlFor="admin-question-marks" className="font-body text-sm text-[#43474d]">Marks<input id="admin-question-marks" name="marks" type="number" min="0" className="tsm-input mt-1 w-full" defaultValue={question?.marks ?? ''} /></label>
-          <label htmlFor="admin-question-order" className="font-body text-sm text-[#43474d]">Order in paper<input id="admin-question-order" name="question_order" type="number" className="tsm-input mt-1 w-full" defaultValue={question?.question_order ?? ''} placeholder="Optional" /><span className="mt-1 block text-xs text-[#6f737b]">Controls where this question appears in lists. Use 1 for the first question, 2 for the next, and so on.</span></label>
+          <label htmlFor="admin-question-order" className="font-body text-sm text-[#43474d]">Order in paper<input id="admin-question-order" name="question_order" type="number" className="tsm-input mt-1 w-full" value={questionOrderValue} onChange={(event) => setQuestionOrderValue(event.target.value)} placeholder="Optional" /><span className="mt-1 block text-xs text-[#6f737b]">Controls where this question appears in lists. Use 1 for the first question, 2 for the next, and so on.</span>{mode === 'new' ? <OrderInPaperHelper suggestedOrder={suggestedOrder} questions={orderReference} onUseSuggested={() => setQuestionOrderValue(String(suggestedOrder))} /> : null}</label>
         </div>
       </StepCard>
 
@@ -612,7 +699,7 @@ export function QuestionBankForm({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className={`font-body text-sm font-semibold ${readyToSubmit ? 'text-emerald-700' : 'text-amber-800'}`}>{readyToSubmit ? 'Ready to save: all required steps are complete.' : 'Not ready yet: complete the highlighted required steps.'}</p>
           <div className="flex flex-wrap gap-3">
-            <SubmitButton readyToSubmit={readyToSubmit} label={mode === 'new' ? 'Create question' : 'Save question'} />
+            <SubmitButton readyToSubmit={readyToSubmit} saving={saving} label={mode === 'new' ? 'Create question' : 'Save question'} />
             <Link href="/dashboard/admin/question-bank" className="tsm-btn-secondary">Cancel</Link>
           </div>
         </div>
@@ -622,12 +709,11 @@ export function QuestionBankForm({
   )
 }
 
-export function SubmitButton({ readyToSubmit, label }: { readyToSubmit: boolean; label: string }) {
-  const { pending } = useFormStatus()
+export function SubmitButton({ readyToSubmit, saving, label }: { readyToSubmit: boolean; saving: boolean; label: string }) {
   return (
-    <button type="submit" className="tsm-btn-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50" disabled={!readyToSubmit || pending}>
-      {pending ? <span className="inline-block size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" /> : null}
-      {pending ? 'Saving...' : label}
+    <button type="submit" className="tsm-btn-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50" disabled={!readyToSubmit || saving}>
+      {saving ? <span className="inline-block size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" /> : null}
+      {saving ? 'Saving...' : label}
     </button>
   )
 }

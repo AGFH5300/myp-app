@@ -11,10 +11,11 @@ export default async function NewQuestionPage() {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
   if (profile?.role !== 'admin') redirect('/dashboard')
 
-  const [{ data: papers }, { data: subjects }, { data: topics }] = await Promise.all([
+  const [{ data: papers }, { data: subjects }, { data: topics }, { data: paperQuestions }] = await Promise.all([
     supabase.from('papers').select('id,title,year,level,subjects(id,name),exam_sessions(session_month)').order('year', { ascending: false }).order('title'),
     supabase.from('subjects').select('id,name').order('name'),
     supabase.from('topics').select('id,name,subject_id,parent_topic_id,level,sort_order,is_active').order('sort_order').order('name'),
+    supabase.from('questions').select('id,paper_id,question_number,question_order').order('question_order').order('question_number'),
   ])
 
   return (
@@ -26,7 +27,7 @@ export default async function NewQuestionPage() {
         </div>
         <Link href="/dashboard/admin/question-bank" className="tsm-btn-secondary">Back to Question Bank</Link>
       </header>
-      <QuestionBankForm mode="new" papers={papers ?? []} subjects={subjects ?? []} topics={topics ?? []} />
+      <QuestionBankForm mode="new" papers={papers ?? []} subjects={subjects ?? []} topics={topics ?? []} paperQuestions={paperQuestions ?? []} />
     </div>
   )
 }
