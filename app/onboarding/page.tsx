@@ -82,7 +82,7 @@ export default function OnboardingPage() {
               <p className="font-label text-xs uppercase tracking-[.12em] text-[#43474d]">What this influences</p>
               <ul className="mt-4 space-y-2 font-body text-sm text-[#43474d]">
                 <li>• Subject-first browsing on your dashboard</li>
-                <li>• Better paper recommendations for your MYP level</li>
+                <li>• Better paper recommendations for your subjects</li>
                 <li>• Faster returns to the topics you revise most often</li>
               </ul>
             </div>

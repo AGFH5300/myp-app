@@ -5,17 +5,15 @@ import { useState } from 'react'
 import { SearchableSelect, type SearchableSelectOption } from '@/components/searchable-select'
 
 type AdminQuestionBankFilterFormProps = {
-  initial: { q: string; subject: string; level: string; paper: string; topic: string; published: string; reviewed: string }
+  initial: { q: string; subject: string; paper: string; topic: string; published: string; reviewed: string }
   subjects: SearchableSelectOption[]
-  levels: SearchableSelectOption[]
   papers: SearchableSelectOption[]
   topics: SearchableSelectOption[]
 }
 
-export function AdminQuestionBankFilterForm({ initial, subjects, levels, papers, topics }: AdminQuestionBankFilterFormProps) {
+export function AdminQuestionBankFilterForm({ initial, subjects, papers, topics }: AdminQuestionBankFilterFormProps) {
   const [openSelectId, setOpenSelectId] = useState<string | null>(null)
   const [subject, setSubject] = useState(initial.subject)
-  const [level, setLevel] = useState(initial.level)
   const [paper, setPaper] = useState(initial.paper)
   const [topic, setTopic] = useState(initial.topic)
   const [published, setPublished] = useState(initial.published)
@@ -24,10 +22,9 @@ export function AdminQuestionBankFilterForm({ initial, subjects, levels, papers,
   return (
     <form className="rounded-md border border-blue-100 bg-white p-5 shadow-sm" action="/dashboard/admin/question-bank">
       <p className="mb-4 font-body text-sm font-semibold text-[#00152a]">Filter the admin question list</p>
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
         <label htmlFor="admin-qb-filter-search" className="md:col-span-2 font-body text-sm text-[#43474d]">Search<input id="admin-qb-filter-search" name="q" className="tsm-input mt-1 w-full" defaultValue={initial.q} placeholder="Paper, topic, or Q1a" /></label>
         <SearchableSelect id="admin-qb-filter-subject" name="subject" label="Subject" value={subject} onChange={setSubject} placeholder="All subjects" emptyText="No matching subjects found." options={subjects} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
-        <SearchableSelect id="admin-qb-filter-level" name="level" label="Level" value={level} onChange={setLevel} placeholder="All levels" emptyText="No matching levels found." options={levels} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
         <SearchableSelect id="admin-qb-filter-paper" name="paper" label="Paper" value={paper} onChange={setPaper} placeholder="All papers" emptyText="No matching papers found." options={papers} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
         <SearchableSelect id="admin-qb-filter-topic" name="topic" label="Topic" value={topic} onChange={setTopic} placeholder="All topics" emptyText="No matching topics found." options={topics} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
         <SearchableSelect id="admin-qb-filter-published" name="published" label="Shown" value={published} onChange={setPublished} placeholder="Any" emptyText="No matching states found." options={[{ value: 'true', label: 'Show to students' }, { value: 'false', label: 'Hidden' }]} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />

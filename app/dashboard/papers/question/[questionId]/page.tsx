@@ -60,7 +60,7 @@ export default async function DashboardPaperQuestionPage({ params, searchParams 
 
   const { data: question } = await supabase
     .from('questions')
-    .select('id,question_number,prompt_text,image_url,question_image_path,markscheme_text,markscheme_image_url,markscheme_image_path,marks,papers!inner(id,title,year,level,is_published,markscheme_url,subjects(id,name),exam_sessions(session_month,session_year)),question_topics(is_primary,topics(id,name,parent_topic_id))')
+    .select('id,question_number,prompt_text,image_url,question_image_path,markscheme_text,markscheme_image_url,markscheme_image_path,marks,papers!inner(id,title,year,is_published,markscheme_url,subjects(id,name),exam_sessions(session_month,session_year)),question_topics(is_primary,topics(id,name,parent_topic_id))')
     .eq('id', questionId)
     .eq('is_published', true)
     .eq('papers.is_published', true)

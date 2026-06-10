@@ -38,7 +38,6 @@ async function ensurePaper(supabase: Awaited<ReturnType<typeof requireAdmin>>, f
   const subjectId = stringValue(formData, 'new_paper_subject_id')
   const year = numberValue(formData, 'new_paper_year')
   const session = stringValue(formData, 'new_paper_session') || 'May'
-  const level = stringValue(formData, 'new_paper_level') || null
 
   if (!newPaperTitle || !subjectId || !year) throw new Error('New papers need a title, subject, and year.')
 
@@ -58,7 +57,6 @@ async function ensurePaper(supabase: Awaited<ReturnType<typeof requireAdmin>>, f
       title: newPaperTitle,
       year,
       session,
-      level,
       source_pdf_path: stringValue(formData, 'new_paper_source_pdf_path') || null,
       markscheme_pdf_path: stringValue(formData, 'new_paper_markscheme_pdf_path') || null,
       is_published: stringValue(formData, 'new_paper_is_published') === 'on',
@@ -246,7 +244,7 @@ export async function createQuestionForPdfFlow(formData: FormData) {
     const created = await createQuestionRecord(supabase, formData)
     const { data: paper } = await supabase
       .from('papers')
-      .select('id,title,year,level,subjects(id,name),exam_sessions(session_month)')
+      .select('id,title,year,subjects(id,name),exam_sessions(session_month)')
       .eq('id', created.paperId)
       .maybeSingle()
 
