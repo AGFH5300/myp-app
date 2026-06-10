@@ -52,6 +52,7 @@ type PdfCropPanelProps = {
   addLabel: string
   onAddCrop: (file: File) => void
   nextFileName: () => string
+  resetToken: number
 }
 
 function makeCropPreview(file: File): LocalPreview {
@@ -184,7 +185,7 @@ function PdfPageCanvas({ pdf, pageNumber, zoom, canUsePdf, crop, canAddCrop, add
   )
 }
 
-function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, onAddCrop, nextFileName }: PdfCropPanelProps) {
+function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, onAddCrop, nextFileName, resetToken }: PdfCropPanelProps) {
   const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map())
   const [pdf, setPdf] = useState<PdfDocumentProxy | null>(null)
   const [pageCount, setPageCount] = useState(0)
@@ -193,6 +194,14 @@ function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, 
   const [interaction, setInteraction] = useState<CropInteraction | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setCrop(null)
+      setInteraction(null)
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [resetToken])
 
   useEffect(() => {
     if (!crop) return
@@ -431,15 +440,15 @@ function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, 
 
 function readableSaveError(error: unknown) {
   const message = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
-  if (!message || message.includes('NEXT_REDIRECT')) return 'Could not create question.'
+  if (!message || /NEXT_|digest|failed to fetch|server components/i.test(message)) return 'Could not create question. Please try again.'
   return message
 }
 
-function FromPdfSubmitButton({ readyToSubmit, saving }: { readyToSubmit: boolean; saving: boolean }) {
+function FromPdfSubmitButton({ readyToSubmit, saving, action, children }: { readyToSubmit: boolean; saving: boolean; action: 'save' | 'next'; children: string }) {
   return (
-    <button type="submit" className="tsm-btn-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50" disabled={!readyToSubmit || saving}>
+    <button type="submit" name="save_action" value={action} className="tsm-btn-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50" disabled={!readyToSubmit || saving}>
       {saving ? <span className="inline-block size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" /> : null}
-      {saving ? 'Saving...' : 'Save question'}
+      {saving ? 'Saving...' : children}
     </button>
   )
 }
@@ -448,6 +457,8 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
   const router = useRouter()
   const defaultSubjectId = subjects.find((subject) => subject.name === 'Mathematics Extended')?.id || subjects.find((subject) => subject.name === 'Mathematics')?.id || subjects[0]?.id || ''
   const [paperMode, setPaperMode] = useState<'existing' | 'new'>('existing')
+  const [availablePapers, setAvailablePapers] = useState<Paper[]>(papers)
+  const [availablePaperQuestions, setAvailablePaperQuestions] = useState<PaperQuestion[]>(paperQuestions)
   const [subjectId, setSubjectId] = useState(defaultSubjectId)
   const [paperId, setPaperId] = useState('')
   const [newPaperTitle, setNewPaperTitle] = useState('')
@@ -470,6 +481,9 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
   const [reviewed, setReviewed] = useState(false)
   const [openSelectId, setOpenSelectId] = useState<string | null>(null)
   const [lightbox, setLightbox] = useState<LightboxState>(null)
+  const [cropResetToken, setCropResetToken] = useState(0)
+
+  const questionNumberRef = useRef<HTMLInputElement>(null)
 
   const paperFileRef = useRef(paperFile)
   const markschemeFileRef = useRef(markschemeFile)
@@ -508,7 +522,7 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
     setMarkschemeOrder((order) => [...order, `new:${preview.id}`])
   }
 
-  const filteredPapers = papers.filter((paper) => !subjectId || relationLabel(paper.subjects, 'id') === subjectId)
+  const filteredPapers = availablePapers.filter((paper) => !subjectId || relationLabel(paper.subjects, 'id') === subjectId)
   const mainTopicGroups = useMemo(() => topics
     .filter((topic) => !topic.parent_topic_id && topicMatchesMainScope(topic, subjectId))
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name)), [topics, subjectId])
@@ -525,29 +539,73 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
   const effectivePrimaryTopicId = selectedSubtopicIds.includes(primaryTopicId) ? primaryTopicId : selectedSubtopicIds[0] || topicGroupId
   const questionLightboxItems = orderedPreviewItems([], questionFiles, questionOrder, 'Question image')
   const markschemeLightboxItems = orderedPreviewItems([], markschemeFiles, markschemeOrder, 'Mark scheme image')
-  const suggestedOrder = suggestedQuestionOrder(paperMode, paperId, paperQuestions)
-  const orderReference = paperQuestionReference(paperMode, paperId, paperQuestions)
+  const suggestedOrder = suggestedQuestionOrder(paperMode, paperId, availablePaperQuestions)
+  const orderReference = paperQuestionReference(paperMode, paperId, availablePaperQuestions)
   const [saving, setSaving] = useState(false)
+
+  function clearCropPreviews() {
+    questionFiles.forEach((file) => URL.revokeObjectURL(file.url))
+    markschemeFiles.forEach((file) => URL.revokeObjectURL(file.url))
+    setQuestionFiles([])
+    setMarkschemeFiles([])
+    setQuestionOrder([])
+    setMarkschemeOrder([])
+    setLightbox(null)
+    setCropResetToken((value) => value + 1)
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!readyToSubmit || saving) return
+
+    const form = event.currentTarget
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
+    const saveAction = submitter?.value === 'next' ? 'next' : 'save'
+    const formData = new FormData(form)
+    const submittedQuestionNumber = questionNumber.trim()
+    const submittedQuestionOrder = Number(questionOrderValue)
 
     setSaving(true)
     let navigating = false
 
     try {
       toast.loading('Creating question…', { id: 'from-pdf-save' })
-      const result = await createQuestionForPdfFlow(new FormData(event.currentTarget))
+      const result = await createQuestionForPdfFlow(formData)
 
       if (!result.ok) {
         toast.error(readableSaveError(result.message), { id: 'from-pdf-save' })
         return
       }
 
-      navigating = true
-      toast.success('Question created', { id: 'from-pdf-save' })
-      router.push('/dashboard/admin/question-bank')
+      if (saveAction === 'save') {
+        navigating = true
+        toast.success('Question created', { id: 'from-pdf-save' })
+        router.push('/dashboard/admin/question-bank')
+        return
+      }
+
+      const createdPaperId = result.paperId
+      const createdQuestion: PaperQuestion = {
+        id: result.questionId,
+        paper_id: createdPaperId,
+        question_number: result.questionNumber || submittedQuestionNumber,
+        question_order: result.questionOrder ?? (Number.isFinite(submittedQuestionOrder) ? submittedQuestionOrder : null),
+      }
+      const nextPaperQuestions = [...availablePaperQuestions, createdQuestion]
+      setAvailablePaperQuestions(nextPaperQuestions)
+
+      if (result.paper && !availablePapers.some((paper) => paper.id === createdPaperId)) {
+        setAvailablePapers((current) => [...current, result.paper as Paper])
+      }
+
+      setPaperMode('existing')
+      setPaperId(createdPaperId)
+      setQuestionNumber('')
+      setMarks('')
+      clearCropPreviews()
+      setQuestionOrderValue(String(suggestedQuestionOrder('existing', createdPaperId, nextPaperQuestions)))
+      toast.success('Question created. Ready for next question.', { id: 'from-pdf-save' })
+      window.setTimeout(() => questionNumberRef.current?.focus(), 0)
     } catch (error) {
       toast.error(readableSaveError(error), { id: 'from-pdf-save' })
     } finally {
@@ -596,14 +654,14 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
       </StepCard>
 
       <StepCard step={3} title="Crop question images" state={!step2Complete ? 'locked' : step3Complete ? 'complete' : 'current'} helper="Crop every part needed to answer this question.">
-        <PdfCropPanel title="Paper PDF cropper" helper="Use this for question text, diagrams, tables, graphs, and continuation pages." fileState={paperFile} pdfType="paper" cropLabel="Question crop" addLabel="Add crop to question images" onAddCrop={addQuestionCrop} nextFileName={() => `question-${questionNumber.trim() || 'untitled'}-crop-${questionFiles.length + 1}.png`} />
+        <PdfCropPanel title="Paper PDF cropper" helper="Use this for question text, diagrams, tables, graphs, and continuation pages." fileState={paperFile} pdfType="paper" cropLabel="Question crop" addLabel="Add crop to question images" onAddCrop={addQuestionCrop} nextFileName={() => `question-${questionNumber.trim() || 'untitled'}-crop-${questionFiles.length + 1}.png`} resetToken={cropResetToken} />
         <div className="mt-5">
           <ImageUploadGroup title="Question image" name="question_image_file" fileKeyName="question_file_key" assetOrderName="question_asset_order" existingAssets={[]} files={questionFiles} setFiles={setQuestionFiles} order={questionOrder} setOrder={setQuestionOrder} onPreview={(index) => setLightbox({ group: 'question', index })} />
         </div>
       </StepCard>
 
       <StepCard step={4} title="Crop mark scheme images" state={!step3Complete ? 'locked' : step4Complete ? 'complete' : 'current'} helper="Crop the matching mark scheme parts for this one question.">
-        <PdfCropPanel title="Mark scheme PDF cropper" helper="Use this for mark allocations, method notes, and answer continuations." fileState={markschemeFile} pdfType="markscheme" cropLabel="Mark scheme crop" addLabel="Add crop to mark scheme images" onAddCrop={addMarkschemeCrop} nextFileName={() => `markscheme-${questionNumber.trim() || 'untitled'}-crop-${markschemeFiles.length + 1}.png`} />
+        <PdfCropPanel title="Mark scheme PDF cropper" helper="Use this for mark allocations, method notes, and answer continuations." fileState={markschemeFile} pdfType="markscheme" cropLabel="Mark scheme crop" addLabel="Add crop to mark scheme images" onAddCrop={addMarkschemeCrop} nextFileName={() => `markscheme-${questionNumber.trim() || 'untitled'}-crop-${markschemeFiles.length + 1}.png`} resetToken={cropResetToken} />
         <div className="mt-5">
           <ImageUploadGroup title="Mark scheme image" name="markscheme_image_file" fileKeyName="markscheme_file_key" assetOrderName="markscheme_asset_order" existingAssets={[]} files={markschemeFiles} setFiles={setMarkschemeFiles} order={markschemeOrder} setOrder={setMarkschemeOrder} onPreview={(index) => setLightbox({ group: 'markscheme', index })} />
         </div>
@@ -611,7 +669,7 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
 
       <StepCard step={5} title="Question details and topics" state={!step4Complete ? 'locked' : step5Complete ? 'complete' : 'current'} helper="Add the required labels before saving.">
         <div className="grid gap-4 md:grid-cols-3">
-          <label className="font-body text-sm text-[#43474d]">Question number<input name="question_number" value={questionNumber} onChange={(event) => setQuestionNumber(event.target.value)} className="tsm-input mt-1 w-full" placeholder="1a" /></label>
+          <label className="font-body text-sm text-[#43474d]">Question number<input ref={questionNumberRef} name="question_number" value={questionNumber} onChange={(event) => setQuestionNumber(event.target.value)} className="tsm-input mt-1 w-full" placeholder="1a" /></label>
           <label className="font-body text-sm text-[#43474d]">Order in paper<input name="question_order" value={questionOrderValue} onChange={(event) => setQuestionOrderValue(event.target.value)} inputMode="decimal" className="tsm-input mt-1 w-full" placeholder="1" /><span className="mt-1 block text-xs text-[#6f737b]">Controls where this question appears in lists. Use 1 for the first question, 2 for the next, and so on.</span><OrderInPaperHelper suggestedOrder={suggestedOrder} questions={orderReference} onUseSuggested={() => setQuestionOrderValue(String(suggestedOrder))} /></label>
           <label className="font-body text-sm text-[#43474d]">Marks<input name="marks" value={marks} onChange={(event) => setMarks(event.target.value)} inputMode="numeric" className="tsm-input mt-1 w-full" placeholder="6" /></label>
         </div>
@@ -640,7 +698,8 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className={`font-body text-sm font-semibold ${readyToSubmit ? 'text-emerald-700' : 'text-amber-800'}`}>{readyToSubmit ? 'Ready to save: all required steps are complete.' : 'Not ready yet: complete the highlighted required steps.'}</p>
           <div className="flex flex-wrap gap-3">
-            <FromPdfSubmitButton readyToSubmit={readyToSubmit} saving={saving} />
+            <FromPdfSubmitButton readyToSubmit={readyToSubmit} saving={saving} action="save">Save question</FromPdfSubmitButton>
+            <FromPdfSubmitButton readyToSubmit={readyToSubmit} saving={saving} action="next">Save & create next</FromPdfSubmitButton>
             <Link href="/dashboard/admin/question-bank" className="tsm-btn-secondary">Cancel</Link>
           </div>
         </div>
