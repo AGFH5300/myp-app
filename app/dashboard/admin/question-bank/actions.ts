@@ -196,8 +196,7 @@ function questionPayload(formData: FormData, paperId: string, questionAssetPath:
   }
 }
 
-export async function createQuestion(formData: FormData) {
-  const supabase = await requireAdmin()
+async function createQuestionRecord(supabase: Awaited<ReturnType<typeof requireAdmin>>, formData: FormData) {
   const paperId = await ensurePaper(supabase, formData)
   const questionAssetPaths = await uploadQuestionAssets(supabase, uploadedFiles(formData, 'question_image_file'), 'questions')
   const markschemeAssetPaths = await uploadQuestionAssets(supabase, uploadedFiles(formData, 'markscheme_image_file'), 'markschemes')
@@ -222,7 +221,24 @@ export async function createQuestion(formData: FormData) {
   }).eq('id', question.id)
   await syncTopics(supabase, question.id, formData)
   revalidatePath('/dashboard/admin/question-bank')
-  redirect(`/dashboard/admin/question-bank/${question.id}/edit`)
+  revalidatePath(`/dashboard/admin/question-bank/${question.id}/edit`)
+  return question.id as string
+}
+
+export async function createQuestion(formData: FormData) {
+  const supabase = await requireAdmin()
+  const questionId = await createQuestionRecord(supabase, formData)
+  redirect(`/dashboard/admin/question-bank/${questionId}/edit`)
+}
+
+export async function createQuestionForPdfFlow(formData: FormData) {
+  const supabase = await requireAdmin()
+  try {
+    const questionId = await createQuestionRecord(supabase, formData)
+    return { ok: true as const, questionId, message: 'Question created' }
+  } catch (error) {
+    return { ok: false as const, message: error instanceof Error ? error.message : 'Could not create question.' }
+  }
 }
 
 export async function updateQuestion(formData: FormData) {

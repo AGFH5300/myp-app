@@ -3,8 +3,9 @@
 import { type CSSProperties, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { createQuestion } from './actions'
+import { createQuestionForPdfFlow } from './actions'
 import {
   ChoiceCard,
   ImageUploadGroup,
@@ -424,6 +425,7 @@ function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, 
 }
 
 export function QuestionFromPdfForm({ papers, subjects, topics }: { papers: Paper[]; subjects: Subject[]; topics: Topic[] }) {
+  const router = useRouter()
   const defaultSubjectId = subjects.find((subject) => subject.name === 'Mathematics Extended')?.id || subjects.find((subject) => subject.name === 'Mathematics')?.id || subjects[0]?.id || ''
   const [paperMode, setPaperMode] = useState<'existing' | 'new'>('existing')
   const [subjectId, setSubjectId] = useState(defaultSubjectId)
@@ -507,11 +509,17 @@ export function QuestionFromPdfForm({ papers, subjects, topics }: { papers: Pape
   return (
     <form action={async (formData) => {
       try {
-        toast.loading('Saving cropped question…', { id: 'from-pdf-save' })
-        await createQuestion(formData)
-        toast.success('Question saved.', { id: 'from-pdf-save' })
+        toast.loading('Creating question…', { id: 'from-pdf-save' })
+        const result = await createQuestionForPdfFlow(formData)
+        if (!result.ok) {
+          toast.error(result.message, { id: 'from-pdf-save' })
+          return
+        }
+        toast.success(result.message, { id: 'from-pdf-save' })
+        router.push(`/dashboard/admin/question-bank/${result.questionId}/edit`)
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Could not save question.', { id: 'from-pdf-save' })
+        const message = error instanceof Error && !error.message.includes('NEXT_REDIRECT') ? error.message : 'Could not create question.'
+        toast.error(message, { id: 'from-pdf-save' })
       }
     }} className="space-y-8" onSubmit={(event) => { if (!readyToSubmit) event.preventDefault() }}>
       <input type="hidden" name="paper_id" value={paperMode === 'existing' ? paperId : ''} />
