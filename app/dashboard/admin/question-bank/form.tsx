@@ -7,12 +7,12 @@ import { Eye, GripVertical, Trash2, Upload, ChevronUp, ChevronDown } from 'lucid
 import { useFormStatus } from 'react-dom'
 import { createQuestion, updateQuestion } from './actions'
 
-type PaperRelation<T> = T | T[] | null
-type Paper = { id: string; title: string; year: number; level: string | null; subjects?: PaperRelation<{ id?: string | null; name?: string | null }>; exam_sessions?: PaperRelation<{ session_month?: string | null }> }
-type Subject = { id: string; name: string }
-type Topic = { id: string; name: string; subject_id?: string | null; parent_topic_id?: string | null; level?: string | null; sort_order?: number | null; is_active?: boolean | null }
+export type PaperRelation<T> = T | T[] | null
+export type Paper = { id: string; title: string; year: number; level: string | null; subjects?: PaperRelation<{ id?: string | null; name?: string | null }>; exam_sessions?: PaperRelation<{ session_month?: string | null }> }
+export type Subject = { id: string; name: string }
+export type Topic = { id: string; name: string; subject_id?: string | null; parent_topic_id?: string | null; level?: string | null; sort_order?: number | null; is_active?: boolean | null }
 type QuestionTopic = { topic_id: string; is_primary?: boolean | null }
-type QuestionAsset = { id: string; asset_type: 'question' | 'markscheme'; storage_path: string | null; public_url: string | null; label: string | null; sort_order: number | null; preview_url?: string | null }
+export type QuestionAsset = { id: string; asset_type: 'question' | 'markscheme'; storage_path: string | null; public_url: string | null; label: string | null; sort_order: number | null; preview_url?: string | null }
 type Question = {
   id: string
   paper_id: string
@@ -30,26 +30,26 @@ type Question = {
   question_topics?: QuestionTopic[] | null
 }
 
-type StepState = 'complete' | 'current' | 'locked' | 'missing'
-type LocalPreview = { id: string; file: File; name: string; url: string }
-type SelectOption = { value: string; label: string; helper?: string }
-type PreviewItem = { token: string; title: string; url: string; subtitle?: string; canRemove?: boolean }
-type LightboxState = { group: 'question' | 'markscheme'; index: number } | null
+export type StepState = 'complete' | 'current' | 'locked' | 'missing'
+export type LocalPreview = { id: string; file: File; name: string; url: string }
+export type SelectOption = { value: string; label: string; helper?: string }
+export type PreviewItem = { token: string; title: string; url: string; subtitle?: string; canRemove?: boolean }
+export type LightboxState = { group: 'question' | 'markscheme'; index: number } | null
 
 const IMAGE_FILE_SIZE_LIMIT_BYTES = 8 * 1024 * 1024
 
-function relationLabel(relation: unknown, key: 'id' | 'name' | 'session_month') {
+export function relationLabel(relation: unknown, key: 'id' | 'name' | 'session_month') {
   const item = Array.isArray(relation) ? relation[0] : relation
   return (item as Record<string, string | null | undefined> | null | undefined)?.[key] || ''
 }
 
-function paperLabel(paper: Paper) {
+export function paperLabel(paper: Paper) {
   const rawSession = relationLabel(paper.exam_sessions, 'session_month') || 'Session'
   const session = rawSession.toLowerCase().startsWith('nov') ? 'Nov' : rawSession.toLowerCase().startsWith('may') ? 'May' : rawSession
   return `${paper.title} — ${session} ${paper.year}`
 }
 
-function topicMatchesMainScope(topic: Topic, subjectId: string) {
+export function topicMatchesMainScope(topic: Topic, subjectId: string) {
   return topic.is_active !== false && Boolean(subjectId) && topic.subject_id === subjectId
 }
 
@@ -60,7 +60,7 @@ function statusBadgeClasses(state: StepState) {
   return 'border-slate-200 bg-slate-100 text-slate-500'
 }
 
-function StepCard({ step, title, state, helper, children }: { step: number; title: string; state: StepState; helper: string; children: ReactNode }) {
+export function StepCard({ step, title, state, helper, children }: { step: number; title: string; state: StepState; helper: string; children: ReactNode }) {
   const locked = state === 'locked'
   const border = state === 'complete' ? 'border-emerald-300' : state === 'current' ? 'border-blue-300 shadow-sm' : state === 'missing' ? 'border-amber-300' : 'border-[#c3c6ce66] opacity-75'
   const label = state === 'complete' ? 'Complete' : state === 'current' ? 'Current step' : state === 'missing' ? 'Needs attention' : 'Locked'
@@ -81,7 +81,7 @@ function StepCard({ step, title, state, helper, children }: { step: number; titl
   )
 }
 
-function ChoiceCard({ active, title, helper, onClick }: { active: boolean; title: string; helper: string; onClick: () => void }) {
+export function ChoiceCard({ active, title, helper, onClick }: { active: boolean; title: string; helper: string; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className={`cursor-pointer rounded-md border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-blue-300 ${active ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100' : 'border-[#c3c6ce66] bg-white hover:border-blue-300 hover:bg-blue-50/40'}`}>
       <span className={`inline-flex rounded-full px-2 py-1 font-body text-xs font-semibold ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{active ? 'Selected' : 'Choose'}</span>
@@ -91,7 +91,7 @@ function ChoiceCard({ active, title, helper, onClick }: { active: boolean; title
   )
 }
 
-function SearchableSelect({ id, name, label, value, options, placeholder, emptyText, onChange, required, openSelectId, setOpenSelectId }: { id: string; name?: string; label: string; value: string; options: SelectOption[]; placeholder: string; emptyText: string; onChange: (value: string) => void; required?: boolean; openSelectId: string | null; setOpenSelectId: (id: string | null) => void }) {
+export function SearchableSelect({ id, name, label, value, options, placeholder, emptyText, onChange, required, openSelectId, setOpenSelectId }: { id: string; name?: string; label: string; value: string; options: SelectOption[]; placeholder: string; emptyText: string; onChange: (value: string) => void; required?: boolean; openSelectId: string | null; setOpenSelectId: (id: string | null) => void }) {
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -172,7 +172,7 @@ function SearchableSelect({ id, name, label, value, options, placeholder, emptyT
   )
 }
 
-function filesToPreviews(files: File[]) {
+export function filesToPreviews(files: File[]) {
   return files.map((file) => ({ id: crypto.randomUUID(), file, name: file.name, url: URL.createObjectURL(file) }))
 }
 
@@ -180,7 +180,7 @@ function fileSizeLabel(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-function moveToken(tokens: string[], token: string, direction: -1 | 1) {
+export function moveToken(tokens: string[], token: string, direction: -1 | 1) {
   const index = tokens.indexOf(token)
   const nextIndex = index + direction
   if (index < 0 || nextIndex < 0 || nextIndex >= tokens.length) return tokens
@@ -202,7 +202,7 @@ function PreviewImage({ item, className, sizes = '88px' }: { item: PreviewItem; 
   return <Image src={item.url} alt={item.title} width={1400} height={900} sizes={sizes} unoptimized className={className} />
 }
 
-function ImageUploadGroup({ title, name, fileKeyName, assetOrderName, existingAssets, fallbackUrl, fallbackTitle, files, setFiles, order, setOrder, onPreview }: { title: string; name: string; fileKeyName: string; assetOrderName: string; existingAssets: QuestionAsset[]; fallbackUrl?: string | null; fallbackTitle: string; files: LocalPreview[]; setFiles: (files: LocalPreview[]) => void; order: string[]; setOrder: (order: string[]) => void; onPreview: (index: number) => void }) {
+export function ImageUploadGroup({ title, name, fileKeyName, assetOrderName, existingAssets, fallbackUrl, fallbackTitle, files, setFiles, order, setOrder, onPreview }: { title: string; name: string; fileKeyName: string; assetOrderName: string; existingAssets: QuestionAsset[]; fallbackUrl?: string | null; fallbackTitle?: string; files: LocalPreview[]; setFiles: (files: LocalPreview[]) => void; order: string[]; setOrder: (order: string[]) => void; onPreview: (index: number) => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dropActive, setDropActive] = useState(false)
   const [draggedToken, setDraggedToken] = useState<string | null>(null)
@@ -333,7 +333,7 @@ function ImageUploadGroup({ title, name, fileKeyName, assetOrderName, existingAs
         })}
         {!orderedItems.length && fallbackUrl ? (
           <button type="button" onClick={() => onPreview(0)} className="flex w-full items-center gap-3 rounded-md border border-[#c3c6ce66] bg-white p-2 text-left">
-            <PreviewImage item={{ token: 'fallback', title: fallbackTitle, url: fallbackUrl }} className="h-16 w-20 rounded-sm border border-[#f0eee9] object-cover" />
+            <PreviewImage item={{ token: 'fallback', title: fallbackTitle || title, url: fallbackUrl }} className="h-16 w-20 rounded-sm border border-[#f0eee9] object-cover" />
             <span className="font-body text-sm font-semibold text-[#00152a]">{fallbackTitle}</span>
           </button>
         ) : null}
@@ -343,7 +343,7 @@ function ImageUploadGroup({ title, name, fileKeyName, assetOrderName, existingAs
   )
 }
 
-function Lightbox({ state, questionItems, markschemeItems, onClose, onMove }: { state: LightboxState; questionItems: PreviewItem[]; markschemeItems: PreviewItem[]; onClose: () => void; onMove: (index: number) => void }) {
+export function Lightbox({ state, questionItems, markschemeItems, onClose, onMove }: { state: LightboxState; questionItems: PreviewItem[]; markschemeItems: PreviewItem[]; onClose: () => void; onMove: (index: number) => void }) {
   const items = state?.group === 'question' ? questionItems : markschemeItems
   const item = state ? items[state.index] : null
 
@@ -382,7 +382,7 @@ function Lightbox({ state, questionItems, markschemeItems, onClose, onMove }: { 
   )
 }
 
-function orderedPreviewItems(assets: QuestionAsset[], files: LocalPreview[], order: string[], label: string, fallbackUrl?: string | null, fallbackTitle?: string): PreviewItem[] {
+export function orderedPreviewItems(assets: QuestionAsset[], files: LocalPreview[], order: string[], label: string, fallbackUrl?: string | null, fallbackTitle?: string): PreviewItem[] {
   const map = new Map<string, PreviewItem>()
   assets.forEach((asset, index) => {
     if (asset.preview_url) map.set(`existing:${asset.id}`, { token: `existing:${asset.id}`, title: asset.label || `${label} ${index + 1}`, url: asset.preview_url, subtitle: asset.storage_path || asset.public_url || undefined })
@@ -621,7 +621,7 @@ export function QuestionBankForm({
   )
 }
 
-function SubmitButton({ readyToSubmit, label }: { readyToSubmit: boolean; label: string }) {
+export function SubmitButton({ readyToSubmit, label }: { readyToSubmit: boolean; label: string }) {
   const { pending } = useFormStatus()
   return (
     <button type="submit" className="tsm-btn-primary inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50" disabled={!readyToSubmit || pending}>
