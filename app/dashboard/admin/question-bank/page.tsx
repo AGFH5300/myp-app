@@ -2,12 +2,25 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { AdminQuestionBankFilterForm } from './filter-form'
+import { QuestionBankList, type QuestionBankRow } from './question-bank-list'
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
+
+type WarningFilter = 'missing-markscheme' | 'missing-topic' | 'missing-question-image'
 
 function relationName(relation: unknown, key: 'id' | 'name' | 'title' | 'session_month' | 'parent_topic_id') {
   const item = Array.isArray(relation) ? relation[0] : relation
   return (item as Record<string, string | null> | null | undefined)?.[key]
+}
+
+function relationNumber(relation: unknown, key: 'year') {
+  const item = Array.isArray(relation) ? relation[0] : relation
+  return (item as Record<string, number | null> | null | undefined)?.[key]
+}
+
+function relationBoolean(relation: unknown, key: 'is_published') {
+  const item = Array.isArray(relation) ? relation[0] : relation
+  return (item as Record<string, boolean | null> | null | undefined)?.[key]
 }
 
 function stringParam(params: Record<string, string | string[] | undefined>, key: string) {
@@ -15,16 +28,15 @@ function stringParam(params: Record<string, string | string[] | undefined>, key:
   return Array.isArray(value) ? value[0] || '' : value || ''
 }
 
-function statusBadge(label: string, tone: 'green' | 'blue' | 'amber' | 'grey') {
-  const classes = tone === 'green'
-    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-    : tone === 'blue'
-      ? 'border-blue-200 bg-blue-50 text-blue-700'
-      : tone === 'amber'
-        ? 'border-amber-200 bg-amber-50 text-amber-800'
-        : 'border-slate-200 bg-slate-100 text-slate-600'
+function hasAsset(question: { question_assets?: { asset_type: string | null; storage_path: string | null; public_url: string | null }[] | null }, type: 'question' | 'markscheme') {
+  return question.question_assets?.some((asset) => asset.asset_type === type && (asset.storage_path || asset.public_url)) ?? false
+}
 
-  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${classes}`}>{label}</span>
+function warningKey(warning: string): WarningFilter | null {
+  if (warning === 'Missing mark scheme image') return 'missing-markscheme'
+  if (warning === 'Missing topic/subtopic') return 'missing-topic'
+  if (warning === 'Missing question image') return 'missing-question-image'
+  return null
 }
 
 export default async function AdminQuestionBankPage({ searchParams }: { searchParams: SearchParams }) {
@@ -39,7 +51,7 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
   const [{ data: questions }, { data: subjects }, { data: papers }, { data: topics }] = await Promise.all([
     supabase
       .from('questions')
-      .select('id,question_number,question_order,marks,is_published,is_reviewed,papers(id,title,year,subject_id,subjects(id,name),exam_sessions(session_month)),question_topics(is_primary,topics(id,name,parent_topic_id))')
+      .select('id,paper_id,question_number,question_order,marks,is_published,is_reviewed,question_image_path,markscheme_image_path,image_url,markscheme_image_url,papers(id,title,year,subject_id,is_published,subjects(id,name),exam_sessions(session_month)),question_topics(is_primary,topics(id,name,parent_topic_id)),question_assets(asset_type,storage_path,public_url)')
       .order('created_at', { ascending: false })
       .limit(200),
     supabase.from('subjects').select('id,name').order('name'),
@@ -51,14 +63,61 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
   const subjectFilter = stringParam(params, 'subject')
   const paperFilter = stringParam(params, 'paper')
   const topicFilter = stringParam(params, 'topic')
-  const publishedFilter = stringParam(params, 'published')
-  const reviewedFilter = stringParam(params, 'reviewed')
+  const statusFilter = stringParam(params, 'status')
+  const warningFilter = stringParam(params, 'warning') as WarningFilter | ''
   const topicNames = new Map((topics ?? []).map((topic) => [topic.id, topic.name]))
+  const orderCounts = new Map<string, number>()
 
-  const filteredQuestions = (questions ?? []).filter((question) => {
+  ;(questions ?? []).forEach((question) => {
+    if (!question.paper_id || question.question_order === null) return
+    const key = `${question.paper_id}:${question.question_order}`
+    orderCounts.set(key, (orderCounts.get(key) ?? 0) + 1)
+  })
+
+  const rows: QuestionBankRow[] = (questions ?? []).map((question) => {
     const paper = Array.isArray(question.papers) ? question.papers[0] : question.papers
     const questionTopics = question.question_topics ?? []
-    const haystack = [paper?.title, paper?.year, relationName(paper?.subjects, 'name'), question.question_number, ...questionTopics.map((row) => relationName(row.topics, 'name'))]
+    const primary = questionTopics.find((row) => row.is_primary) ?? questionTopics[0]
+    const primaryTopic = Array.isArray(primary?.topics) ? primary?.topics[0] : primary?.topics
+    const parentName = primaryTopic?.parent_topic_id ? topicNames.get(primaryTopic.parent_topic_id) : null
+    const hasQuestionImage = Boolean(question.question_image_path || question.image_url || hasAsset(question, 'question'))
+    const hasMarkschemeImage = Boolean(question.markscheme_image_path || question.markscheme_image_url || hasAsset(question, 'markscheme'))
+    const orderKey = question.paper_id && question.question_order !== null ? `${question.paper_id}:${question.question_order}` : ''
+    const warnings = [
+      !hasQuestionImage ? 'Missing question image' : null,
+      !hasMarkschemeImage ? 'Missing mark scheme image' : null,
+      !questionTopics.length ? 'Missing topic/subtopic' : null,
+      !question.question_number ? 'Missing question number' : null,
+      question.marks === null ? 'Missing marks' : null,
+      orderKey && (orderCounts.get(orderKey) ?? 0) > 1 ? 'Duplicate order' : null,
+      !paper ? 'Missing paper' : null,
+      paper && relationBoolean(paper, 'is_published') === false ? 'Paper not published' : null,
+    ].filter((warning): warning is string => Boolean(warning))
+    const paperTitle = relationName(paper, 'title') || 'Missing paper'
+    const year = relationNumber(paper, 'year')
+    const session = relationName(paper?.exam_sessions, 'session_month')
+    const subjectName = relationName(paper?.subjects, 'name') || 'No subject'
+
+    return {
+      id: question.id,
+      paperTitle,
+      paperMeta: [year, session].filter(Boolean).join(' ') || 'No year/session',
+      subjectName,
+      questionNumber: question.question_number ? `Q${question.question_number}` : 'No question number',
+      questionOrder: question.question_order,
+      marks: question.marks,
+      topicSummary: parentName ? `${parentName} → ${primaryTopic?.name || 'No subtopic'}` : relationName(primary?.topics, 'name') || '',
+      isPublished: Boolean(question.is_published),
+      needsReview: !question.is_reviewed || warnings.length > 0,
+      warnings,
+    }
+  })
+
+  const filteredQuestions = rows.filter((question) => {
+    const rawQuestion = (questions ?? []).find((item) => item.id === question.id)
+    const paper = Array.isArray(rawQuestion?.papers) ? rawQuestion?.papers[0] : rawQuestion?.papers
+    const questionTopics = rawQuestion?.question_topics ?? []
+    const haystack = [question.paperTitle, question.paperMeta, question.subjectName, question.questionNumber, question.topicSummary]
       .filter(Boolean)
       .join(' ')
       .toLowerCase()
@@ -66,8 +125,10 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
     if (subjectFilter && paper?.subject_id !== subjectFilter) return false
     if (paperFilter && paper?.id !== paperFilter) return false
     if (topicFilter && !questionTopics.some((row) => relationName(row.topics, 'id') === topicFilter || (row.topics && relationName(row.topics, 'parent_topic_id') === topicFilter))) return false
-    if (publishedFilter && String(question.is_published) !== publishedFilter) return false
-    if (reviewedFilter && String(question.is_reviewed) !== reviewedFilter) return false
+    if (statusFilter === 'draft' && question.isPublished) return false
+    if (statusFilter === 'published' && !question.isPublished) return false
+    if (statusFilter === 'needs-review' && !question.needsReview) return false
+    if (warningFilter && !question.warnings.some((warning) => warningKey(warning) === warningFilter)) return false
     return true
   })
 
@@ -87,7 +148,7 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
       </header>
 
       <AdminQuestionBankFilterForm
-        initial={{ q: stringParam(params, 'q'), subject: subjectFilter, paper: paperFilter, topic: topicFilter, published: publishedFilter, reviewed: reviewedFilter }}
+        initial={{ q: stringParam(params, 'q'), subject: subjectFilter, paper: paperFilter, topic: topicFilter, status: statusFilter, warning: warningFilter }}
         subjects={(subjects ?? []).map((subject) => ({ value: subject.id, label: subject.name }))}
         papers={(papers ?? []).map((paper) => ({ value: paper.id, label: `${paper.title} — ${relationName(paper.exam_sessions, 'session_month')} ${paper.year}` }))}
         topics={(topics ?? []).map((topic) => ({ value: topic.id, label: topic.name }))}
@@ -98,31 +159,7 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
           <h2 className="font-headline text-2xl text-[#00152a]">Questions</h2>
           <p className="font-body text-sm text-[#43474d]">{filteredQuestions.length} shown</p>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-left font-body text-sm">
-            <thead className="border-b border-[#c3c6ce66] text-xs uppercase tracking-[.08em] text-[#735b2b]"><tr><th className="py-3 pr-4">Paper</th><th className="py-3 pr-4">Year/session</th><th className="py-3 pr-4">Question</th><th className="py-3 pr-4">Marks</th><th className="py-3 pr-4">Primary topic</th><th className="py-3 pr-4">Status</th><th className="py-3 pr-4">Action</th></tr></thead>
-            <tbody>
-              {filteredQuestions.map((question) => {
-                const paper = Array.isArray(question.papers) ? question.papers[0] : question.papers
-                const primary = question.question_topics?.find((row) => row.is_primary) ?? question.question_topics?.[0]
-                const primaryTopic = Array.isArray(primary?.topics) ? primary?.topics[0] : primary?.topics
-                const parentName = primaryTopic?.parent_topic_id ? topicNames.get(primaryTopic.parent_topic_id) : null
-                return (
-                  <tr key={question.id} className="border-b border-[#f0eee9] align-top text-[#43474d]">
-                    <td className="py-4 pr-4 font-semibold text-[#00152a]">{paper?.title || 'Untitled paper'}</td>
-                    <td className="py-4 pr-4">{paper?.year || '—'} {relationName(paper?.exam_sessions, 'session_month')}</td>
-                    <td className="py-4 pr-4">Q{question.question_number}</td>
-                    <td className="py-4 pr-4">{question.marks ?? '—'}</td>
-                    <td className="py-4 pr-4">{parentName ? <><span className="font-semibold text-[#00152a]">{parentName}</span> <span className="text-[#735b2b]">→</span> </> : null}{primaryTopic?.name || <span className="text-amber-800">Not tagged</span>}</td>
-                    <td className="py-4 pr-4"><div className="flex flex-wrap gap-2">{question.is_published ? statusBadge('Published', 'green') : statusBadge('Draft', 'grey')}{question.is_reviewed ? statusBadge('Checked', 'blue') : statusBadge('Needs check', 'amber')}</div></td>
-                    <td className="py-4 pr-4"><Link href={`/dashboard/admin/question-bank/${question.id}/edit`} className="tsm-btn-secondary w-fit">Edit</Link></td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-        {!filteredQuestions.length ? <p className="mt-4 font-body text-sm text-[#43474d]">No questions match these filters.</p> : null}
+        <QuestionBankList questions={filteredQuestions} />
       </section>
     </div>
   )
