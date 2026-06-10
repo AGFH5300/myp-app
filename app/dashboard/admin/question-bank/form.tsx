@@ -79,17 +79,9 @@ export function paperQuestionReference(paperMode: 'existing' | 'new', paperId: s
 }
 
 export function OrderInPaperHelper({ suggestedOrder, questions, onUseSuggested }: { suggestedOrder: number; questions: PaperQuestion[]; onUseSuggested: () => void }) {
-  const hasLongList = questions.length > 6
-  const list = (
-    <div className="mt-2 space-y-1">
-      {questions.map((item) => (
-        <p key={item.id} className="font-body text-xs text-[#43474d]">
-          <span className="font-semibold text-[#00152a]">{item.question_order ?? '—'}</span> — {item.question_number || 'Untitled question'}
-        </p>
-      ))}
-      {!questions.length ? <p className="font-body text-xs text-[#6f737b]">No questions saved for this paper yet.</p> : null}
-    </div>
-  )
+  const sortedQuestions = [...questions].sort((a, b) => (a.question_order ?? Number.MAX_SAFE_INTEGER) - (b.question_order ?? Number.MAX_SAFE_INTEGER) || (a.question_number || '').localeCompare(b.question_number || ''))
+  const visibleQuestions = sortedQuestions.slice(-3)
+  const hasMoreQuestions = sortedQuestions.length > visibleQuestions.length
 
   return (
     <div className="mt-2 rounded-md border border-blue-100 bg-blue-50/50 p-3">
@@ -97,12 +89,15 @@ export function OrderInPaperHelper({ suggestedOrder, questions, onUseSuggested }
         <p className="font-body text-xs font-semibold text-blue-900">Suggested next order: {suggestedOrder}</p>
         <button type="button" onClick={onUseSuggested} className="rounded-sm border border-blue-200 bg-white px-2 py-1 font-body text-xs font-semibold text-blue-700 hover:bg-blue-50">Use suggested</button>
       </div>
-      {hasLongList ? (
-        <details className="mt-2">
-          <summary className="cursor-pointer font-body text-xs font-semibold text-[#735b2b]">Show existing order ({questions.length})</summary>
-          {list}
-        </details>
-      ) : list}
+      <div className="mt-2 space-y-1">
+        {visibleQuestions.map((item) => (
+          <p key={item.id} className="font-body text-xs text-[#43474d]">
+            <span className="font-semibold text-[#00152a]">{item.question_order ?? '—'}</span> — {item.question_number || 'Untitled question'}
+          </p>
+        ))}
+        {!visibleQuestions.length ? <p className="font-body text-xs text-[#6f737b]">No questions saved for this paper yet.</p> : null}
+        {hasMoreQuestions ? <p className="font-body text-xs text-[#6f737b]">Showing last 3 orders.</p> : null}
+      </div>
     </div>
   )
 }
@@ -575,6 +570,7 @@ export function QuestionBankForm({
     if (!readyToSubmit || saving) return
 
     setSaving(true)
+    let navigating = false
     const toastId = mode === 'new' ? 'question-create' : 'question-update'
     try {
       toast.loading(mode === 'new' ? 'Creating question…' : 'Saving question…', { id: toastId })
@@ -584,16 +580,17 @@ export function QuestionBankForm({
         toast.error(readableActionError(result.message), { id: toastId })
         return
       }
+      navigating = true
       toast.success(mode === 'new' ? 'Question created' : 'Question updated', { id: toastId })
-      if (mode === 'new') {
-        router.push('/dashboard/admin/question-bank')
-      } else {
-        router.refresh()
-      }
+      router.push('/dashboard/admin/question-bank')
     } catch (error) {
       toast.error(readableActionError(error), { id: toastId })
     } finally {
-      setSaving(false)
+      if (navigating) {
+        window.setTimeout(() => setSaving(false), 3000)
+      } else {
+        setSaving(false)
+      }
     }
   }
 
