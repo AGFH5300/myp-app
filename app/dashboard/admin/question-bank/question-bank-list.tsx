@@ -32,8 +32,8 @@ function statusBadge(label: string, tone: 'green' | 'amber' | 'grey' | 'red') {
   return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${classes}`}>{label}</span>
 }
 
-function warningBadge(label: string) {
-  return <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">{label}</span>
+function warningBadge(label: string, key?: string) {
+  return <span key={key} className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">{label}</span>
 }
 
 export function QuestionBankList({ questions }: { questions: QuestionBankRow[] }) {
@@ -127,7 +127,7 @@ export function QuestionBankList({ questions }: { questions: QuestionBankRow[] }
                   <td className="py-4 pr-4">{question.marks ?? '—'}</td>
                   <td className="py-4 pr-4">{question.topicSummary || <span className="text-amber-800">Not tagged</span>}</td>
                   <td className="py-4 pr-4"><div className="flex flex-wrap gap-2">{question.isPublished ? statusBadge('Published', 'green') : statusBadge('Draft', 'grey')}{question.needsReview ? statusBadge('Needs review', 'amber') : null}</div></td>
-                  <td className="py-4 pr-4"><div className="flex max-w-xs flex-wrap gap-1.5">{question.warnings.length ? question.warnings.map((warning) => warningBadge(warning)) : statusBadge('Ready', 'green')}</div></td>
+                  <td className="py-4 pr-4"><div className="flex max-w-xs flex-wrap gap-1.5">{question.warnings.length ? question.warnings.map((warning, index) => warningBadge(warning, `${question.id}-${warning}-${index}`)) : statusBadge('Ready', 'green')}</div></td>
                   <td className="py-4 pr-4"><div className="flex flex-wrap gap-2"><Link href={`/dashboard/admin/question-bank/${question.id}/preview`} className="tsm-btn-secondary w-fit">Preview as student</Link><Link href={`/dashboard/admin/question-bank/${question.id}/edit`} className="tsm-btn-secondary w-fit">Edit</Link></div></td>
                 </tr>
               )
