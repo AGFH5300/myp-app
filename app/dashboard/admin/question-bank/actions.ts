@@ -204,7 +204,7 @@ async function createQuestionRecord(supabase: Awaited<ReturnType<typeof requireA
   const { data: question, error } = await supabase
     .from('questions')
     .insert(questionPayload(formData, paperId, questionAssetPath, markschemeAssetPath))
-    .select('id,paper_id,question_number,question_order')
+    .select('id,paper_id,question_number,question_order,is_published,is_reviewed,created_at,updated_at')
     .single()
 
   if (error || !question) throw new Error('Could not create question.')
@@ -225,6 +225,10 @@ async function createQuestionRecord(supabase: Awaited<ReturnType<typeof requireA
     paperId: question.paper_id as string,
     questionNumber: question.question_number as string | null,
     questionOrder: question.question_order as number | null,
+    isPublished: question.is_published as boolean | null,
+    isReviewed: question.is_reviewed as boolean | null,
+    createdAt: question.created_at as string | null,
+    updatedAt: question.updated_at as string | null,
   }
 }
 

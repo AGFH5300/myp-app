@@ -3,7 +3,9 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { QuestionFromPdfForm } from '../from-pdf-form'
 
-export default async function QuestionFromPdfPage() {
+export default async function QuestionFromPdfPage({ searchParams }: { searchParams: Promise<{ paperId?: string | string[] }> }) {
+  const params = await searchParams
+  const initialPaperId = Array.isArray(params.paperId) ? params.paperId[0] || '' : params.paperId || ''
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
@@ -15,7 +17,7 @@ export default async function QuestionFromPdfPage() {
     supabase.from('papers').select('id,title,year,subjects(id,name),exam_sessions(session_month)').order('year', { ascending: false }).order('title'),
     supabase.from('subjects').select('id,name').order('name'),
     supabase.from('topics').select('id,name,subject_id,parent_topic_id,sort_order,is_active').order('sort_order').order('name'),
-    supabase.from('questions').select('id,paper_id,question_number,question_order').order('question_order').order('question_number'),
+    supabase.from('questions').select('id,paper_id,question_number,question_order,is_published,is_reviewed,created_at,updated_at').order('question_order').order('question_number'),
   ])
 
   return (
@@ -28,7 +30,7 @@ export default async function QuestionFromPdfPage() {
         </div>
         <Link href="/dashboard/admin/question-bank" className="tsm-btn-secondary">Back to Question Bank</Link>
       </header>
-      <QuestionFromPdfForm papers={papers ?? []} subjects={subjects ?? []} topics={topics ?? []} paperQuestions={paperQuestions ?? []} />
+      <QuestionFromPdfForm papers={papers ?? []} subjects={subjects ?? []} topics={topics ?? []} paperQuestions={paperQuestions ?? []} initialPaperId={initialPaperId} />
     </div>
   )
 }

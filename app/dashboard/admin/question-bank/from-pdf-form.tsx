@@ -1,7 +1,7 @@
 "use client"
 
 import { type CSSProperties, type DragEvent, type FormEvent, type MouseEvent, type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { RotateCcw, Upload, ZoomIn, ZoomOut } from 'lucide-react'
+import { AlertTriangle, RotateCcw, Upload, ZoomIn, ZoomOut } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -17,6 +17,8 @@ import {
   paperLabel,
   relationLabel,
   topicMatchesMainScope,
+  subtopicSearchOptions,
+  addSubtopicSelection,
   type LightboxState,
   type LocalPreview,
   paperQuestionReference,
@@ -710,14 +712,95 @@ function buildSmartFillSuggestions(text: string, allTopics: Topic[], subjectId: 
   }
 }
 
-export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions = [] }: { papers: Paper[]; subjects: Subject[]; topics: Topic[]; paperQuestions?: PaperQuestion[] }) {
+
+type PaperProgress = {
+  total: number
+  highestOrderQuestion: PaperQuestion | null
+  lastWorkedQuestion: PaperQuestion | null
+  nextOrder: number
+  draftCount: number
+  publishedCount: number
+  needsReviewCount: number
+  duplicateOrders: number[]
+  missingOrders: number[]
+}
+
+function questionRef(question: PaperQuestion | null) {
+  if (!question) return 'No question yet'
+  const number = question.question_number ? `Q${question.question_number}` : 'Untitled question'
+  return `${number} · Order ${question.question_order ?? '—'}`
+}
+
+function workedAt(question: PaperQuestion) {
+  const value = question.updated_at || question.created_at || ''
+  const time = Date.parse(value)
+  return Number.isFinite(time) ? time : 0
+}
+
+function buildPaperProgress(paperId: string, questions: PaperQuestion[]): PaperProgress {
+  const paperQuestions = questions.filter((question) => question.paper_id === paperId)
+  const orderedQuestions = paperQuestions.filter((question) => Number.isFinite(question.question_order))
+  const orderValues = orderedQuestions.map((question) => question.question_order as number)
+  const maxOrder = orderValues.length ? Math.max(...orderValues) : 0
+  const orderCounts = new Map<number, number>()
+  orderValues.forEach((order) => orderCounts.set(order, (orderCounts.get(order) ?? 0) + 1))
+  const missingOrders = maxOrder ? Array.from({ length: maxOrder }, (_, index) => index + 1).filter((order) => !orderCounts.has(order)) : []
+
+  return {
+    total: paperQuestions.length,
+    highestOrderQuestion: orderedQuestions.sort((a, b) => (b.question_order ?? 0) - (a.question_order ?? 0))[0] || null,
+    lastWorkedQuestion: [...paperQuestions].sort((a, b) => workedAt(b) - workedAt(a))[0] || null,
+    nextOrder: maxOrder + 1,
+    draftCount: paperQuestions.filter((question) => question.is_published === false).length,
+    publishedCount: paperQuestions.filter((question) => question.is_published === true).length,
+    needsReviewCount: paperQuestions.filter((question) => question.is_reviewed === false).length,
+    duplicateOrders: [...orderCounts.entries()].filter(([, count]) => count > 1).map(([order]) => order).sort((a, b) => a - b),
+    missingOrders,
+  }
+}
+
+function PaperProgressCard({ paper, progress, onUseNextOrder }: { paper: Paper; progress: PaperProgress; onUseNextOrder: () => void }) {
+  const editQuestion = progress.highestOrderQuestion || progress.lastWorkedQuestion
+
+  return (
+    <div className="mt-5 rounded-md border border-blue-100 bg-blue-50/50 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-label text-xs uppercase tracking-[.14em] text-[#735b2b]">Resume paper</p>
+          <h3 className="font-headline text-xl text-[#00152a]">{paperLabel(paper)}</h3>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={onUseNextOrder} className="rounded-md border border-blue-200 bg-white px-3 py-2 font-body text-xs font-semibold text-blue-700 hover:bg-blue-50">Use next order</button>
+          {editQuestion ? <Link href={`/dashboard/admin/question-bank/${editQuestion.id}/edit`} className="rounded-md border border-[#c3c6ce66] bg-white px-3 py-2 font-body text-xs font-semibold text-[#00152a] hover:bg-[#f5f3ee]">Edit previous question</Link> : null}
+          <Link href={`/dashboard/admin/question-bank?paper=${paper.id}`} className="rounded-md border border-[#c3c6ce66] bg-white px-3 py-2 font-body text-xs font-semibold text-[#00152a] hover:bg-[#f5f3ee]">Review this paper</Link>
+        </div>
+      </div>
+      <div className="mt-3 grid gap-2 font-body text-sm text-[#43474d] sm:grid-cols-2 lg:grid-cols-3">
+        <p><span className="font-semibold text-[#00152a]">Questions created:</span> {progress.total}</p>
+        <p><span className="font-semibold text-[#00152a]">Previous by order:</span> {questionRef(progress.highestOrderQuestion)}</p>
+        <p><span className="font-semibold text-[#00152a]">Last worked on:</span> {questionRef(progress.lastWorkedQuestion)}</p>
+        <p><span className="font-semibold text-[#00152a]">Next suggested order:</span> {progress.nextOrder}</p>
+        <p><span className="font-semibold text-[#00152a]">Published / Draft / Needs review:</span> {progress.publishedCount} / {progress.draftCount} / {progress.needsReviewCount}</p>
+      </div>
+      {progress.duplicateOrders.length || progress.missingOrders.length ? (
+        <div className="mt-3 space-y-1 rounded-md border border-amber-200 bg-amber-50 p-3 font-body text-sm text-amber-900">
+          {progress.duplicateOrders.length ? <p className="flex items-center gap-2"><AlertTriangle className="size-4" aria-hidden="true" /> Duplicate order: {progress.duplicateOrders.join(', ')}</p> : null}
+          {progress.missingOrders.length ? <p>Missing order: {progress.missingOrders.join(', ')}</p> : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions = [], initialPaperId = '' }: { papers: Paper[]; subjects: Subject[]; topics: Topic[]; paperQuestions?: PaperQuestion[]; initialPaperId?: string }) {
   const router = useRouter()
   const defaultSubjectId = subjects.find((subject) => subject.name === 'Mathematics Extended')?.id || subjects.find((subject) => subject.name === 'Mathematics')?.id || subjects[0]?.id || ''
+  const initialPaper = papers.find((paper) => paper.id === initialPaperId)
   const [paperMode, setPaperMode] = useState<'existing' | 'new'>('existing')
   const [availablePapers, setAvailablePapers] = useState<Paper[]>(papers)
   const [availablePaperQuestions, setAvailablePaperQuestions] = useState<PaperQuestion[]>(paperQuestions)
-  const [subjectId, setSubjectId] = useState(defaultSubjectId)
-  const [paperId, setPaperId] = useState('')
+  const [subjectId, setSubjectId] = useState(relationLabel(initialPaper?.subjects, 'id') || defaultSubjectId)
+  const [paperId, setPaperId] = useState(initialPaper?.id || '')
   const [newPaperTitle, setNewPaperTitle] = useState('')
   const [newPaperYear, setNewPaperYear] = useState('2025')
   const [newPaperSession, setNewPaperSession] = useState('May')
@@ -888,7 +971,7 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
   }
 
   function applySmartFillTopic(suggestion: SmartFillTopicSuggestion, showToast = true) {
-    setTopicGroupId((current) => current || suggestion.groupId)
+    setTopicGroupId(suggestion.groupId)
     setSelectedSubtopicIds((current) => {
       const next = current.includes(suggestion.subtopicId) ? current : [...current, suggestion.subtopicId]
       if (!primaryTopicId && next.includes(suggestion.subtopicId)) setPrimaryTopicId(suggestion.subtopicId)
@@ -911,6 +994,19 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
     if (newTopics.length) toast.success(newTopics.length === 1 ? 'Topic applied.' : 'Topics applied.')
   }
 
+  function addGlobalSubtopic(value: string) {
+    if (!value) return
+    addSubtopicSelection({
+      subtopicId: value,
+      topics,
+      selectedSubtopicIds,
+      primaryTopicId,
+      setTopicGroupId,
+      setSelectedSubtopicIds,
+      setPrimaryTopicId,
+    })
+  }
+
   const filteredPapers = availablePapers.filter((paper) => !subjectId || relationLabel(paper.subjects, 'id') === subjectId)
   const mainTopicGroups = useMemo(() => topics
     .filter((topic) => !topic.parent_topic_id && topicMatchesMainScope(topic, subjectId))
@@ -918,6 +1014,9 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
   const subtopics = useMemo(() => topics
     .filter((topic) => topic.parent_topic_id === topicGroupId && topicMatchesMainScope(topic, subjectId))
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name)), [topics, topicGroupId, subjectId])
+  const globalSubtopicOptions = useMemo(() => subtopicSearchOptions(topics, subjectId, selectedSubtopicIds), [topics, subjectId, selectedSubtopicIds])
+  const selectedPaper = availablePapers.find((paper) => paper.id === paperId)
+  const paperProgress = useMemo(() => buildPaperProgress(paperId, availablePaperQuestions), [paperId, availablePaperQuestions])
 
   const step1Complete = paperMode === 'existing' ? Boolean(subjectId && paperId) : Boolean(subjectId && newPaperTitle && newPaperYear && newPaperSession)
   const step2Complete = Boolean(paperFile && markschemeFile)
@@ -987,6 +1086,10 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
         paper_id: createdPaperId,
         question_number: result.questionNumber || submittedQuestionNumber,
         question_order: result.questionOrder ?? (Number.isFinite(submittedQuestionOrder) ? submittedQuestionOrder : null),
+        is_published: result.isPublished ?? published,
+        is_reviewed: result.isReviewed ?? reviewed,
+        created_at: result.createdAt ?? new Date().toISOString(),
+        updated_at: result.updatedAt ?? new Date().toISOString(),
       }
       const nextPaperQuestions = [...availablePaperQuestions, createdQuestion]
       setAvailablePaperQuestions(nextPaperQuestions)
@@ -1038,6 +1141,7 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
           <SearchableSelect id="pdf-question-subject" label="Subject" value={subjectId} onChange={updateSubject} placeholder="Choose subject" emptyText="No matching subjects found." options={subjects.map((subject) => ({ value: subject.id, label: subject.name }))} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
           {paperMode === 'existing' ? <SearchableSelect id="pdf-question-paper" label="Existing paper" value={paperId} onChange={setPaperId} placeholder="Search papers" emptyText="No matching papers found." options={filteredPapers.map((paper) => ({ value: paper.id, label: paperLabel(paper) }))} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} /> : null}
         </div>
+        {paperMode === 'existing' && selectedPaper ? <PaperProgressCard paper={selectedPaper} progress={paperProgress} onUseNextOrder={() => setQuestionOrderValue(String(paperProgress.nextOrder))} /> : null}
         {paperMode === 'new' ? (
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <label className="font-body text-sm text-[#43474d]">Paper title<input name="new_paper_title" value={newPaperTitle} onChange={(event) => setNewPaperTitle(event.target.value)} className="tsm-input mt-1 w-full" placeholder="Paper 1" /></label>
@@ -1148,9 +1252,10 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
           <label className="font-body text-sm text-[#43474d]">Order in paper<input name="question_order" value={questionOrderValue} onChange={(event) => setQuestionOrderValue(event.target.value)} inputMode="decimal" className="tsm-input mt-1 w-full" placeholder="1" /><span className="mt-1 block text-xs text-[#6f737b]">Controls where this question appears in lists. Use 1 for the first question, 2 for the next, and so on.</span><OrderInPaperHelper suggestedOrder={suggestedOrder} questions={orderReference} onUseSuggested={() => setQuestionOrderValue(String(suggestedOrder))} /></label>
           <label className="font-body text-sm text-[#43474d]">Marks<input name="marks" value={marks} onChange={(event) => setMarks(event.target.value)} inputMode="numeric" className="tsm-input mt-1 w-full" placeholder="6" /></label>
         </div>
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
           <SearchableSelect id="pdf-question-topic-group" label="Topic group" value={topicGroupId} onChange={(value) => { setTopicGroupId(value); setSelectedSubtopicIds([]); setPrimaryTopicId('') }} placeholder="Choose topic group" emptyText="No matching topic groups found." options={mainTopicGroups.map((topic) => ({ value: topic.id, label: topic.name }))} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
           <SearchableSelect id="pdf-question-subtopic" label="Add exact subtopic" value="" onChange={(value) => { if (value && !selectedSubtopicIds.includes(value)) { setSelectedSubtopicIds([...selectedSubtopicIds, value]); if (!primaryTopicId) setPrimaryTopicId(value) } }} placeholder={topicGroupId ? 'Search subtopics to add' : 'Choose a topic group first'} emptyText="No matching subtopics found." options={subtopics.filter((topic) => !selectedSubtopicIds.includes(topic.id)).map((topic) => ({ value: topic.id, label: topic.name }))} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
+          <SearchableSelect id="pdf-question-global-subtopic" label="Search all subtopics in this subject" value="" onChange={addGlobalSubtopic} placeholder={subjectId ? 'Search by unit, topic, or subtopic' : 'Select a subject first.'} emptyText={subjectId ? 'No subtopics found in this subject.' : 'Select a subject first.'} options={subjectId ? globalSubtopicOptions : []} disabled={!subjectId} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
         </div>
         <div className="mt-4 rounded-md border border-[#c3c6ce66] bg-[#fbf9f4] p-4">
           <h3 className="font-body text-sm font-semibold text-[#00152a]">Selected subtopics</h3>
