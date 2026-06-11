@@ -10,9 +10,9 @@ import { createQuestion, updateQuestion } from './actions'
 
 export type PaperRelation<T> = T | T[] | null
 export type Paper = { id: string; title: string; year: number; subjects?: PaperRelation<{ id?: string | null; name?: string | null }>; exam_sessions?: PaperRelation<{ session_month?: string | null }> }
-export type PaperQuestion = { id: string; paper_id: string; question_number: string | null; question_order: number | null }
+export type PaperQuestion = { id: string; paper_id: string; question_number: string | null; question_order: number | null; is_published?: boolean | null; is_reviewed?: boolean | null; created_at?: string | null; updated_at?: string | null }
 export type Subject = { id: string; name: string }
-export type Topic = { id: string; name: string; subject_id?: string | null; parent_topic_id?: string | null; sort_order?: number | null; is_active?: boolean | null }
+export type Topic = { id: string; name: string; subject_id?: string | null; parent_topic_id?: string | null; sort_order?: number | null; is_active?: boolean | null; level?: string | null }
 type QuestionTopic = { topic_id: string; is_primary?: boolean | null }
 export type QuestionAsset = { id: string; asset_type: 'question' | 'markscheme'; storage_path: string | null; public_url: string | null; label: string | null; sort_order: number | null; preview_url?: string | null }
 type Question = {
@@ -78,6 +78,61 @@ export function paperQuestionReference(paperMode: 'existing' | 'new', paperId: s
     .sort((a, b) => (a.question_order ?? Number.MAX_SAFE_INTEGER) - (b.question_order ?? Number.MAX_SAFE_INTEGER) || (a.question_number || '').localeCompare(b.question_number || ''))
 }
 
+
+export function subtopicSearchOptions(topics: Topic[], subjectId: string, selectedSubtopicIds: string[] = []) {
+  const parents = topics.filter((topic) => !topic.parent_topic_id && topicMatchesMainScope(topic, subjectId))
+  const parentById = new Map(parents.map((topic) => [topic.id, topic]))
+  const selected = new Set(selectedSubtopicIds)
+
+  return topics
+    .filter((topic) => topic.parent_topic_id && topicMatchesMainScope(topic, subjectId) && parentById.has(topic.parent_topic_id) && !selected.has(topic.id))
+    .sort((a, b) => {
+      const parentA = parentById.get(a.parent_topic_id || '')
+      const parentB = parentById.get(b.parent_topic_id || '')
+      return (parentA?.sort_order ?? 0) - (parentB?.sort_order ?? 0)
+        || (parentA?.name || '').localeCompare(parentB?.name || '')
+        || (a.sort_order ?? 0) - (b.sort_order ?? 0)
+        || a.name.localeCompare(b.name)
+    })
+    .map((topic) => {
+      const parent = parentById.get(topic.parent_topic_id || '')
+      const level = topic.level ? `Level: ${topic.level}` : undefined
+      return {
+        value: topic.id,
+        label: `${parent?.name || 'Parent topic'} → ${topic.name}`,
+        helper: level ? `${level} · Search by parent or subtopic name` : 'Search by parent or subtopic name',
+      }
+    })
+}
+
+export function addSubtopicSelection({
+  subtopicId,
+  topics,
+  selectedSubtopicIds,
+  primaryTopicId,
+  setTopicGroupId,
+  setSelectedSubtopicIds,
+  setPrimaryTopicId,
+  toastMessage = 'Subtopic added',
+}: {
+  subtopicId: string
+  topics: Topic[]
+  selectedSubtopicIds: string[]
+  primaryTopicId: string
+  setTopicGroupId: (value: string) => void
+  setSelectedSubtopicIds: (value: string[]) => void
+  setPrimaryTopicId: (value: string) => void
+  toastMessage?: string
+}) {
+  const subtopic = topics.find((topic) => topic.id === subtopicId)
+  if (!subtopic?.parent_topic_id) return
+  setTopicGroupId(subtopic.parent_topic_id)
+  const next = selectedSubtopicIds.includes(subtopicId) ? selectedSubtopicIds : [...selectedSubtopicIds, subtopicId]
+  setSelectedSubtopicIds(next)
+  if (!primaryTopicId) setPrimaryTopicId(subtopicId)
+  toast.success(selectedSubtopicIds.includes(subtopicId) ? 'Subtopic already selected' : toastMessage)
+}
+
 export function OrderInPaperHelper({ suggestedOrder, questions, onUseSuggested }: { suggestedOrder: number; questions: PaperQuestion[]; onUseSuggested: () => void }) {
   const sortedQuestions = [...questions].sort((a, b) => (a.question_order ?? Number.MAX_SAFE_INTEGER) - (b.question_order ?? Number.MAX_SAFE_INTEGER) || (a.question_number || '').localeCompare(b.question_number || ''))
   const visibleQuestions = sortedQuestions.slice(-3)
@@ -140,12 +195,12 @@ export function ChoiceCard({ active, title, helper, onClick }: { active: boolean
   )
 }
 
-export function SearchableSelect({ id, name, label, value, options, placeholder, emptyText, onChange, required, openSelectId, setOpenSelectId }: { id: string; name?: string; label: string; value: string; options: SelectOption[]; placeholder: string; emptyText: string; onChange: (value: string) => void; required?: boolean; openSelectId: string | null; setOpenSelectId: (id: string | null) => void }) {
+export function SearchableSelect({ id, name, label, value, options, placeholder, emptyText, onChange, required, disabled = false, openSelectId, setOpenSelectId }: { id: string; name?: string; label: string; value: string; options: SelectOption[]; placeholder: string; emptyText: string; onChange: (value: string) => void; required?: boolean; disabled?: boolean; openSelectId: string | null; setOpenSelectId: (id: string | null) => void }) {
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   const rootRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
-  const open = openSelectId === id
+  const open = !disabled && openSelectId === id
   const selected = options.find((option) => option.value === value)
   const filtered = options.filter((option) => `${option.label} ${option.helper ?? ''}`.toLowerCase().includes(query.toLowerCase()))
 
@@ -179,6 +234,7 @@ export function SearchableSelect({ id, name, label, value, options, placeholder,
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (disabled) return
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       setOpenSelectId(id)
@@ -198,7 +254,7 @@ export function SearchableSelect({ id, name, label, value, options, placeholder,
     <div ref={rootRef} className="relative font-body text-sm text-[#43474d]">
       {name ? <input type="hidden" name={name} value={value} /> : null}
       <label id={`${id}-label`} className="block">{label}</label>
-      <button id={id} type="button" aria-labelledby={`${id}-label`} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpenSelectId(open ? null : id)} onKeyDown={handleKeyDown} className="tsm-input mt-1 flex w-full cursor-pointer items-center justify-between gap-3 text-left">
+      <button id={id} type="button" aria-labelledby={`${id}-label`} aria-haspopup="listbox" aria-expanded={open} onClick={() => { if (!disabled) setOpenSelectId(open ? null : id) }} onKeyDown={handleKeyDown} disabled={disabled} className="tsm-input mt-1 flex w-full cursor-pointer items-center justify-between gap-3 text-left disabled:cursor-not-allowed disabled:opacity-60">
         <span className={selected ? 'text-[#00152a]' : 'text-[#6f737b]'}>{selected?.label || placeholder}</span>
         <span className="text-[#735b2b]" aria-hidden="true">⌄</span>
       </button>
@@ -482,7 +538,7 @@ export function QuestionBankForm({
   const [questionNumber, setQuestionNumber] = useState(question?.question_number || '')
   const [questionOrderValue, setQuestionOrderValue] = useState(question?.question_order?.toString() || '')
   const [topicGroupId, setTopicGroupId] = useState(initialTopicGroupId)
-  const [selectedSubtopicIds, setSelectedSubtopicIds] = useState(() => Array.from(selectedTopics).filter((topicId) => topics.find((topic) => topic.id === topicId)?.parent_topic_id === initialTopicGroupId))
+  const [selectedSubtopicIds, setSelectedSubtopicIds] = useState(() => Array.from(selectedTopics).filter((topicId) => Boolean(topics.find((topic) => topic.id === topicId)?.parent_topic_id)))
   const [primaryTopicId, setPrimaryTopicId] = useState(primaryTopicIdFromQuestion)
   const [published, setPublished] = useState(question?.is_published ?? false)
   const [reviewed, setReviewed] = useState(question?.is_reviewed ?? false)
@@ -536,7 +592,20 @@ export function QuestionBankForm({
   const subtopics = useMemo(() => topics
     .filter((topic) => topic.parent_topic_id === topicGroupId && topicMatchesMainScope(topic, subjectId))
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name)), [topics, topicGroupId, subjectId])
+  const globalSubtopicOptions = useMemo(() => subtopicSearchOptions(topics, subjectId, selectedSubtopicIds), [topics, subjectId, selectedSubtopicIds])
 
+  function addGlobalSubtopic(value: string) {
+    if (!value) return
+    addSubtopicSelection({
+      subtopicId: value,
+      topics,
+      selectedSubtopicIds,
+      primaryTopicId,
+      setTopicGroupId,
+      setSelectedSubtopicIds,
+      setPrimaryTopicId,
+    })
+  }
 
   const questionLightboxItems = orderedPreviewItems(existingQuestionAssets, questionFiles, questionOrder, 'Question image', questionPreviewUrl, 'Question image 1')
   const markschemeLightboxItems = orderedPreviewItems(existingMarkschemeAssets, markschemeFiles, markschemeOrder, 'Mark scheme image', markschemePreviewUrl, 'Mark scheme image 1')
@@ -661,9 +730,10 @@ export function QuestionBankForm({
       </StepCard>
 
       <StepCard step={4} title="Topics and publishing" state={step4State} helper="Choose the subject-scoped topic group and exact subtopic tags for this question.">
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-3">
           <SearchableSelect id="admin-question-topic-group" label="Topic group" value={topicGroupId} onChange={(value) => { setTopicGroupId(value); setSelectedSubtopicIds([]); setPrimaryTopicId('') }} placeholder="Choose topic group" emptyText="No matching topic groups found." options={mainTopicGroups.map((topic) => ({ value: topic.id, label: topic.name }))} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
-          <SearchableSelect id="admin-question-primary-topic" label="Add exact subtopic" value="" onChange={(value) => { if (value && !selectedSubtopicIds.includes(value)) setSelectedSubtopicIds([...selectedSubtopicIds, value]) }} placeholder={topicGroupId ? 'Search subtopics to add' : 'Choose a topic group first'} emptyText="No matching subtopics found." options={subtopics.filter((topic) => !selectedSubtopicIds.includes(topic.id)).map((topic) => ({ value: topic.id, label: topic.name }))} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
+          <SearchableSelect id="admin-question-primary-topic" label="Add exact subtopic" value="" onChange={(value) => { if (value && !selectedSubtopicIds.includes(value)) { setSelectedSubtopicIds([...selectedSubtopicIds, value]); if (!primaryTopicId) setPrimaryTopicId(value) } }} placeholder={topicGroupId ? 'Search subtopics to add' : 'Choose a topic group first'} emptyText="No matching subtopics found." options={subtopics.filter((topic) => !selectedSubtopicIds.includes(topic.id)).map((topic) => ({ value: topic.id, label: topic.name }))} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
+          <SearchableSelect id="admin-question-global-subtopic" label="Search all subtopics in this subject" value="" onChange={addGlobalSubtopic} placeholder={subjectId ? 'Search by unit, topic, or subtopic' : 'Select a subject first.'} emptyText={subjectId ? 'No subtopics found in this subject.' : 'Select a subject first.'} options={subjectId ? globalSubtopicOptions : []} disabled={!subjectId} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
         </div>
         <p className="mt-3 font-body text-sm text-[#43474d]">Need a new subtopic? Ask the topic manager/admin to add it first.</p>
         <div className="mt-4 rounded-md border border-[#c3c6ce66] bg-[#fbf9f4] p-4">
