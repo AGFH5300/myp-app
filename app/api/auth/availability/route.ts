@@ -29,7 +29,12 @@ function jsonResponse(
       message: reason,
       ...(availabilityDebugEnabled ? { debug: init?.debug ?? null } : {}),
     },
-    { status: init?.status },
+    {
+      status: init?.status,
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+      },
+    },
   )
 }
 
@@ -41,9 +46,8 @@ export async function GET(request: Request) {
   const value = rawValue?.trim() ?? ''
   const requestMeta = {
     rawType,
-    rawValue,
     parsedType: type,
-    parsedValue: value,
+    valueLength: value.length,
   }
 
   if (availabilityDebugEnabled) {
@@ -112,7 +116,8 @@ export async function GET(request: Request) {
         debug: {
           ...requestMeta,
           validationPath: 'rpc_is_username_available_succeeded',
-          rpcData: data,
+          checkPath: 'database_rpc',
+          rpcAvailable: available,
         },
       },
     )
@@ -144,7 +149,8 @@ export async function GET(request: Request) {
       debug: {
         ...requestMeta,
         validationPath: 'rpc_is_email_available_succeeded',
-        rpcData: data,
+        checkPath: 'database_rpc',
+        rpcAvailable: available,
       },
     },
   )

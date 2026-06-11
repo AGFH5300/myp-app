@@ -135,15 +135,10 @@ export function VerifyOtpForm({ email, username, fullName, next }: { email: stri
     setNotice(null)
 
     const supabase = createClient()
-    const { error: resendError } = await supabase.auth.signInWithOtp({
+    const { error: resendError } = await supabase.auth.resend({
+      type: 'signup',
       email: normalizedEmail,
       options: {
-        shouldCreateUser: true,
-        data: {
-          username: username.trim(),
-          full_name: fullName.trim(),
-          onboarding_completed: false,
-        },
         emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
       },
     })

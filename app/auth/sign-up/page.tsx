@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthShell } from '@/components/auth-shell'
 import { Spinner } from '@/components/ui/spinner'
-import { createClient } from '@/lib/supabase/client'
 
 type AvailabilityResponse = {
   status?: 'idle' | 'checking' | 'available' | 'invalid' | 'unavailable' | 'error'
@@ -36,7 +35,7 @@ const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,24}$/
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const VALIDATION_DEBOUNCE_MS = 600
-const AVAILABILITY_CACHE_SUCCESS_TTL_MS = 4 * 60 * 1000
+const AVAILABILITY_CACHE_SUCCESS_TTL_MS = 20 * 1000
 const AVAILABILITY_CACHE_ERROR_TTL_MS = 8 * 1000
 
 type CachedAvailabilityResult = {
@@ -97,7 +96,6 @@ export default function SignUpPage() {
   const nextPathRef = useRef('/onboarding')
 
   const normalizedUsername = observedValues.username
-  const normalizedFullName = observedValues.fullName
   const normalizedEmail = observedValues.email
 
   const getCachedAvailabilityResult = useCallback((cacheKey: string) => {
@@ -243,7 +241,7 @@ export default function SignUpPage() {
     }
 
     const cacheKey = `username:${trimmed}`
-    const cached = getCachedAvailabilityResult(cacheKey)
+    const cached = trigger === 'submit' ? null : getCachedAvailabilityResult(cacheKey)
     if (cached) {
       const isValid = cached.status === 'available' && cached.available
       setUsernameField((previous) => ({
@@ -271,7 +269,7 @@ export default function SignUpPage() {
     const requestPath = `/api/auth/availability?type=username&value=${encodeURIComponent(trimmed)}`
 
     try {
-      const response = await fetch(requestPath)
+      const response = await fetch(requestPath, { cache: 'no-store' })
       const payload = (await response.json()) as AvailabilityResponse
       const reason = payload.reason ?? payload.message ?? 'Could not validate username right now.'
 
@@ -418,7 +416,7 @@ export default function SignUpPage() {
     }
 
     const cacheKey = `email:${trimmed}`
-    const cached = getCachedAvailabilityResult(cacheKey)
+    const cached = trigger === 'submit' ? null : getCachedAvailabilityResult(cacheKey)
     if (cached) {
       const isValid = cached.status === 'available' && cached.available
       setEmailField((previous) => ({
@@ -446,7 +444,7 @@ export default function SignUpPage() {
     const requestPath = `/api/auth/availability?type=email&value=${encodeURIComponent(trimmed)}`
 
     try {
-      const response = await fetch(requestPath)
+      const response = await fetch(requestPath, { cache: 'no-store' })
       const payload = (await response.json()) as AvailabilityResponse
       const reason = payload.reason ?? payload.message ?? 'Could not validate email right now.'
 
@@ -675,28 +673,31 @@ export default function SignUpPage() {
     setIsSubmitting(true)
 
     try {
-      const supabase = createClient()
       const payload = {
         username: observedValues.username,
         fullName: observedValues.fullName,
         email: observedValues.email,
       }
 
-      const { error: signUpError } = await supabase.auth.signInWithOtp({
-        email: payload.email,
-        options: {
-          shouldCreateUser: true,
-          data: {
-            username: payload.username,
-            full_name: payload.fullName,
-            onboarding_completed: false,
-          },
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPathRef.current)}`,
-        },
+      const response = await fetch('/api/auth/start-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({
+          ...payload,
+          next: nextPathRef.current,
+        }),
       })
+      const result = (await response.json()) as { ok?: boolean; message?: string; field?: 'username' | 'email' | 'form' }
 
-      if (signUpError) {
-        setError(signUpError.message)
+      if (!response.ok || !result.ok) {
+        const message = result.message || 'Something went wrong while creating your account. Please try again.'
+        if (result.field === 'username') {
+          setUsernameField((previous) => ({ ...previous, status: 'invalid', error: message, isChecking: false, isAvailable: false }))
+        } else if (result.field === 'email') {
+          setEmailField((previous) => ({ ...previous, status: 'invalid', error: message, isChecking: false, isAvailable: false }))
+        }
+        setError(message)
         return
       }
 
