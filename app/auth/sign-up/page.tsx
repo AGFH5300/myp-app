@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthShell } from '@/components/auth-shell'
+import { isValidEmail } from '@/lib/auth-email'
 import { Spinner } from '@/components/ui/spinner'
 
 type AvailabilityResponse = {
@@ -36,7 +37,6 @@ type AvailabilityFieldState = FieldState & {
 
 const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,24}$/
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const VALIDATION_DEBOUNCE_MS = 600
 const AVAILABILITY_CACHE_SUCCESS_TTL_MS = 20 * 1000
 const AVAILABILITY_CACHE_ERROR_TTL_MS = 8 * 1000
@@ -422,7 +422,7 @@ export default function SignUpPage() {
       return false
     }
 
-    if (!EMAIL_PATTERN.test(trimmed)) {
+    if (!isValidEmail(trimmed)) {
       setEmailField((previous) => ({
         ...previous,
         status: 'invalid',
