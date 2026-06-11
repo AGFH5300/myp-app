@@ -26,9 +26,12 @@ type FieldState = {
   lastValidatedAt: number | null
 }
 
+type AvailabilityErrorKind = 'local' | 'unavailable' | 'server'
+
 type AvailabilityFieldState = FieldState & {
   isChecking: boolean
   isAvailable: boolean | null
+  errorKind: AvailabilityErrorKind | null
 }
 
 const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
@@ -46,10 +49,20 @@ type CachedAvailabilityResult = {
   value: string
 }
 
-function fieldStatusClass({ status, isChecking, isAvailable }: { status: FieldStatus; isChecking?: boolean; isAvailable?: boolean | null }) {
+function fieldStatusClass({
+  status,
+  isChecking,
+  isAvailable,
+  showInvalid = true,
+}: {
+  status: FieldStatus
+  isChecking?: boolean
+  isAvailable?: boolean | null
+  showInvalid?: boolean
+}) {
   if (isChecking || status === 'validating') return ''
   if (status === 'valid' && isAvailable !== false) return 'border-b-[#0c7a43]'
-  if (status === 'invalid') return 'border-b-red-600'
+  if (status === 'invalid' && showInvalid) return 'border-b-red-600'
   return ''
 }
 
@@ -67,6 +80,7 @@ const INITIAL_AVAILABILITY_FIELD_STATE: AvailabilityFieldState = {
   ...INITIAL_FIELD_STATE,
   isChecking: false,
   isAvailable: null,
+  errorKind: null,
 }
 
 export default function SignUpPage() {
@@ -217,6 +231,7 @@ export default function SignUpPage() {
         error: 'Enter a username.',
         isChecking: false,
         isAvailable: null,
+        errorKind: 'local',
         lastValidatedValue: trimmed,
         lastValidatedAt: checkedAt,
       }))
@@ -230,6 +245,7 @@ export default function SignUpPage() {
         error: 'Use 3-24 characters: letters, numbers, or underscore.',
         isChecking: false,
         isAvailable: null,
+        errorKind: 'local',
         lastValidatedValue: trimmed,
         lastValidatedAt: checkedAt,
       }))
@@ -250,6 +266,7 @@ export default function SignUpPage() {
         error: isValid ? null : cached.message,
         isChecking: false,
         isAvailable: cached.available,
+        errorKind: isValid ? null : cached.status === 'unavailable' ? 'unavailable' : cached.status === 'error' ? 'server' : 'local',
         lastValidatedValue: trimmed,
         lastValidatedAt: cached.checkedAt,
       }))
@@ -264,6 +281,7 @@ export default function SignUpPage() {
       error: null,
       isChecking: true,
       isAvailable: null,
+      errorKind: null,
     }))
 
     const requestPath = `/api/auth/availability?type=username&value=${encodeURIComponent(trimmed)}`
@@ -291,6 +309,7 @@ export default function SignUpPage() {
           error: reason,
           isChecking: false,
           isAvailable: false,
+          errorKind: payload.status === 'invalid' ? 'local' : 'server',
           lastValidatedValue: trimmed,
           lastValidatedAt: Date.now(),
         }))
@@ -311,6 +330,7 @@ export default function SignUpPage() {
           error: reason,
           isChecking: false,
           isAvailable: false,
+          errorKind: payload.status === 'invalid' ? 'local' : 'server',
           lastValidatedValue: trimmed,
           lastValidatedAt: Date.now(),
         }))
@@ -332,6 +352,7 @@ export default function SignUpPage() {
           error: unavailableMessage,
           isChecking: false,
           isAvailable: false,
+          errorKind: 'unavailable',
           lastValidatedValue: trimmed,
           lastValidatedAt: Date.now(),
         }))
@@ -351,6 +372,7 @@ export default function SignUpPage() {
         error: null,
         isChecking: false,
         isAvailable: true,
+        errorKind: null,
         lastValidatedValue: trimmed,
         lastValidatedAt: Date.now(),
       }))
@@ -374,6 +396,7 @@ export default function SignUpPage() {
         error: genericError,
         isChecking: false,
         isAvailable: false,
+        errorKind: 'server',
         lastValidatedValue: trimmed,
         lastValidatedAt: Date.now(),
       }))
@@ -392,6 +415,7 @@ export default function SignUpPage() {
         error: 'Enter your email address.',
         isChecking: false,
         isAvailable: null,
+        errorKind: 'local',
         lastValidatedValue: trimmed,
         lastValidatedAt: checkedAt,
       }))
@@ -405,6 +429,7 @@ export default function SignUpPage() {
         error: 'Enter a valid email address.',
         isChecking: false,
         isAvailable: null,
+        errorKind: 'local',
         lastValidatedValue: trimmed,
         lastValidatedAt: checkedAt,
       }))
@@ -425,6 +450,7 @@ export default function SignUpPage() {
         error: isValid ? null : cached.message,
         isChecking: false,
         isAvailable: cached.available,
+        errorKind: isValid ? null : cached.status === 'unavailable' ? 'unavailable' : cached.status === 'error' ? 'server' : 'local',
         lastValidatedValue: trimmed,
         lastValidatedAt: cached.checkedAt,
       }))
@@ -439,6 +465,7 @@ export default function SignUpPage() {
       error: null,
       isChecking: true,
       isAvailable: null,
+      errorKind: null,
     }))
 
     const requestPath = `/api/auth/availability?type=email&value=${encodeURIComponent(trimmed)}`
@@ -466,6 +493,7 @@ export default function SignUpPage() {
           error: reason,
           isChecking: false,
           isAvailable: false,
+          errorKind: payload.status === 'invalid' ? 'local' : 'server',
           lastValidatedValue: trimmed,
           lastValidatedAt: Date.now(),
         }))
@@ -486,6 +514,7 @@ export default function SignUpPage() {
           error: reason,
           isChecking: false,
           isAvailable: false,
+          errorKind: 'local',
           lastValidatedValue: trimmed,
           lastValidatedAt: Date.now(),
         }))
@@ -507,6 +536,7 @@ export default function SignUpPage() {
           error: unavailableMessage,
           isChecking: false,
           isAvailable: false,
+          errorKind: 'unavailable',
           lastValidatedValue: trimmed,
           lastValidatedAt: Date.now(),
         }))
@@ -526,6 +556,7 @@ export default function SignUpPage() {
         error: null,
         isChecking: false,
         isAvailable: true,
+        errorKind: null,
         lastValidatedValue: trimmed,
         lastValidatedAt: Date.now(),
       }))
@@ -549,6 +580,7 @@ export default function SignUpPage() {
         error: genericError,
         isChecking: false,
         isAvailable: false,
+        errorKind: 'server',
         lastValidatedValue: trimmed,
         lastValidatedAt: Date.now(),
       }))
@@ -607,6 +639,7 @@ export default function SignUpPage() {
       error: null,
       isChecking: false,
       isAvailable: null,
+      errorKind: null,
     }))
   }, [syncFromDom])
 
@@ -632,6 +665,7 @@ export default function SignUpPage() {
       error: null,
       isChecking: false,
       isAvailable: null,
+      errorKind: null,
     }))
   }, [syncFromDom])
 
@@ -646,9 +680,17 @@ export default function SignUpPage() {
     )
   }, [emailField.isChecking, emailField.status, fullNameField.status, isSubmitting, usernameField.isChecking, usernameField.status])
 
-  const shouldShowUsernameError = usernameField.status === 'invalid' && usernameField.error && (submitAttempted || usernameField.blurred)
+  const shouldShowUsernameError = Boolean(
+    usernameField.status === 'invalid' &&
+      usernameField.error &&
+      (submitAttempted || usernameField.blurred || usernameField.errorKind === 'unavailable' || usernameField.errorKind === 'server'),
+  )
   const shouldShowFullNameError = fullNameField.status === 'invalid' && fullNameField.error && (submitAttempted || fullNameField.blurred)
-  const shouldShowEmailError = emailField.status === 'invalid' && emailField.error && (submitAttempted || emailField.blurred)
+  const shouldShowEmailError = Boolean(
+    emailField.status === 'invalid' &&
+      emailField.error &&
+      (submitAttempted || emailField.blurred || emailField.errorKind === 'unavailable' || emailField.errorKind === 'server'),
+  )
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -693,9 +735,9 @@ export default function SignUpPage() {
       if (!response.ok || !result.ok) {
         const message = result.message || 'Something went wrong while creating your account. Please try again.'
         if (result.field === 'username') {
-          setUsernameField((previous) => ({ ...previous, status: 'invalid', error: message, isChecking: false, isAvailable: false }))
+          setUsernameField((previous) => ({ ...previous, status: 'invalid', error: message, isChecking: false, isAvailable: false, errorKind: 'unavailable' }))
         } else if (result.field === 'email') {
-          setEmailField((previous) => ({ ...previous, status: 'invalid', error: message, isChecking: false, isAvailable: false }))
+          setEmailField((previous) => ({ ...previous, status: 'invalid', error: message, isChecking: false, isAvailable: false, errorKind: 'unavailable' }))
         }
         setError(message)
         return
@@ -743,7 +785,7 @@ export default function SignUpPage() {
             <input
               ref={usernameRef}
               id="signup-username"
-              className={`tsm-input pr-10 ${fieldStatusClass(usernameField)}`}
+              className={`tsm-input pr-10 ${fieldStatusClass({ ...usernameField, showInvalid: shouldShowUsernameError })}`}
               type="text"
               name="signup_username_input"
               onChange={onUsernameInput}
@@ -760,7 +802,7 @@ export default function SignUpPage() {
             <div className="pointer-events-none absolute right-2 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center">
               {(usernameField.isChecking || usernameField.status === 'validating') && <Spinner className="size-4 text-[#00152a]" />}
               {usernameField.status === 'valid' && usernameField.isAvailable && <CheckCircle2 className="size-4 text-[#0c7a43]" />}
-              {usernameField.status === 'invalid' && (submitAttempted || usernameField.blurred) && <AlertCircle className="size-4 text-red-600" />}
+              {shouldShowUsernameError && <AlertCircle className="size-4 text-red-600" />}
             </div>
           </div>
           {shouldShowUsernameError ? <p className="mt-2 text-sm text-red-700">{usernameField.error}</p> : null}
@@ -794,7 +836,7 @@ export default function SignUpPage() {
             <input
               ref={emailRef}
               id="signup-email"
-              className={`tsm-input pr-10 ${fieldStatusClass(emailField)}`}
+              className={`tsm-input pr-10 ${fieldStatusClass({ ...emailField, showInvalid: shouldShowEmailError })}`}
               type="email"
               name="signup_email_input"
               onChange={onEmailInput}
@@ -811,7 +853,7 @@ export default function SignUpPage() {
             <div className="pointer-events-none absolute right-2 top-1/2 z-10 flex h-6 w-6 -translate-y-1/2 items-center justify-center">
               {(emailField.isChecking || emailField.status === 'validating') && <Spinner className="size-4 text-[#00152a]" />}
               {emailField.status === 'valid' && emailField.isAvailable && <CheckCircle2 className="size-4 text-[#0c7a43]" />}
-              {emailField.status === 'invalid' && (submitAttempted || emailField.blurred) && <AlertCircle className="size-4 text-red-600" />}
+              {shouldShowEmailError && <AlertCircle className="size-4 text-red-600" />}
             </div>
           </div>
           {shouldShowEmailError ? <p className="mt-2 text-sm text-red-700">{emailField.error}</p> : null}
