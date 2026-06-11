@@ -20,7 +20,7 @@ export type QuestionBankRow = {
   warnings: string[]
 }
 
-function statusBadge(label: string, tone: 'green' | 'amber' | 'grey' | 'red') {
+function statusBadge(label: string, tone: 'green' | 'amber' | 'grey' | 'red', key?: string) {
   const classes = tone === 'green'
     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
     : tone === 'amber'
@@ -29,7 +29,7 @@ function statusBadge(label: string, tone: 'green' | 'amber' | 'grey' | 'red') {
         ? 'border-red-200 bg-red-50 text-red-700'
         : 'border-slate-200 bg-slate-100 text-slate-600'
 
-  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${classes}`}>{label}</span>
+  return <span key={key} className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${classes}`}>{label}</span>
 }
 
 function warningBadge(label: string, key?: string) {
@@ -126,7 +126,7 @@ export function QuestionBankList({ questions }: { questions: QuestionBankRow[] }
                   <td className="py-4 pr-4"><p className="font-semibold text-[#00152a]">{question.questionNumber}</p><p className="text-xs text-[#5f646c]">Order: {question.questionOrder ?? '—'}</p></td>
                   <td className="py-4 pr-4">{question.marks ?? '—'}</td>
                   <td className="py-4 pr-4">{question.topicSummary || <span className="text-amber-800">Not tagged</span>}</td>
-                  <td className="py-4 pr-4"><div className="flex flex-wrap gap-2">{question.isPublished ? statusBadge('Published', 'green') : statusBadge('Draft', 'grey')}{question.needsReview ? statusBadge('Needs review', 'amber') : null}</div></td>
+                  <td className="py-4 pr-4"><div className="flex flex-wrap gap-2">{question.isPublished ? statusBadge('Published', 'green', `${question.id}-published`) : statusBadge('Draft', 'grey', `${question.id}-draft`)}{question.needsReview ? statusBadge('Needs review', 'amber', `${question.id}-needs-review`) : null}</div></td>
                   <td className="py-4 pr-4"><div className="flex max-w-xs flex-wrap gap-1.5">{question.warnings.length ? question.warnings.map((warning, index) => warningBadge(warning, `${question.id}-${warning}-${index}`)) : statusBadge('Ready', 'green')}</div></td>
                   <td className="py-4 pr-4"><div className="flex flex-wrap gap-2"><Link href={`/dashboard/admin/question-bank/${question.id}/preview`} className="tsm-btn-secondary w-fit">Preview as student</Link><Link href={`/dashboard/admin/question-bank/${question.id}/edit`} className="tsm-btn-secondary w-fit">Edit</Link></div></td>
                 </tr>

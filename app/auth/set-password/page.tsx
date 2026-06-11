@@ -134,6 +134,52 @@ export default function SetPasswordPage() {
       return
     }
 
+    const cached = typeof window !== 'undefined' ? window.sessionStorage.getItem(SIGNUP_DRAFT_KEY) : null
+    let parsed: { username?: string; fullName?: string; email?: string } | null = null
+    if (cached) {
+      try {
+        parsed = JSON.parse(cached) as { username?: string; fullName?: string; email?: string }
+      } catch {
+        parsed = null
+      }
+    }
+
+    const draftUsername = parsed?.username?.trim() || authData.user.user_metadata?.username?.trim() || null
+    const draftFullName = parsed?.fullName?.trim() || authData.user.user_metadata?.full_name?.trim() || null
+    const draftEmail = parsed?.email?.trim().toLowerCase() || authData.user.email?.trim().toLowerCase() || null
+    const userEmail = authData.user.email?.trim().toLowerCase() || null
+
+    if (!draftUsername || !draftFullName || !draftEmail || draftEmail !== userEmail) {
+      setError('Your signup details could not be verified. Please sign up again.')
+      setLoading(false)
+      return
+    }
+
+    const { data: existingProfile, error: profileLoadError } = await supabase
+      .from('profiles')
+      .select('username, full_name, email, onboarding_completed')
+      .eq('id', authData.user.id)
+      .maybeSingle()
+
+    if (profileLoadError) {
+      setError('Could not verify your account details. Please try again.')
+      setLoading(false)
+      return
+    }
+
+    if (existingProfile?.onboarding_completed) {
+      setError('This email already has an account. Please log in instead.')
+      setLoading(false)
+      return
+    }
+
+    const existingUsername = existingProfile?.username?.trim() || null
+    if (existingUsername && existingUsername.toLowerCase() !== draftUsername.toLowerCase()) {
+      setError('This email already has an account. Please log in instead.')
+      setLoading(false)
+      return
+    }
+
     const { error: updateError } = await supabase.auth.updateUser({ password })
     if (updateError) {
       setError(updateError.message)
@@ -141,19 +187,21 @@ export default function SetPasswordPage() {
       return
     }
 
-    const cached = typeof window !== 'undefined' ? window.sessionStorage.getItem(SIGNUP_DRAFT_KEY) : null
-    const parsed = cached ? JSON.parse(cached) : null
-
     const { error: profileError } = await supabase.from('profiles').upsert({
       id: authData.user.id,
-      email: authData.user.email,
-      username: parsed?.username ?? authData.user.user_metadata?.username ?? null,
-      full_name: parsed?.fullName ?? authData.user.user_metadata?.full_name ?? null,
+      email: userEmail,
+      username: existingUsername ?? draftUsername,
+      full_name: existingProfile?.full_name?.trim() || draftFullName,
       onboarding_completed: false,
     })
 
     if (profileError) {
-      setError(profileError.message)
+      const duplicateMessage = profileError.code === '23505'
+        ? profileError.message.includes('email')
+          ? 'That email is already registered. Log in instead.'
+          : 'That username is already taken.'
+        : profileError.message
+      setError(duplicateMessage)
       setLoading(false)
       return
     }
