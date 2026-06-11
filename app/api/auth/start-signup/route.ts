@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isValidEmail } from '@/lib/auth-email'
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,24}$/
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const signupDebugEnabled = process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_SIGNUP_DEBUG === 'true'
 
 type SignupRequest = {
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     return jsonResponse({ ok: false, message: 'Enter your full name.', field: 'form' }, 400)
   }
 
-  if (!EMAIL_PATTERN.test(email)) {
+  if (!isValidEmail(email)) {
     return jsonResponse({ ok: false, message: 'Enter a valid email address.', field: 'email' }, 400)
   }
 
