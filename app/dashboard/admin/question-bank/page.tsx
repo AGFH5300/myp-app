@@ -7,8 +7,9 @@ import { QuestionBankList, type QuestionBankRow } from './question-bank-list'
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
 type WarningFilter = 'missing-markscheme' | 'missing-topic' | 'missing-subtopic' | 'missing-question-image'
+type TopicRef = { id?: string | null; name?: string | null; parent_topic_id?: string | null; subject_id?: string | null; is_active?: boolean | null }
 
-function relationName(relation: unknown, key: 'id' | 'name' | 'title' | 'session_month' | 'parent_topic_id') {
+function relationName(relation: unknown, key: 'id' | 'name' | 'title' | 'session_month' | 'parent_topic_id' | 'subject_id') {
   const item = Array.isArray(relation) ? relation[0] : relation
   return (item as Record<string, string | null> | null | undefined)?.[key]
 }
@@ -21,6 +22,38 @@ function relationNumber(relation: unknown, key: 'year') {
 function relationBoolean(relation: unknown, key: 'is_published') {
   const item = Array.isArray(relation) ? relation[0] : relation
   return (item as Record<string, boolean | null> | null | undefined)?.[key]
+}
+
+function relationTopic(relation: unknown) {
+  const item = Array.isArray(relation) ? relation[0] : relation
+  return item as TopicRef | null | undefined
+}
+
+function isActiveSubjectTopic(topic: TopicRef | null | undefined, subjectId: string | null | undefined) {
+  return Boolean(topic?.id && subjectId && topic.subject_id === subjectId && topic.is_active !== false)
+}
+
+function isActiveChildTopic(topic: TopicRef | null | undefined, subjectId: string | null | undefined, topicsById: Map<string, TopicRef>) {
+  if (!isActiveSubjectTopic(topic, subjectId) || !topic?.parent_topic_id) return false
+  return isActiveSubjectTopic(topicsById.get(topic.parent_topic_id), subjectId)
+}
+
+function topicSummary(topicRows: { topics?: unknown }[], subjectId: string | null | undefined, topicsById: Map<string, TopicRef>) {
+  const selectedTopics = topicRows
+    .map((row) => relationTopic(row.topics))
+    .filter((topic) => isActiveSubjectTopic(topic, subjectId))
+
+  const childTopics = selectedTopics.filter((topic) => isActiveChildTopic(topic, subjectId, topicsById))
+  const topicsToShow = childTopics.length ? childTopics : selectedTopics.filter((topic) => !topic?.parent_topic_id)
+
+  return topicsToShow
+    .map((topic) => {
+      if (!topic?.name) return ''
+      const parent = topic.parent_topic_id ? topicsById.get(topic.parent_topic_id) : null
+      return parent?.name ? `${parent.name} → ${topic.name}` : topic.name
+    })
+    .filter(Boolean)
+    .join(', ')
 }
 
 function stringParam(params: Record<string, string | string[] | undefined>, key: string) {
@@ -52,12 +85,12 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
   const [{ data: questions }, { data: subjects }, { data: papers }, { data: topics }] = await Promise.all([
     supabase
       .from('questions')
-      .select('id,paper_id,question_number,question_order,marks,is_published,is_reviewed,question_image_path,markscheme_image_path,image_url,markscheme_image_url,papers(id,title,year,subject_id,is_published,subjects(id,name),exam_sessions(session_month)),question_topics(is_primary,topics(id,name,parent_topic_id)),question_assets(asset_type,storage_path,public_url)')
+      .select('id,paper_id,question_number,question_order,marks,is_published,is_reviewed,question_image_path,markscheme_image_path,image_url,markscheme_image_url,papers(id,title,year,subject_id,is_published,subjects(id,name),exam_sessions(session_month)),question_topics(is_primary,topics(id,name,parent_topic_id,subject_id,is_active)),question_assets(asset_type,storage_path,public_url)')
       .order('created_at', { ascending: false })
       .limit(200),
     supabase.from('subjects').select('id,name').order('name'),
     supabase.from('papers').select('id,title,year,subject_id,subjects(id,name),exam_sessions(session_month)').order('year', { ascending: false }).order('title'),
-    supabase.from('topics').select('id,name,parent_topic_id').order('name'),
+    supabase.from('topics').select('id,name,parent_topic_id,subject_id,is_active,sort_order').eq('is_active', true).not('subject_id', 'is', null).order('sort_order').order('name'),
   ])
 
   const search = stringParam(params, 'q').toLowerCase()
@@ -66,7 +99,7 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
   const topicFilter = stringParam(params, 'topic')
   const statusFilter = stringParam(params, 'status')
   const warningFilter = stringParam(params, 'warning') as WarningFilter | ''
-  const topicNames = new Map((topics ?? []).map((topic) => [topic.id, topic.name]))
+  const topicsById = new Map<string, TopicRef>((topics ?? []).map((topic) => [topic.id, topic]))
   const orderCounts = new Map<string, number>()
 
   ;(questions ?? []).forEach((question) => {
@@ -78,19 +111,18 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
   const rows: QuestionBankRow[] = (questions ?? []).map((question) => {
     const paper = Array.isArray(question.papers) ? question.papers[0] : question.papers
     const questionTopics = question.question_topics ?? []
-    const primary = questionTopics.find((row) => row.is_primary) ?? questionTopics[0]
-    const primaryTopic = Array.isArray(primary?.topics) ? primary?.topics[0] : primary?.topics
-    const hasTopicGroup = questionTopics.some((row) => Boolean(relationName(row.topics, 'id')))
-    const hasSubtopic = questionTopics.some((row) => Boolean(relationName(row.topics, 'parent_topic_id')))
-    const parentName = primaryTopic?.parent_topic_id ? topicNames.get(primaryTopic.parent_topic_id) : null
+    const paperSubjectId = relationName(paper, 'subject_id')
+    const hasTopicRows = questionTopics.some((row) => Boolean(relationName(row.topics, 'id')))
+    const hasSubtopic = questionTopics.some((row) => isActiveChildTopic(relationTopic(row.topics), paperSubjectId, topicsById))
+    const summary = topicSummary(questionTopics, paperSubjectId, topicsById)
     const hasQuestionImage = Boolean(question.question_image_path || question.image_url || hasAsset(question, 'question'))
     const hasMarkschemeImage = Boolean(question.markscheme_image_path || question.markscheme_image_url || hasAsset(question, 'markscheme'))
     const orderKey = question.paper_id && question.question_order !== null ? `${question.paper_id}:${question.question_order}` : ''
     const warnings = [
       !hasQuestionImage ? 'Missing question image' : null,
       !hasMarkschemeImage ? 'Missing mark scheme image' : null,
-      !hasTopicGroup ? 'Missing topic' : null,
-      hasTopicGroup && !hasSubtopic ? 'Missing subtopic' : null,
+      !hasTopicRows ? 'Missing topic' : null,
+      hasTopicRows && !hasSubtopic ? 'Missing subtopic' : null,
       !question.question_number ? 'Missing question number' : null,
       question.marks === null ? 'Missing marks' : null,
       orderKey && (orderCounts.get(orderKey) ?? 0) > 1 ? 'Duplicate order' : null,
@@ -110,7 +142,7 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
       questionNumber: question.question_number ? `Q${question.question_number}` : 'No question number',
       questionOrder: question.question_order,
       marks: question.marks,
-      topicSummary: parentName ? `${parentName} → ${primaryTopic?.name || 'No subtopic'}` : relationName(primary?.topics, 'name') || '',
+      topicSummary: summary,
       isPublished: Boolean(question.is_published),
       needsReview: !question.is_reviewed || warnings.length > 0,
       warnings,
@@ -128,7 +160,7 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
     if (search && !haystack.includes(search)) return false
     if (subjectFilter && paper?.subject_id !== subjectFilter) return false
     if (paperFilter && paper?.id !== paperFilter) return false
-    if (topicFilter && !questionTopics.some((row) => relationName(row.topics, 'id') === topicFilter || (row.topics && relationName(row.topics, 'parent_topic_id') === topicFilter))) return false
+    if (topicFilter && !questionTopics.some((row) => relationName(row.topics, 'id') === topicFilter || relationName(row.topics, 'parent_topic_id') === topicFilter)) return false
     if (statusFilter === 'draft' && question.isPublished) return false
     if (statusFilter === 'published' && !question.isPublished) return false
     if (statusFilter === 'needs-review' && !question.needsReview) return false
@@ -155,7 +187,7 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
         initial={{ q: stringParam(params, 'q'), subject: subjectFilter, paper: paperFilter, topic: topicFilter, status: statusFilter, warning: warningFilter }}
         subjects={(subjects ?? []).map((subject) => ({ value: subject.id, label: subject.name }))}
         papers={(papers ?? []).map((paper) => ({ value: paper.id, label: `${paper.title} — ${relationName(paper.exam_sessions, 'session_month')} ${paper.year}` }))}
-        topics={(topics ?? []).map((topic) => ({ value: topic.id, label: topic.name }))}
+        topics={(topics ?? []).map((topic) => ({ value: topic.id, label: topic.parent_topic_id && topicsById.get(topic.parent_topic_id)?.name ? `${topicsById.get(topic.parent_topic_id)?.name} → ${topic.name}` : topic.name }))}
       />
 
       <section className="rounded-md border border-[#c3c6ce66] bg-white p-6">
