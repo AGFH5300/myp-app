@@ -84,11 +84,41 @@ export function QuestionBankList({ questions }: { questions: QuestionBankRow[] }
 
   return (
     <div className="space-y-4">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[980px] text-left font-body text-sm">
+          <thead className="border-b border-[#c3c6ce66] text-xs uppercase tracking-[.08em] text-[#735b2b]"><tr><th className="w-12 py-3 pr-4"><span className="sr-only">Select questions</span></th><th className="py-3 pr-4">Paper</th><th className="py-3 pr-4">Question/order</th><th className="py-3 pr-4">Marks</th><th className="py-3 pr-4">Topic</th><th className="py-3 pr-4">Status</th><th className="py-3 pr-4">Review warnings</th><th className="py-3 pr-4">Actions</th></tr></thead>
+          <tbody>
+            {questions.map((question) => {
+              const selected = selectedIds.includes(question.id)
+              return (
+                <tr key={question.id} className="border-b border-[#f0eee9] align-top text-[#43474d]">
+                  <td className="py-4 pr-4">
+                    <button type="button" onClick={() => toggleQuestion(question.id)} aria-pressed={selected} aria-label={`${selected ? 'Deselect' : 'Select'} question ${question.questionNumber}`} className={`flex size-7 items-center justify-center rounded-md border font-semibold ${selected ? 'border-blue-700 bg-blue-700 text-white' : 'border-[#c3c6ce] bg-white text-transparent hover:border-blue-500'}`}>✓</button>
+                  </td>
+                  <td className="py-4 pr-4">
+                    <p className="font-semibold text-[#00152a]">{question.paperTitle}</p>
+                    <p className="text-xs text-[#5f646c]">{question.paperMeta}</p>
+                    <p className="text-xs text-[#5f646c]">{question.subjectName}</p>
+                  </td>
+                  <td className="py-4 pr-4"><p className="font-semibold text-[#00152a]">{question.questionNumber}</p><p className="text-xs text-[#5f646c]">Order: {question.questionOrder ?? '—'}</p></td>
+                  <td className="py-4 pr-4">{question.marks ?? '—'}</td>
+                  <td className="py-4 pr-4">{question.topicSummary || <span className="text-amber-800">Not tagged</span>}</td>
+                  <td className="py-4 pr-4"><div className="flex flex-wrap gap-2">{question.isPublished ? statusBadge('Published', 'green', `${question.id}-published`) : statusBadge('Draft', 'grey', `${question.id}-draft`)}{question.needsReview ? statusBadge('Needs review', 'amber', `${question.id}-needs-review`) : null}</div></td>
+                  <td className="py-4 pr-4"><div className="flex max-w-xs flex-wrap gap-1.5">{question.warnings.length ? question.warnings.map((warning, index) => warningBadge(warning, `${question.id}-${warning}-${index}`)) : statusBadge('Ready', 'green')}</div></td>
+                  <td className="py-4 pr-4"><div className="flex min-w-36 flex-col items-start gap-2"><Link href={`/dashboard/admin/question-bank/${question.id}/edit`} className="tsm-btn-secondary w-full justify-center text-center">Edit</Link><Link href={`/dashboard/admin/question-bank/${question.id}/preview`} className="tsm-btn-secondary w-full justify-center text-center">Preview as student</Link></div></td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      {!questions.length ? <p className="mt-4 font-body text-sm text-[#43474d]">No questions match these filters.</p> : null}
+
       {selectedIds.length ? (
-        <div className="rounded-md border border-blue-100 bg-blue-50/60 p-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="sticky bottom-4 z-10 rounded-md border border-[#c3c6ce66] bg-white/95 p-4 shadow-sm backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="font-body text-sm font-semibold text-[#00152a]">{selectedIds.length} selected</p>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-3">
               <button type="button" onClick={selectAllVisible} disabled={allVisibleSelected || isPending} className="rounded-md border border-blue-200 bg-white px-3 py-2 font-body text-sm font-semibold text-blue-800 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60">{allVisibleSelected ? 'All visible selected' : 'Select all visible'}</button>
               <button type="button" onClick={clearSelection} disabled={isPending} className="rounded-md border border-[#c3c6ce66] bg-white px-3 py-2 font-body text-sm font-semibold text-[#43474d] hover:bg-[#f5f3ee] disabled:cursor-not-allowed disabled:opacity-60">Clear selection</button>
               <button type="button" onClick={() => runBatch(true)} disabled={isPending} className="tsm-btn-primary disabled:cursor-not-allowed disabled:opacity-60">{isPending ? 'Saving…' : 'Publish selected'}</button>
@@ -106,36 +136,6 @@ export function QuestionBankList({ questions }: { questions: QuestionBankRow[] }
           ) : null}
         </div>
       ) : null}
-
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1100px] text-left font-body text-sm">
-          <thead className="border-b border-[#c3c6ce66] text-xs uppercase tracking-[.08em] text-[#735b2b]"><tr><th className="py-3 pr-4">Select</th><th className="py-3 pr-4">Paper</th><th className="py-3 pr-4">Question/order</th><th className="py-3 pr-4">Marks</th><th className="py-3 pr-4">Topic</th><th className="py-3 pr-4">Status</th><th className="py-3 pr-4">Review warnings</th><th className="py-3 pr-4">Actions</th></tr></thead>
-          <tbody>
-            {questions.map((question) => {
-              const selected = selectedIds.includes(question.id)
-              return (
-                <tr key={question.id} className="border-b border-[#f0eee9] align-top text-[#43474d]">
-                  <td className="py-4 pr-4">
-                    <button type="button" onClick={() => toggleQuestion(question.id)} aria-pressed={selected} aria-label={`${selected ? 'Deselect' : 'Select'} ${question.questionNumber}`} className={`flex size-7 items-center justify-center rounded-md border font-semibold ${selected ? 'border-blue-700 bg-blue-700 text-white' : 'border-[#c3c6ce] bg-white text-transparent hover:border-blue-500'}`}>✓</button>
-                  </td>
-                  <td className="py-4 pr-4">
-                    <p className="font-semibold text-[#00152a]">{question.paperTitle}</p>
-                    <p className="text-xs text-[#5f646c]">{question.paperMeta}</p>
-                    <p className="text-xs text-[#5f646c]">{question.subjectName}</p>
-                  </td>
-                  <td className="py-4 pr-4"><p className="font-semibold text-[#00152a]">{question.questionNumber}</p><p className="text-xs text-[#5f646c]">Order: {question.questionOrder ?? '—'}</p></td>
-                  <td className="py-4 pr-4">{question.marks ?? '—'}</td>
-                  <td className="py-4 pr-4">{question.topicSummary || <span className="text-amber-800">Not tagged</span>}</td>
-                  <td className="py-4 pr-4"><div className="flex flex-wrap gap-2">{question.isPublished ? statusBadge('Published', 'green', `${question.id}-published`) : statusBadge('Draft', 'grey', `${question.id}-draft`)}{question.needsReview ? statusBadge('Needs review', 'amber', `${question.id}-needs-review`) : null}</div></td>
-                  <td className="py-4 pr-4"><div className="flex max-w-xs flex-wrap gap-1.5">{question.warnings.length ? question.warnings.map((warning, index) => warningBadge(warning, `${question.id}-${warning}-${index}`)) : statusBadge('Ready', 'green')}</div></td>
-                  <td className="py-4 pr-4"><div className="flex flex-wrap gap-2"><Link href={`/dashboard/admin/question-bank/${question.id}/preview`} className="tsm-btn-secondary w-fit">Preview as student</Link><Link href={`/dashboard/admin/question-bank/${question.id}/edit`} className="tsm-btn-secondary w-fit">Edit</Link></div></td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-      {!questions.length ? <p className="mt-4 font-body text-sm text-[#43474d]">No questions match these filters.</p> : null}
     </div>
   )
 }
