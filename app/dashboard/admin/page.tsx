@@ -30,6 +30,15 @@ export default async function AdminPage() {
         </article>
 
         <article className="rounded-md border border-[#c3c6ce66] bg-white p-6">
+          <p className="font-label text-xs uppercase tracking-[.14em] text-[#735b2b]">Paper Manager</p>
+          <h2 className="mt-3 font-headline text-3xl text-[#00152a]">Manage whole papers</h2>
+          <p className="mt-3 font-body text-sm text-[#43474d]">Review paper readiness, continue adding questions from PDF, and publish or unpublish paper-level access.</p>
+          <div className="mt-6">
+            <Link href="/dashboard/admin/papers" className="tsm-btn-primary">Open Paper Manager</Link>
+          </div>
+        </article>
+
+        <article className="rounded-md border border-[#c3c6ce66] bg-white p-6">
           <p className="font-label text-xs uppercase tracking-[.14em] text-[#735b2b]">Topic Manager</p>
           <h2 className="mt-3 font-headline text-3xl text-[#00152a]">Topic Manager</h2>
           <p className="mt-3 font-body text-sm text-[#43474d]">Manage official topic groups and subtopics used for tagging questions.</p>
