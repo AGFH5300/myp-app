@@ -38,6 +38,15 @@ function isActiveChildTopic(topic: TopicRef | null | undefined, subjectId: strin
   return isActiveSubjectTopic(topicsById.get(topic.parent_topic_id), subjectId)
 }
 
+function cleanTopicLabel(label: string) {
+  return label.replace(/^(?:Math Unit|Num|Chem Unit|Chem Topic|Physics Unit|Physics Topic|Unit|Topic):\s*/i, '').trim()
+}
+
+function compactTopicPair(parentName: string | null | undefined, topicName: string | null | undefined) {
+  if (!topicName) return ''
+  return parentName ? `${cleanTopicLabel(parentName)} → ${cleanTopicLabel(topicName)}` : cleanTopicLabel(topicName)
+}
+
 function topicSummary(topicRows: { topics?: unknown }[], subjectId: string | null | undefined, topicsById: Map<string, TopicRef>) {
   const selectedTopics = topicRows
     .map((row) => relationTopic(row.topics))
@@ -45,15 +54,16 @@ function topicSummary(topicRows: { topics?: unknown }[], subjectId: string | nul
 
   const childTopics = selectedTopics.filter((topic) => isActiveChildTopic(topic, subjectId, topicsById))
   const topicsToShow = childTopics.length ? childTopics : selectedTopics.filter((topic) => !topic?.parent_topic_id)
-
-  return topicsToShow
+  const topicLabels = topicsToShow
     .map((topic) => {
-      if (!topic?.name) return ''
-      const parent = topic.parent_topic_id ? topicsById.get(topic.parent_topic_id) : null
-      return parent?.name ? `${parent.name} → ${topic.name}` : topic.name
+      const parent = topic?.parent_topic_id ? topicsById.get(topic.parent_topic_id) : null
+      return compactTopicPair(parent?.name, topic?.name)
     })
     .filter(Boolean)
-    .join(', ')
+  const visibleTopicLabels = topicLabels.slice(0, 2)
+  const moreCount = topicLabels.length - visibleTopicLabels.length
+
+  return `${visibleTopicLabels.join(', ')}${moreCount > 0 ? ` +${moreCount} more` : ''}`
 }
 
 function stringParam(params: Record<string, string | string[] | undefined>, key: string) {
@@ -66,7 +76,7 @@ function hasAsset(question: { question_assets?: { asset_type: string | null; sto
 }
 
 function warningKey(warning: string): WarningFilter | null {
-  if (warning === 'Missing mark scheme image') return 'missing-markscheme'
+  if (warning === 'Missing mark scheme') return 'missing-markscheme'
   if (warning === 'Missing topic') return 'missing-topic'
   if (warning === 'Missing subtopic') return 'missing-subtopic'
   if (warning === 'Missing question image') return 'missing-question-image'
@@ -120,10 +130,9 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
     const orderKey = question.paper_id && question.question_order !== null ? `${question.paper_id}:${question.question_order}` : ''
     const warnings = [
       !hasQuestionImage ? 'Missing question image' : null,
-      !hasMarkschemeImage ? 'Missing mark scheme image' : null,
+      !hasMarkschemeImage ? 'Missing mark scheme' : null,
       !hasTopicRows ? 'Missing topic' : null,
       hasTopicRows && !hasSubtopic ? 'Missing subtopic' : null,
-      !question.question_number ? 'Missing question number' : null,
       question.marks === null ? 'Missing marks' : null,
       orderKey && (orderCounts.get(orderKey) ?? 0) > 1 ? 'Duplicate order' : null,
       !paper ? 'Missing paper' : null,
@@ -144,7 +153,7 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
       marks: question.marks,
       topicSummary: summary,
       isPublished: Boolean(question.is_published),
-      needsReview: !question.is_reviewed || warnings.length > 0,
+      needsReview: warnings.length > 0,
       warnings,
     }
   })
@@ -187,7 +196,7 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
         initial={{ q: stringParam(params, 'q'), subject: subjectFilter, paper: paperFilter, topic: topicFilter, status: statusFilter, warning: warningFilter }}
         subjects={(subjects ?? []).map((subject) => ({ value: subject.id, label: subject.name }))}
         papers={(papers ?? []).map((paper) => ({ value: paper.id, label: `${paper.title} — ${relationName(paper.exam_sessions, 'session_month')} ${paper.year}` }))}
-        topics={(topics ?? []).map((topic) => ({ value: topic.id, label: topic.parent_topic_id && topicsById.get(topic.parent_topic_id)?.name ? `${topicsById.get(topic.parent_topic_id)?.name} → ${topic.name}` : topic.name }))}
+        topics={(topics ?? []).map((topic) => ({ value: topic.id, label: compactTopicPair(topicsById.get(topic.parent_topic_id || '')?.name, topic.name) }))}
       />
 
       <section className="rounded-md border border-[#c3c6ce66] bg-white p-6">

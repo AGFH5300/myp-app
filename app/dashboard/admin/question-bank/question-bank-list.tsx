@@ -102,9 +102,9 @@ export function QuestionBankList({ questions }: { questions: QuestionBankRow[] }
                   </td>
                   <td className="py-4 pr-4"><p className="font-semibold text-[#00152a]">{question.questionNumber}</p><p className="text-xs text-[#5f646c]">Order: {question.questionOrder ?? '—'}</p></td>
                   <td className="py-4 pr-4">{question.marks ?? '—'}</td>
-                  <td className="py-4 pr-4">{question.topicSummary || <span className="text-amber-800">Not tagged</span>}</td>
-                  <td className="py-4 pr-4"><div className="flex flex-wrap gap-2">{question.isPublished ? statusBadge('Published', 'green', `${question.id}-published`) : statusBadge('Draft', 'grey', `${question.id}-draft`)}{question.needsReview ? statusBadge('Needs review', 'amber', `${question.id}-needs-review`) : null}</div></td>
-                  <td className="py-4 pr-4"><div className="flex max-w-xs flex-wrap gap-1.5">{question.warnings.length ? question.warnings.map((warning, index) => warningBadge(warning, `${question.id}-${warning}-${index}`)) : statusBadge('Ready', 'green')}</div></td>
+                  <td className="py-4 pr-4"><span className="block max-w-[18rem] text-sm leading-5">{question.topicSummary || <span className="text-amber-800">Not tagged</span>}</span></td>
+                  <td className="py-4 pr-4"><div className="flex flex-wrap gap-2">{question.isPublished ? statusBadge('Published', 'green', `${question.id}-published`) : statusBadge('Draft', 'grey', `${question.id}-draft`)}{question.needsReview ? statusBadge('Needs review', 'amber', `${question.id}-needs-review`) : statusBadge('Ready', 'green', `${question.id}-ready`)}</div></td>
+                  <td className="py-4 pr-4"><div className="flex max-w-xs flex-wrap gap-1.5">{question.warnings.length ? question.warnings.map((warning, index) => warningBadge(warning, `${question.id}-${warning}-${index}`)) : <span className="text-xs text-[#6f737b]">No warnings</span>}</div></td>
                   <td className="py-4 pr-4"><div className="flex min-w-36 flex-col items-start gap-2"><Link href={`/dashboard/admin/question-bank/${question.id}/edit`} className="tsm-btn-secondary w-full justify-center text-center">Edit</Link><Link href={`/dashboard/admin/question-bank/${question.id}/preview`} className="tsm-btn-secondary w-full justify-center text-center">Preview as student</Link></div></td>
                 </tr>
               )
