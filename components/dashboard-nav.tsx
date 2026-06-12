@@ -22,6 +22,7 @@ const baseNav = [
 
 const adminNav = [
   ['Question Bank', '/dashboard/admin/question-bank'],
+  ['Paper Manager', '/dashboard/admin/papers'],
   ['Topic Manager', '/dashboard/admin/topics'],
   ['Resource Analytics', '/dashboard/admin/resource-analytics'],
 ] as const
@@ -65,7 +66,7 @@ export function DashboardNav({ user, profile }: { user: SupabaseUser; profile: P
                 <span className="font-body">Admin</span>
                 <AppIcon name="chevron_right" className={`ml-auto mr-4 size-4 transition-transform ${adminOpen ? 'rotate-90' : ''}`} />
               </button>
-              <div id="admin-sidebar-links" className={`overflow-hidden transition-[max-height,opacity] duration-200 ${adminOpen ? 'max-h-40 opacity-100' : 'max-h-0 opacity-0'}`}>
+              <div id="admin-sidebar-links" className={`overflow-hidden transition-[max-height,opacity] duration-200 ${adminOpen ? 'max-h-52 opacity-100' : 'max-h-0 opacity-0'}`}>
                 <div className="mt-1 space-y-1 pb-2 pl-12 pr-4">
                   {adminNav.map(([label, href]) => {
                     const active = pathname === href || pathname.startsWith(`${href}/`)
