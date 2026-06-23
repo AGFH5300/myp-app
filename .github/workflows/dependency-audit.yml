@@ -16,12 +16,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Enable Corepack
-        run: corepack enable
-      - name: Regenerate lockfile for proposed dependency pins
-        run: pnpm install --lockfile-only --no-frozen-lockfile --force
-      - name: Install locked dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Regenerate lockfile with pnpm 10.25.0
+        run: npx --yes pnpm@10.25.0 install --lockfile-only --no-frozen-lockfile
+      - name: Install locked dependencies with the project package manager
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
       - name: Create production dependency audit
         run: pnpm audit --prod --json > audit-production.json || true
       - name: Create full dependency audit
