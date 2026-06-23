@@ -12,24 +12,24 @@ export default async function PracticePage({ params }: { params: Promise<{ paper
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const { data: paper } = await supabase
-    .from('papers')
-    .select('id,title,subjects(name)')
-    .eq('id', paperId)
-    .maybeSingle()
+  const [{ data: paper }, { data: questions }, { data: bookmarks }] = await Promise.all([
+    supabase
+      .from('papers')
+      .select('id,title,subjects(name)')
+      .eq('id', paperId)
+      .maybeSingle(),
+    supabase
+      .from('questions')
+      .select('id,question_number,prompt_text,context_image_url,image_url,secondary_image_url,answer_mode,options_json,marks,is_published')
+      .eq('paper_id', paperId)
+      .order('question_number'),
+    supabase
+      .from('bookmarks')
+      .select('question_id')
+      .eq('student_id', user.id),
+  ])
 
   if (!paper) notFound()
-
-  const { data: questions } = await supabase
-    .from('questions')
-    .select('id,question_number,prompt_text,context_image_url,image_url,secondary_image_url,answer_mode,options_json,marks,is_published')
-    .eq('paper_id', paperId)
-    .order('question_number')
-
-  const { data: bookmarks } = await supabase
-    .from('bookmarks')
-    .select('question_id')
-    .eq('student_id', user.id)
 
   const sessionPaper = { ...paper, subjects: firstRelation(paper.subjects) ?? null }
 

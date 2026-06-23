@@ -30,7 +30,7 @@ export default async function AdminPaperPreviewPage({ params }: { params: Promis
 
   if (!paper) notFound()
 
-  const questions = [...(paper.questions ?? [])].sort((a, b) => (a.question_order ?? Number.MAX_SAFE_INTEGER) - (b.question_order ?? Number.MAX_SAFE_INTEGER) || (a.question_number || '').localeCompare(b.question_number || ''))
+  const questions = (paper.questions ?? []).toSorted((a, b) => (a.question_order ?? Number.MAX_SAFE_INTEGER) - (b.question_order ?? Number.MAX_SAFE_INTEGER) || (a.question_number || '').localeCompare(b.question_number || ''))
   const { data: assetRows } = questions.length
     ? await supabase
       .from('question_assets')
@@ -47,11 +47,15 @@ export default async function AdminPaperPreviewPage({ params }: { params: Promis
     assetsByQuestion.set(asset.question_id, [...(assetsByQuestion.get(asset.question_id) ?? []), asset])
   })
 
-  const questionImagesById = new Map<string, Awaited<ReturnType<typeof resolveQuestionAssetImages>>>()
-  for (const question of questions) {
-    const assets = assetsByQuestion.get(question.id) ?? []
-    questionImagesById.set(question.id, await resolveQuestionAssetImages(supabase, assets.filter((asset) => asset.asset_type === 'question'), question.question_image_path || question.image_url))
-  }
+  const questionImagesById = new Map(
+    await Promise.all(
+      questions.map(async (question) => {
+        const assets = assetsByQuestion.get(question.id) ?? []
+        const images = await resolveQuestionAssetImages(supabase, assets.filter((asset) => asset.asset_type === 'question'), question.question_image_path || question.image_url)
+        return [question.id, images] as const
+      }),
+    ),
+  )
 
   const subject = firstRelation(paper.subjects)
   const session = paper.session || firstRelation(paper.exam_sessions)?.session_month

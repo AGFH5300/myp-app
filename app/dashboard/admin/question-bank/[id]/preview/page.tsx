@@ -40,8 +40,10 @@ export default async function AdminQuestionPreviewPage({ params }: { params: Pro
 
   type QuestionAssetWithType = QuestionAssetRow & { asset_type: 'question' | 'markscheme' }
   const assets = (assetRows ?? []) as QuestionAssetWithType[]
-  const questionImages = await resolveQuestionAssetImages(supabase, assets.filter((asset) => asset.asset_type === 'question'), question.question_image_path || question.image_url)
-  const markschemeImages = await resolveQuestionAssetImages(supabase, assets.filter((asset) => asset.asset_type === 'markscheme'), question.markscheme_image_path || question.markscheme_image_url)
+  const [questionImages, markschemeImages] = await Promise.all([
+    resolveQuestionAssetImages(supabase, assets.filter((asset) => asset.asset_type === 'question'), question.question_image_path || question.image_url),
+    resolveQuestionAssetImages(supabase, assets.filter((asset) => asset.asset_type === 'markscheme'), question.markscheme_image_path || question.markscheme_image_url),
+  ])
   const paper = firstRelation(question.papers)
   if (!paper) notFound()
 

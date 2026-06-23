@@ -23,13 +23,15 @@ export default async function EditQuestionPage({ params }: { params: Promise<{ i
 
   if (!question) notFound()
 
-  const questionPreviewUrl = await resolveQuestionAssetUrl(supabase, question.question_image_path || question.image_url)
-  const markschemePreviewUrl = await resolveQuestionAssetUrl(supabase, question.markscheme_image_path || question.markscheme_image_url)
-  const questionAssets = await Promise.all((assets ?? []).map(async (asset) => ({
-    ...asset,
-    asset_type: asset.asset_type as 'question' | 'markscheme',
-    preview_url: await resolveQuestionAssetUrl(supabase, asset.storage_path || asset.public_url),
-  })))
+  const [questionPreviewUrl, markschemePreviewUrl, questionAssets] = await Promise.all([
+    resolveQuestionAssetUrl(supabase, question.question_image_path || question.image_url),
+    resolveQuestionAssetUrl(supabase, question.markscheme_image_path || question.markscheme_image_url),
+    Promise.all((assets ?? []).map(async (asset) => ({
+      ...asset,
+      asset_type: asset.asset_type as 'question' | 'markscheme',
+      preview_url: await resolveQuestionAssetUrl(supabase, asset.storage_path || asset.public_url),
+    }))),
+  ])
 
   return (
     <div className="space-y-8">

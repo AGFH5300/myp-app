@@ -92,7 +92,7 @@ export function SearchableSelect({ id, name, label, value, options, placeholder,
       </button>
       {open ? (
         <div className="absolute z-30 mt-2 w-full rounded-md border border-[#c3c6ce66] bg-white p-2 shadow-lg">
-          <input ref={searchRef} value={query} onChange={(event) => { setQuery(event.target.value); setActiveIndex(0) }} placeholder="Search..." className="tsm-input mb-2 w-full" />
+          <input ref={searchRef} aria-label={`Search ${label}`} value={query} onChange={(event) => { setQuery(event.target.value); setActiveIndex(0) }} placeholder="Search..." className="tsm-input mb-2 w-full" />
           <div id={`${id}-listbox`} role="listbox" aria-labelledby={`${id}-label`} className="max-h-64 overflow-y-auto">
             {listOptions.map((option, index) => (
               <button key={option.value || '__clear'} type="button" role="option" aria-selected={option.value === value} onMouseDown={(event) => event.preventDefault()} onClick={() => choose(option.value)} className={`block w-full rounded-sm px-3 py-2 text-left transition ${option.value === value ? 'bg-[#00152a] text-white' : index === activeIndex ? 'bg-[#f5f3ee] text-[#00152a]' : 'text-[#00152a] hover:bg-[#f5f3ee]'}`}>
