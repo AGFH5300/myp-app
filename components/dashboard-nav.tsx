@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { AppIcon } from '@/components/app-icon'
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useState } from 'react'
 import { BrandMark } from '@/components/brand-mark'
 import { BrandWordmark } from '@/components/brand-wordmark'
@@ -48,17 +49,20 @@ export function DashboardNav({ user, profile, collapsed = false, onCollapsedChan
       <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#f5f3ee] border-b border-[#c3c6ce66] px-6 py-4 flex items-center justify-between"><BrandWordmark className="text-xl" /><button type="button" onClick={signOut} disabled={signingOut} className="text-sm disabled:opacity-60">{signingOut ? 'Signing out…' : 'Sign out'}</button></header>
       <nav className={`hidden md:flex fixed left-0 top-0 h-full bg-[#f5f3ee] flex-col py-8 z-40 border-r border-[#c3c6ce33] transition-[width] duration-200 ${collapsed ? 'w-[4.5rem]' : 'w-64'}`} aria-label="Dashboard navigation">
         {collapsed ? (
-          <div className="mb-10 flex justify-center">
-            <button type="button" onClick={() => onCollapsedChange?.(false)} aria-label="Open sidebar" title="Open sidebar" className="group relative flex size-11 items-center justify-center rounded-md border border-[#c3c6ce66] bg-white transition hover:bg-[#fbf9f4] focus:outline-none focus:ring-2 focus:ring-[#735b2b] focus:ring-offset-2 focus:ring-offset-[#f5f3ee]">
-              <BrandMark className="h-7 w-auto" />
+          <div className="mb-8 flex flex-col items-center gap-3">
+            <button type="button" onClick={() => onCollapsedChange?.(false)} aria-label="Open sidebar" title="Open sidebar" className="group relative flex size-10 items-center justify-center rounded-sm border border-[#c3c6ce66] bg-white text-[#43474d] transition hover:text-[#00152a] focus:outline-none focus:ring-2 focus:ring-[#735b2b] focus:ring-offset-2 focus:ring-offset-[#f5f3ee]">
+              <PanelLeftOpen className="size-5" aria-hidden="true" />
               <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-sm bg-[#00152a] px-2 py-1 font-body text-xs font-semibold text-white opacity-0 shadow-md transition group-hover:opacity-100 group-focus:opacity-100">Open sidebar</span>
             </button>
+            <Link href="/dashboard" aria-label="Dashboard home" title="Dashboard home" className="flex size-11 items-center justify-center rounded-md border border-[#c3c6ce66] bg-white transition hover:bg-[#fbf9f4] focus:outline-none focus:ring-2 focus:ring-[#735b2b] focus:ring-offset-2 focus:ring-offset-[#f5f3ee]">
+              <BrandMark className="h-7 w-auto" />
+            </Link>
           </div>
         ) : (
           <div className="mb-12 flex items-center justify-between px-8">
             <BrandWordmark className="text-xl" href="/dashboard" />
             <button type="button" onClick={() => onCollapsedChange?.(true)} aria-label="Collapse sidebar" title="Collapse sidebar" className="rounded-sm border border-[#c3c6ce66] bg-white p-2 text-[#43474d] transition hover:text-[#00152a] focus:outline-none focus:ring-2 focus:ring-[#735b2b]">
-              <AppIcon name="chevron_right" className="size-4 rotate-180" />
+              <PanelLeftClose className="size-5" aria-hidden="true" />
             </button>
           </div>
         )}
@@ -68,12 +72,15 @@ export function DashboardNav({ user, profile, collapsed = false, onCollapsedChan
             return <SidebarLink key={href} href={href} icon={icon} label={label} active={active} collapsed={collapsed} />
           })}
           {isAdmin ? collapsed ? (
-            <SidebarLink href="/dashboard/admin/question-bank" icon="settings" label="Admin" active={isAdminRoute} collapsed={collapsed} />
+            <SidebarLink href="/dashboard/admin" icon="settings" label="Admin" active={isAdminRoute} collapsed={collapsed} />
           ) : (
             <div>
-              <button type="button" onClick={() => setAdminOpen((open) => !open)} aria-expanded={adminOpen} aria-controls="admin-sidebar-links" className={`flex w-full cursor-pointer items-center gap-3 py-3 text-left ${isAdminRoute ? 'text-[#00152a] font-semibold border-l-4 border-[#735b2b] pl-4 bg-[#fbf9f4]' : 'text-[#6b7280] pl-5 hover:text-[#00152a]'}`}>
-                <AppIcon name="settings" className="size-5" /><span className="font-body">Admin</span><AppIcon name="chevron_right" className={`ml-auto mr-4 size-4 transition-transform ${adminOpen ? 'rotate-90' : ''}`} />
-              </button>
+              <div className={`flex items-center gap-3 py-3 ${isAdminRoute ? 'text-[#00152a] font-semibold border-l-4 border-[#735b2b] pl-4 bg-[#fbf9f4]' : 'text-[#6b7280] pl-5 hover:text-[#00152a]'}`}>
+                <Link href="/dashboard/admin" className="flex min-w-0 flex-1 items-center gap-3"><AppIcon name="settings" className="size-5" /><span className="font-body">Admin</span></Link>
+                <button type="button" onClick={() => setAdminOpen((open) => !open)} aria-expanded={adminOpen} aria-controls="admin-sidebar-links" aria-label="Toggle Admin menu" className="mr-4 cursor-pointer rounded-sm p-1 transition hover:bg-white/70 focus:outline-none focus:ring-2 focus:ring-[#735b2b]">
+                  <AppIcon name="chevron_right" className={`size-4 transition-transform ${adminOpen ? 'rotate-90' : ''}`} />
+                </button>
+              </div>
               <div id="admin-sidebar-links" className={`overflow-hidden transition-[max-height,opacity] duration-200 ${adminOpen ? 'max-h-52 opacity-100' : 'max-h-0 opacity-0'}`}>
                 <div className="mt-1 space-y-1 pb-2 pl-12 pr-4">{adminNav.map(([label, href]) => { const active = pathname === href || pathname.startsWith(`${href}/`); return <Link key={href} href={href} className={`block rounded-sm px-3 py-2 font-body text-sm transition ${active ? 'bg-white font-semibold text-[#00152a] shadow-sm' : 'text-[#6b7280] hover:bg-[#fbf9f4] hover:text-[#00152a]'}`}>{label}</Link> })}</div>
               </div>
