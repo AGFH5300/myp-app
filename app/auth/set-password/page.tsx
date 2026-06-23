@@ -6,10 +6,12 @@ import { Eye, EyeOff } from 'lucide-react'
 import { AuthShell } from '@/components/auth-shell'
 import { Spinner } from '@/components/ui/spinner'
 import { createClient } from '@/lib/supabase/client'
+import { safeInternalReturnPath } from '@/lib/auth-redirect'
 
 const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
 const INPUT_SETTLE_DELAY_MS = 600
 const MEANINGFUL_MATCH_LENGTH = 3
+const DEFAULT_NEXT_PATH = '/onboarding'
 
 const STRENGTH_LEVELS = [
   { label: 'Very Weak', color: '#b91c1c', barClass: 'bg-red-700' },
@@ -54,14 +56,11 @@ export default function SetPasswordPage() {
   const [confirmSettled, setConfirmSettled] = useState(false)
   const [strengthBoosted, setStrengthBoosted] = useState(false)
   const prevStrengthScoreRef = useRef(0)
-  const nextPathRef = useRef('/onboarding')
+  const nextPathRef = useRef(DEFAULT_NEXT_PATH)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const rawNext = new URLSearchParams(window.location.search).get('next')
-      if (rawNext?.startsWith('/') && !rawNext.startsWith('//')) {
-        nextPathRef.current = rawNext
-      }
+      nextPathRef.current = safeInternalReturnPath(new URLSearchParams(window.location.search).get('next'), DEFAULT_NEXT_PATH)
     }
   }, [])
 

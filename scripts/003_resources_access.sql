@@ -31,21 +31,31 @@ create index if not exists idx_resource_access_events_user on public.resource_ac
 create index if not exists idx_resource_access_events_resource on public.resource_access_events(resource_id, created_at desc);
 
 create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
 begin
   new.updated_at = now();
   return new;
 end;
 $$;
 
-create or replace function public.is_admin()
+create schema if not exists private;
+
+create or replace function private.is_admin()
 returns boolean
 language sql
+stable
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
   select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin');
 $$;
+
+revoke all on function private.is_admin() from public, anon;
+grant usage on schema private to authenticated;
+grant execute on function private.is_admin() to authenticated;
 
 drop trigger if exists resources_set_updated_at on public.resources;
 create trigger resources_set_updated_at before update on public.resources for each row execute function public.set_updated_at();
@@ -59,8 +69,8 @@ using (is_published = true);
 
 create policy "resources_admin_manage" on public.resources
 for all
-using (public.is_admin())
-with check (public.is_admin());
+using (private.is_admin())
+with check (private.is_admin());
 
 create policy "resource_access_events_insert_own" on public.resource_access_events
 for insert
@@ -72,12 +82,12 @@ using (auth.uid() = user_id);
 
 create policy "resource_access_events_admin_read" on public.resource_access_events
 for select
-using (public.is_admin());
+using (private.is_admin());
 
 -- Allows admin analytics to show names/emails for access events.
 create policy "profiles_admin_read" on public.profiles
 for select
-using (public.is_admin());
+using (private.is_admin());
 
 insert into storage.buckets (id, name, public)
 values ('myp-resources', 'myp-resources', false)
@@ -93,11 +103,11 @@ for all
 to authenticated
 using (
   bucket_id = 'myp-resources'
-  and public.is_admin()
+  and private.is_admin()
 )
 with check (
   bucket_id = 'myp-resources'
-  and public.is_admin()
+  and private.is_admin()
 );
 
-grant execute on function public.is_admin() to authenticated;
+

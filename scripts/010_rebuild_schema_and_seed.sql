@@ -138,7 +138,10 @@ create index if not exists idx_recent_question_views_student on public.recent_qu
 create index if not exists idx_attempts_student on public.attempts(student_id, created_at desc);
 
 create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
 begin
   new.updated_at = now();
   return new;
@@ -189,6 +192,24 @@ begin
   return new;
 end;
 $$;
+
+
+create schema if not exists private;
+
+create or replace function private.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin');
+$$;
+
+revoke all on function private.is_admin() from public, anon;
+grant usage on schema private to authenticated;
+grant execute on function private.is_admin() to authenticated;
+revoke all on function public.handle_new_user() from public, anon, authenticated;
 
 create or replace function public.is_username_available(p_username text)
 returns boolean
@@ -266,9 +287,9 @@ alter table public.paper_views enable row level security;
 alter table public.recent_question_views enable row level security;
 alter table public.attempts enable row level security;
 
-create policy "profiles_select_own" on public.profiles for select using (auth.uid() = id);
-create policy "profiles_insert_own" on public.profiles for insert with check (auth.uid() = id);
-create policy "profiles_update_own" on public.profiles for update using (auth.uid() = id);
+create policy "profiles_select_own" on public.profiles for select to authenticated using (auth.uid() = id);
+create policy "profiles_insert_own" on public.profiles for insert to authenticated with check (auth.uid() = id and coalesce(role, 'student') = 'student');
+create policy "profiles_update_own" on public.profiles for update to authenticated using (auth.uid() = id) with check (auth.uid() = id and coalesce(role, 'student') = 'student');
 
 create policy "subjects_public_read" on public.subjects for select using (true);
 create policy "student_subjects_select_own" on public.student_subjects for select using (auth.uid() = student_id);
@@ -295,33 +316,39 @@ create policy "attempts_insert_own" on public.attempts for insert with check (au
 
 create policy "subjects_admin_write" on public.subjects
 for all
-using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
-with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+to authenticated
+using (private.is_admin())
+with check (private.is_admin());
 
 create policy "sessions_admin_write" on public.exam_sessions
 for all
-using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
-with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+to authenticated
+using (private.is_admin())
+with check (private.is_admin());
 
 create policy "papers_admin_write" on public.papers
 for all
-using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
-with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+to authenticated
+using (private.is_admin())
+with check (private.is_admin());
 
 create policy "questions_admin_write" on public.questions
 for all
-using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
-with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+to authenticated
+using (private.is_admin())
+with check (private.is_admin());
 
 create policy "topics_admin_write" on public.topics
 for all
-using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
-with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+to authenticated
+using (private.is_admin())
+with check (private.is_admin());
 
 create policy "question_topics_admin_write" on public.question_topics
 for all
-using (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'))
-with check (exists (select 1 from public.profiles where id = auth.uid() and role = 'admin'));
+to authenticated
+using (private.is_admin())
+with check (private.is_admin());
 
 grant execute on function public.is_username_available(text) to anon, authenticated;
 grant execute on function public.is_email_available(text) to anon, authenticated;
