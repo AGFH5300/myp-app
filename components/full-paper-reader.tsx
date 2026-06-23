@@ -46,25 +46,58 @@ export function FullPaperReader({
 
   useEffect(() => {
     if (!questions.length) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => Math.abs(a.boundingClientRect.top) - Math.abs(b.boundingClientRect.top))[0]
-        if (visible?.target.id) {
-          const nextId = visible.target.id.replace('question-', '')
-          setCurrentId(nextId)
-          const nextQuestion = questions.find((question) => question.id === nextId)
-          if (nextQuestion) setOpenSectionKey(questionSectionKey(nextQuestion.questionNumber))
-        }
-      },
-      { rootMargin: '-20% 0px -65% 0px', threshold: [0, 0.1, 0.25] },
-    )
-    questions.forEach((question) => {
-      const element = document.getElementById(`question-${question.id}`)
-      if (element) observer.observe(element)
-    })
-    return () => observer.disconnect()
+    let frame: number | null = null
+
+    function updateActiveQuestion() {
+      frame = null
+      const questionElements = questions
+        .map((question) => ({ question, element: document.getElementById(`question-${question.id}`) }))
+        .filter((item): item is { question: FullPaperReaderQuestion; element: HTMLElement } => Boolean(item.element))
+      if (!questionElements.length) return
+
+      const stickyHeader = document.querySelector('[data-reader-header]') as HTMLElement | null
+      const headerBottom = stickyHeader?.getBoundingClientRect().bottom ?? 0
+      const availableHeight = Math.max(0, window.innerHeight - headerBottom)
+      const referenceLine = headerBottom + availableHeight * 0.3
+      let nextQuestion = questionElements.find(({ element }) => {
+        const rect = element.getBoundingClientRect()
+        return rect.top <= referenceLine && rect.bottom >= referenceLine
+      })?.question
+
+      if (!nextQuestion) {
+        const below = questionElements
+          .map(({ question, element }) => ({ question, rect: element.getBoundingClientRect() }))
+          .filter(({ rect }) => rect.bottom >= headerBottom && rect.top >= referenceLine)
+          .sort((a, b) => a.rect.top - b.rect.top)[0]
+        const preceding = questionElements
+          .map(({ question, element }) => ({ question, rect: element.getBoundingClientRect() }))
+          .filter(({ rect }) => rect.bottom >= headerBottom && rect.top < referenceLine)
+          .sort((a, b) => b.rect.top - a.rect.top)[0]
+        nextQuestion = below?.question ?? preceding?.question
+      }
+
+      if (nextQuestion) {
+        setCurrentId((previousId) => (previousId === nextQuestion.id ? previousId : nextQuestion.id))
+        setOpenSectionKey((previousKey) => {
+          const nextKey = questionSectionKey(nextQuestion.questionNumber)
+          return previousKey === nextKey ? previousKey : nextKey
+        })
+      }
+    }
+
+    function scheduleUpdate() {
+      if (frame !== null) return
+      frame = window.requestAnimationFrame(updateActiveQuestion)
+    }
+
+    scheduleUpdate()
+    window.addEventListener('scroll', scheduleUpdate, { passive: true })
+    window.addEventListener('resize', scheduleUpdate)
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame)
+      window.removeEventListener('scroll', scheduleUpdate)
+      window.removeEventListener('resize', scheduleUpdate)
+    }
   }, [questions])
 
   useEffect(() => {
@@ -81,11 +114,11 @@ export function FullPaperReader({
 
   function scrollToQuestion(questionId: string) {
     document.getElementById(`question-${questionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    window.history.replaceState(null, '', `#question-${questionId}`)
     setCurrentId(questionId)
     const nextQuestion = questions.find((question) => question.id === questionId)
     if (nextQuestion) setOpenSectionKey(questionSectionKey(nextQuestion.questionNumber))
   }
-
 
   const navItems = useMemo(() => questions.map((question, index) => ({ ...question, index, sectionKey: questionSectionKey(question.questionNumber) })), [questions])
   const navSections = useMemo(() => groupQuestions(navItems), [navItems])
@@ -102,7 +135,7 @@ export function FullPaperReader({
 
   return (
     <div className="min-h-screen bg-[#ebe8df] text-[#00152a]">
-      <div className="sticky top-0 z-30 border-b border-[#c3c6ce66] bg-white/95 backdrop-blur">
+      <div data-reader-header className="sticky top-0 z-30 border-b border-[#c3c6ce66] bg-white/95 backdrop-blur">
         {adminPreview ? (
           <div className="border-b border-blue-200 bg-blue-50 px-4 py-2 text-center font-body text-sm font-semibold text-blue-900">
             Admin preview — students only see published papers and published questions.
@@ -149,12 +182,8 @@ export function FullPaperReader({
 
             <div className="divide-y divide-[#d6d0c2]">
               {questions.map((question) => (
-                <section key={question.id} id={`question-${question.id}`} className="scroll-mt-32 py-8">
-                  <div className="mb-4 flex items-start justify-between gap-4">
-                    <h3 className="font-headline text-xl text-[#00152a]">Question {question.questionNumber || '—'}</h3>
-                    <p className="shrink-0 font-body text-sm font-semibold text-[#43474d]">[{question.marks ?? '—'} marks]</p>
-                  </div>
-                  {adminPreview && question.isPublished === false ? <p className="mb-3 font-body text-xs font-semibold text-slate-600">Draft question</p> : null}
+                <section key={question.id} id={`question-${question.id}`} aria-label={`Question ${question.questionNumber || '—'}`} className="scroll-mt-32 py-6">
+                  <h3 className="sr-only">Question {question.questionNumber || '—'}</h3>
                   {question.questionImages.length ? (
                     <div className="space-y-1">
                       {question.questionImages.map((image, index) => <img key={`${image.url}-${index}`} src={image.url} alt={image.alt} className="h-auto w-full object-contain" />)}
