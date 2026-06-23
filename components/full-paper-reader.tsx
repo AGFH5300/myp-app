@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
+import { AppIcon } from '@/components/app-icon'
 
 type ReaderImage = { url: string; alt: string }
 export type FullPaperReaderQuestion = {
@@ -37,10 +38,10 @@ export function FullPaperReader({
   adminPreview?: boolean
 }) {
   const [currentId, setCurrentId] = useState(questions[0]?.id ?? '')
-  const [revealedId, setRevealedId] = useState<string | null>(adminPreview ? (questions[0]?.id ?? null) : null)
+  const [markSchemeOpen, setMarkSchemeOpen] = useState(false)
+  const [openSectionKey, setOpenSectionKey] = useState<string>(() => questions[0] ? questionSectionKey(questions[0].questionNumber) : '')
   const currentIndex = Math.max(0, questions.findIndex((question) => question.id === currentId))
   const currentQuestion = questions[currentIndex] ?? questions[0]
-  const revealedQuestion = questions.find((question) => question.id === revealedId) ?? null
   const metadata = [paper.subjectName, paper.session, paper.year, paper.paperCode].filter(Boolean).join(' · ')
 
   useEffect(() => {
@@ -50,7 +51,12 @@ export function FullPaperReader({
         const visible = entries
           .filter((entry) => entry.isIntersecting)
           .sort((a, b) => Math.abs(a.boundingClientRect.top) - Math.abs(b.boundingClientRect.top))[0]
-        if (visible?.target.id) setCurrentId(visible.target.id.replace('question-', ''))
+        if (visible?.target.id) {
+          const nextId = visible.target.id.replace('question-', '')
+          setCurrentId(nextId)
+          const nextQuestion = questions.find((question) => question.id === nextId)
+          if (nextQuestion) setOpenSectionKey(questionSectionKey(nextQuestion.questionNumber))
+        }
       },
       { rootMargin: '-20% 0px -65% 0px', threshold: [0, 0.1, 0.25] },
     )
@@ -63,17 +69,36 @@ export function FullPaperReader({
 
   useEffect(() => {
     const hash = window.location.hash.replace('#question-', '')
-    if (hash && questions.some((question) => question.id === hash)) {
-      window.setTimeout(() => scrollToQuestion(hash), 50)
+    const hashQuestion = questions.find((question) => question.id === hash)
+    if (hashQuestion) {
+      window.setTimeout(() => {
+        document.getElementById(`question-${hash}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        setCurrentId(hash)
+        setOpenSectionKey(questionSectionKey(hashQuestion.questionNumber))
+      }, 50)
     }
   }, [questions])
 
   function scrollToQuestion(questionId: string) {
     document.getElementById(`question-${questionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     setCurrentId(questionId)
+    const nextQuestion = questions.find((question) => question.id === questionId)
+    if (nextQuestion) setOpenSectionKey(questionSectionKey(nextQuestion.questionNumber))
   }
 
-  const navItems = useMemo(() => questions.map((question, index) => ({ ...question, index })), [questions])
+
+  const navItems = useMemo(() => questions.map((question, index) => ({ ...question, index, sectionKey: questionSectionKey(question.questionNumber) })), [questions])
+  const navSections = useMemo(() => groupQuestions(navItems), [navItems])
+  const currentHasMarkScheme = Boolean(currentQuestion?.markschemeImages.length || currentQuestion?.markschemeText)
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setMarkSchemeOpen(false)
+    }
+    if (!markSchemeOpen) return
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [markSchemeOpen])
 
   return (
     <div className="min-h-screen bg-[#ebe8df] text-[#00152a]">
@@ -92,22 +117,27 @@ export function FullPaperReader({
             <h1 className="truncate font-headline text-xl text-[#00152a] md:text-2xl">{paper.title}</h1>
             <p className="font-body text-xs text-[#43474d] md:text-sm">{metadata || 'Paper workspace'}</p>
           </div>
-          <div className="font-body text-sm font-semibold text-[#00152a]">
-            {currentQuestion ? `Question ${currentQuestion.questionNumber} of ${questions.length}` : 'No questions'}
-          </div>
-          <details className="relative lg:hidden">
-            <summary className="tsm-btn-secondary cursor-pointer list-none">Questions</summary>
-            <div className="absolute right-0 mt-2 max-h-[70vh] w-56 overflow-auto rounded-md border border-[#c3c6ce66] bg-white p-2 shadow-lg">
-              {navItems.map((question) => <NavButton key={question.id} question={question} currentId={currentId} onClick={scrollToQuestion} />)}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="font-body text-sm font-semibold text-[#00152a]">
+              {currentQuestion ? `Question ${currentQuestion.questionNumber} of ${questions.length}` : 'No questions'}
             </div>
-          </details>
+            <button type="button" disabled={!currentQuestion || !currentHasMarkScheme} onClick={() => setMarkSchemeOpen(true)} className="rounded-sm border border-[#c3c6ce66] bg-[#f5f3ee] px-3 py-2 font-body text-sm font-semibold text-[#43474d] transition hover:border-[#735b2b] hover:text-[#00152a] disabled:cursor-not-allowed disabled:opacity-50 enabled:cursor-pointer">
+              {adminPreview ? 'Open mark scheme' : 'Reveal mark scheme'}
+            </button>
+            <details className="relative lg:hidden">
+              <summary className="tsm-btn-secondary cursor-pointer list-none">Questions</summary>
+              <div className="absolute right-0 mt-2 max-h-[70vh] w-72 overflow-auto rounded-md border border-[#c3c6ce66] bg-white p-2 shadow-lg">
+                <GroupedNavigator sections={navSections} currentId={currentId} openSectionKey={openSectionKey} setOpenSectionKey={setOpenSectionKey} onClick={scrollToQuestion} />
+              </div>
+            </details>
+          </div>
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 lg:grid-cols-[13rem_minmax(0,1fr)_16rem]">
+      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 lg:grid-cols-[14rem_minmax(0,1fr)]">
         <aside className="sticky top-28 hidden h-[calc(100vh-8rem)] overflow-auto rounded-md border border-[#c3c6ce66] bg-white p-3 lg:block">
           <p className="mb-3 font-body text-xs font-semibold uppercase tracking-widest text-[#6f737b]">Question navigator</p>
-          <div className="space-y-1">{navItems.map((question) => <NavButton key={question.id} question={question} currentId={currentId} onClick={scrollToQuestion} />)}</div>
+          <GroupedNavigator sections={navSections} currentId={currentId} openSectionKey={openSectionKey} setOpenSectionKey={setOpenSectionKey} onClick={scrollToQuestion} />
         </aside>
 
         <main className="min-w-0">
@@ -149,28 +179,69 @@ export function FullPaperReader({
           </div>
         </main>
 
-        <aside className="sticky top-28 h-fit rounded-md border border-[#c3c6ce66] bg-white p-4">
-          <p className="font-body text-sm text-[#43474d]">{questions.length} questions</p>
-          <p className="mt-1 font-headline text-xl text-[#00152a]">{currentQuestion ? `Question ${currentQuestion.questionNumber}` : 'No question selected'}</p>
-          {currentQuestion ? <button type="button" onClick={() => setRevealedId(currentQuestion.id)} className="tsm-btn-primary mt-4 w-full justify-center">Reveal mark scheme</button> : null}
-          {revealedQuestion ? (
-            <div className="mt-4 border-t border-[#c3c6ce66] pt-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <p className="font-body text-sm font-semibold text-[#00152a]">Mark scheme · Question {revealedQuestion.questionNumber}</p>
-                <button type="button" onClick={() => setRevealedId(null)} className="font-body text-xs font-semibold text-[#735b2b] underline">Close</button>
+        {markSchemeOpen && currentQuestion ? (
+          <div className="fixed inset-0 z-50 flex justify-end bg-[#00152a]/30" onClick={() => setMarkSchemeOpen(false)}>
+            <aside className="h-full w-full max-w-xl overflow-auto bg-white p-5 shadow-2xl" role="dialog" aria-modal="true" aria-label={`Mark scheme · Question ${currentQuestion.questionNumber}`} onClick={(event) => event.stopPropagation()}>
+              <div className="mb-4 flex items-center justify-between gap-3 border-b border-[#c3c6ce66] pb-3">
+                <p className="font-body text-sm font-semibold text-[#00152a]">Mark scheme · Question {currentQuestion.questionNumber}</p>
+                <button type="button" onClick={() => setMarkSchemeOpen(false)} className="cursor-pointer rounded-sm border border-[#c3c6ce66] px-3 py-1.5 font-body text-xs font-semibold text-[#43474d] hover:text-[#00152a]">Close</button>
               </div>
-              <div className="max-h-[55vh] space-y-2 overflow-auto">
-                {revealedQuestion.markschemeImages.length ? revealedQuestion.markschemeImages.map((image, index) => <img key={`${image.url}-${index}`} src={image.url} alt={image.alt} className="h-auto w-full object-contain" />) : revealedQuestion.markschemeText ? <p className="whitespace-pre-wrap font-body text-sm text-[#43474d]">{revealedQuestion.markschemeText}</p> : <p className="font-body text-sm text-[#43474d]">No mark scheme has been added for this question yet.</p>}
+              <div className="space-y-3">
+                {currentQuestion.markschemeImages.length ? currentQuestion.markschemeImages.map((image, index) => <img key={`${image.url}-${index}`} src={image.url} alt={image.alt} className="h-auto w-full object-contain" />) : currentQuestion.markschemeText ? <p className="whitespace-pre-wrap font-body text-sm text-[#43474d]">{currentQuestion.markschemeText}</p> : <p className="rounded-sm border border-[#c3c6ce66] bg-[#f5f3ee] p-3 font-body text-sm text-[#43474d]">No mark scheme has been added for this question yet.</p>}
               </div>
-            </div>
-          ) : null}
-        </aside>
+            </aside>
+          </div>
+        ) : null}
       </div>
     </div>
   )
 }
 
-function NavButton({ question, currentId, onClick }: { question: FullPaperReaderQuestion & { index: number }; currentId: string; onClick: (id: string) => void }) {
+type NavQuestion = FullPaperReaderQuestion & { index: number; sectionKey: string }
+type NavSection = { key: string; title: string; questions: NavQuestion[] }
+
+function questionSectionKey(label: string) {
+  const match = label.trim().match(/^(?:q(?:uestion)?\s*)?(\d+)/i)
+  return match ? match[1] : 'other'
+}
+
+function groupQuestions(questions: NavQuestion[]): NavSection[] {
+  const sections: NavSection[] = []
+  questions.forEach((question) => {
+    let section = sections.find((item) => item.key === question.sectionKey)
+    if (!section) {
+      section = { key: question.sectionKey, title: question.sectionKey === 'other' ? 'Other questions' : `Section ${question.sectionKey}`, questions: [] }
+      sections.push(section)
+    }
+    section.questions.push(question)
+  })
+  return sections
+}
+
+function GroupedNavigator({ sections, currentId, openSectionKey, setOpenSectionKey, onClick }: { sections: NavSection[]; currentId: string; openSectionKey: string; setOpenSectionKey: (key: string) => void; onClick: (id: string) => void }) {
+  return (
+    <div className="space-y-2">
+      {sections.map((section) => {
+        const open = section.key === openSectionKey
+        return (
+          <div key={section.key} className="rounded-sm border border-[#c3c6ce66]">
+            <button type="button" onClick={() => setOpenSectionKey(open ? '' : section.key)} aria-expanded={open} className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2 text-left font-body text-sm font-semibold text-[#00152a] hover:bg-[#f5f3ee]">
+              <span>{section.title}</span>
+              <span className="flex items-center gap-2 text-xs text-[#6f737b]"><span>{section.questions.length}</span><AppIcon name="chevron_right" className={`size-4 transition-transform ${open ? 'rotate-90' : ''}`} /></span>
+            </button>
+            <div className={`overflow-hidden transition-[max-height,opacity] duration-200 ${open ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+              <div className="space-y-1 p-2 pt-0">
+                {section.questions.map((question) => <NavButton key={question.id} question={question} currentId={currentId} onClick={onClick} />)}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function NavButton({ question, currentId, onClick }: { question: NavQuestion; currentId: string; onClick: (id: string) => void }) {
   const active = question.id === currentId
-  return <button type="button" onClick={() => onClick(question.id)} className={`block w-full rounded-sm px-3 py-2 text-left font-body text-sm font-semibold ${active ? 'bg-[#00152a] text-white' : 'text-[#43474d] hover:bg-[#f5f3ee]'}`}>Question {question.questionNumber || question.index + 1}</button>
+  return <button type="button" onClick={() => onClick(question.id)} className={`block w-full cursor-pointer rounded-sm border-l-4 px-3 py-2 text-left font-body text-sm font-semibold ${active ? 'border-[#735b2b] bg-[#00152a] text-white' : 'border-transparent text-[#43474d] hover:bg-[#f5f3ee]'}`}>Question {question.questionNumber || question.index + 1}</button>
 }
