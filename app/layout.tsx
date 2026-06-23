@@ -19,8 +19,8 @@ export const metadata: Metadata = {
   applicationName: siteTitle,
   keywords: ['MYP', 'eAssessment', 'past papers', 'markscheme', '2016', '2025', 'IB Middle Years Programme'],
   icons: {
-    icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
-    shortcut: ['/favicon.svg'],
+    icon: [{ url: '/myp-atlas-icon.svg', type: 'image/svg+xml' }],
+    shortcut: ['/myp-atlas-icon.svg'],
   },
 }
 
