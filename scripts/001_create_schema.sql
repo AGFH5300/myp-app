@@ -204,10 +204,31 @@ as $$
   select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin');
 $$;
 
-revoke all on function private.is_admin() from public, anon;
+revoke all on function private.is_admin() from public, anon, authenticated, service_role;
+revoke all on schema private from public, anon;
 grant usage on schema private to authenticated;
 grant execute on function private.is_admin() to authenticated;
-revoke all on function public.handle_new_user() from public, anon, authenticated;
+revoke all on function public.handle_new_user() from public, anon, authenticated, service_role;
+
+create or replace function public.prevent_profile_role_change()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if current_user in ('anon', 'authenticated') then
+    if tg_op = 'INSERT' and new.role is distinct from 'student' then
+      raise exception 'Users cannot create profiles with a privileged role';
+    end if;
+
+    if tg_op = 'UPDATE' and new.role is distinct from old.role then
+      raise exception 'Users cannot change their own role';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
 
 create or replace function public.is_username_available(p_username text)
 returns boolean
@@ -259,6 +280,9 @@ as $$
   from normalized;
 $$;
 
+drop trigger if exists profiles_prevent_role_change on public.profiles;
+create trigger profiles_prevent_role_change before insert or update on public.profiles for each row execute function public.prevent_profile_role_change();
+
 drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at before update on public.profiles for each row execute function public.set_updated_at();
 drop trigger if exists papers_set_updated_at on public.papers;
@@ -285,9 +309,9 @@ alter table public.paper_views enable row level security;
 alter table public.recent_question_views enable row level security;
 alter table public.attempts enable row level security;
 
-create policy "profiles_select_own" on public.profiles for select to authenticated using (auth.uid() = id);
-create policy "profiles_insert_own" on public.profiles for insert to authenticated with check (auth.uid() = id and coalesce(role, 'student') = 'student');
-create policy "profiles_update_own" on public.profiles for update to authenticated using (auth.uid() = id) with check (auth.uid() = id and coalesce(role, 'student') = 'student');
+create policy "profiles_select_own" on public.profiles for select to authenticated using ((select auth.uid()) = id);
+create policy "profiles_insert_own" on public.profiles for insert to authenticated with check ((select auth.uid()) = id);
+create policy "profiles_update_own" on public.profiles for update to authenticated using ((select auth.uid()) = id) with check ((select auth.uid()) = id);
 
 create policy "subjects_public_read" on public.subjects for select using (true);
 create policy "student_subjects_select_own" on public.student_subjects for select using (auth.uid() = student_id);
