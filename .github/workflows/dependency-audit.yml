@@ -16,8 +16,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Regenerate lockfile with pnpm 10.25.0
-        run: npx --yes pnpm@10.25.0 install --lockfile-only --no-frozen-lockfile
+      - name: Regenerate lockfile with pnpm 9
+        run: npx --yes pnpm@9.15.0 install --lockfile-only --no-frozen-lockfile
       - name: Install locked dependencies with the project package manager
         run: |
           corepack enable
