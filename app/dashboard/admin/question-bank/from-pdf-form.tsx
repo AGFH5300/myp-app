@@ -732,8 +732,8 @@ function buildPaperProgress(paperId: string, questions: PaperQuestion[]): PaperP
 
   return {
     total: paperQuestions.length,
-    highestOrderQuestion: orderedQuestions.sort((a, b) => (b.question_order ?? 0) - (a.question_order ?? 0))[0] || null,
-    lastWorkedQuestion: [...paperQuestions].sort((a, b) => workedAt(b) - workedAt(a))[0] || null,
+    highestOrderQuestion: orderedQuestions.reduce<PaperQuestion | null>((highest, question) => (highest && (highest.question_order ?? 0) >= (question.question_order ?? 0) ? highest : question), null),
+    lastWorkedQuestion: paperQuestions.reduce<PaperQuestion | null>((latest, question) => (latest && workedAt(latest) >= workedAt(question) ? latest : question), null),
     nextOrder: maxOrder + 1,
     draftCount: paperQuestions.filter((question) => question.is_published === false).length,
     publishedCount: paperQuestions.filter((question) => question.is_published === true).length,

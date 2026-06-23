@@ -9,15 +9,16 @@ function firstRelation<T>(relation: T | T[] | null | undefined) {
 export default async function SubjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
-  const { data: subject } = await supabase.from('subjects').select('id,name,description').eq('id', id).maybeSingle()
+  const [{ data: subject }, { data: papers }] = await Promise.all([
+    supabase.from('subjects').select('id,name,description').eq('id', id).maybeSingle(),
+    supabase
+      .from('papers')
+      .select('id,title,year,is_published,exam_sessions(session_month,session_year)')
+      .eq('subject_id', id)
+      .eq('is_published', true)
+      .order('year', { ascending: false }),
+  ])
   if (!subject) notFound()
-
-  const { data: papers } = await supabase
-    .from('papers')
-    .select('id,title,year,is_published,exam_sessions(session_month,session_year)')
-    .eq('subject_id', id)
-    .eq('is_published', true)
-    .order('year', { ascending: false })
 
   return (
     <div>

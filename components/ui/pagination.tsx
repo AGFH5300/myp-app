@@ -11,7 +11,6 @@ import { Button, buttonVariants } from '@/components/ui/button'
 function Pagination({ className, ...props }: React.ComponentProps<'nav'>) {
   return (
     <nav
-      role="navigation"
       aria-label="pagination"
       data-slot="pagination"
       className={cn('mx-auto flex w-full justify-center', className)}
@@ -46,11 +45,14 @@ function PaginationLink({
   className,
   isActive,
   size = 'icon',
+  children,
+  'aria-label': ariaLabel,
   ...props
 }: PaginationLinkProps) {
   return (
     <a
       aria-current={isActive ? 'page' : undefined}
+      aria-label={ariaLabel}
       data-slot="pagination-link"
       data-active={isActive}
       className={cn(
@@ -61,7 +63,9 @@ function PaginationLink({
         className,
       )}
       {...props}
-    />
+    >
+      {children ?? (ariaLabel ? <span className="sr-only">{ariaLabel}</span> : null)}
+    </a>
   )
 }
 

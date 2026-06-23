@@ -20,21 +20,22 @@ export default async function PaperDetailPage({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const { data: paper } = await supabase
-    .from('papers')
-    .select('id,title,year,pdf_url,markscheme_url,markscheme_text,subjects(name),exam_sessions(session_month,session_year)')
-    .eq('id', paperId)
-    .eq('is_published', true)
-    .maybeSingle()
+  const [{ data: paper }, { data: questions }] = await Promise.all([
+    supabase
+      .from('papers')
+      .select('id,title,year,pdf_url,markscheme_url,markscheme_text,subjects(name),exam_sessions(session_month,session_year)')
+      .eq('id', paperId)
+      .eq('is_published', true)
+      .maybeSingle(),
+    supabase
+      .from('questions')
+      .select('id,question_number,context_image_url,image_url,secondary_image_url,marks,is_published,question_topics(topic_id,topics(id,name))')
+      .eq('paper_id', paperId)
+      .eq('is_published', true)
+      .order('question_number'),
+  ])
 
   if (!paper) notFound()
-
-  const { data: questions } = await supabase
-    .from('questions')
-    .select('id,question_number,context_image_url,image_url,secondary_image_url,marks,is_published,question_topics(topic_id,topics(id,name))')
-    .eq('paper_id', paperId)
-    .eq('is_published', true)
-    .order('question_number')
 
   if (user) {
     await supabase.from('paper_views').insert({ student_id: user.id, paper_id: paperId })

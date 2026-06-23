@@ -34,14 +34,16 @@ function groupResources(resources: Resource[]) {
 
 export default async function ResourcesPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  const { data: resources } = await supabase
-    .from('resources')
-    .select('id,title,subject,category,description,file_type,source_label')
-    .eq('is_published', true)
-    .order('subject')
-    .order('category')
-    .order('title')
+  const [{ data: { user } }, { data: resources }] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase
+      .from('resources')
+      .select('id,title,subject,category,description,file_type,source_label')
+      .eq('is_published', true)
+      .order('subject')
+      .order('category')
+      .order('title'),
+  ])
 
   const groupedResources = groupResources((resources ?? []) as Resource[])
 
