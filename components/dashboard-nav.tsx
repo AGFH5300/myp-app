@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { AppIcon } from '@/components/app-icon'
 import { useState } from 'react'
+import { BrandMark } from '@/components/brand-mark'
 import { BrandWordmark } from '@/components/brand-wordmark'
 
 interface Profile {
@@ -48,8 +49,8 @@ export function DashboardNav({ user, profile, collapsed = false, onCollapsedChan
       <nav className={`hidden md:flex fixed left-0 top-0 h-full bg-[#f5f3ee] flex-col py-8 z-40 border-r border-[#c3c6ce33] transition-[width] duration-200 ${collapsed ? 'w-[4.5rem]' : 'w-64'}`} aria-label="Dashboard navigation">
         {collapsed ? (
           <div className="mb-10 flex justify-center">
-            <button type="button" onClick={() => onCollapsedChange?.(false)} aria-label="Open sidebar" title="Open sidebar" className="group relative flex size-11 items-center justify-center rounded-md bg-[#00152a] font-headline text-lg text-white transition hover:bg-[#19324d] focus:outline-none focus:ring-2 focus:ring-[#735b2b] focus:ring-offset-2 focus:ring-offset-[#f5f3ee]">
-              M
+            <button type="button" onClick={() => onCollapsedChange?.(false)} aria-label="Open sidebar" title="Open sidebar" className="group relative flex size-11 items-center justify-center rounded-md border border-[#c3c6ce66] bg-white transition hover:bg-[#fbf9f4] focus:outline-none focus:ring-2 focus:ring-[#735b2b] focus:ring-offset-2 focus:ring-offset-[#f5f3ee]">
+              <BrandMark className="h-7 w-auto" />
               <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-sm bg-[#00152a] px-2 py-1 font-body text-xs font-semibold text-white opacity-0 shadow-md transition group-hover:opacity-100 group-focus:opacity-100">Open sidebar</span>
             </button>
           </div>
