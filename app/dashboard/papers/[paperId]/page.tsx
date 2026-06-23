@@ -1,38 +1,32 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { FullPaperReader, type FullPaperReaderQuestion } from '@/components/full-paper-reader'
+import { resolveQuestionAssetImages, type QuestionAssetRow } from '@/lib/question-assets'
 import { createClient } from '@/lib/supabase/server'
-import { PaperTopicFilterForm } from '@/components/paper-topic-filter-form'
 
 function firstRelation<T>(relation: T | T[] | null | undefined) {
   return Array.isArray(relation) ? relation[0] : relation
 }
 
-export default async function PaperDetailPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ paperId: string }>
-  searchParams: Promise<Record<string, string | string[] | undefined>>
-}) {
+type QuestionAssetWithType = QuestionAssetRow & { question_id: string; asset_type: 'question' | 'markscheme' }
+
+export default async function PaperDetailPage({ params }: { params: Promise<{ paperId: string }> }) {
   const { paperId } = await params
-  const query = await searchParams
-  const selectedTopic = typeof query.topic === 'string' ? query.topic : ''
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   const [{ data: paper }, { data: questions }] = await Promise.all([
     supabase
       .from('papers')
-      .select('id,title,year,pdf_url,markscheme_url,markscheme_text,subjects(name),exam_sessions(session_month,session_year)')
+      .select('id,title,year,session,paper_code,subjects(name),exam_sessions(session_month,session_year)')
       .eq('id', paperId)
       .eq('is_published', true)
       .maybeSingle(),
     supabase
       .from('questions')
-      .select('id,question_number,context_image_url,image_url,secondary_image_url,marks,is_published,question_topics(topic_id,topics(id,name))')
+      .select('id,question_number,question_order,prompt_text,image_url,question_image_path,markscheme_text,markscheme_image_url,markscheme_image_path,marks')
       .eq('paper_id', paperId)
       .eq('is_published', true)
-      .order('question_number'),
+      .order('question_order', { ascending: true, nullsFirst: false }),
   ])
 
   if (!paper) notFound()
@@ -41,77 +35,51 @@ export default async function PaperDetailPage({
     await supabase.from('paper_views').insert({ student_id: user.id, paper_id: paperId })
   }
 
-  const topicMap = new Map<string, string>()
-  questions?.forEach((item) => {
-    item.question_topics?.forEach((row) => {
-      const topic = firstRelation(row.topics)
-      const id = topic?.id
-      const name = topic?.name
-      if (id && name) topicMap.set(id, name)
-    })
+  const orderedQuestions = (questions ?? []).toSorted((a, b) => (a.question_order ?? Number.MAX_SAFE_INTEGER) - (b.question_order ?? Number.MAX_SAFE_INTEGER))
+  const { data: assetRows } = orderedQuestions.length
+    ? await supabase
+      .from('question_assets')
+      .select('question_id,asset_type,storage_path,public_url,label,sort_order,created_at')
+      .in('question_id', orderedQuestions.map((question) => question.id))
+      .in('asset_type', ['question', 'markscheme'])
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true })
+    : { data: [] }
+
+  const assetsByQuestion = new Map<string, QuestionAssetWithType[]>()
+  ;((assetRows ?? []) as QuestionAssetWithType[]).forEach((asset) => {
+    assetsByQuestion.set(asset.question_id, [...(assetsByQuestion.get(asset.question_id) ?? []), asset])
   })
 
-  const paperTopics = Array.from(topicMap.entries())
-    .map(([id, name]) => ({ id, name }))
-    .sort((a, b) => a.name.localeCompare(b.name))
-
-  const filteredQuestions = selectedTopic
-    ? (questions ?? []).filter((item) => item.question_topics?.some((row) => firstRelation(row.topics)?.id === selectedTopic))
-    : questions ?? []
+  const resolvedQuestions = await Promise.all(orderedQuestions.map(async (question) => {
+    const assets = assetsByQuestion.get(question.id) ?? []
+    const questionImages = await resolveQuestionAssetImages(supabase, assets.filter((asset) => asset.asset_type === 'question'), question.question_image_path || question.image_url)
+    const markschemeImages = await resolveQuestionAssetImages(supabase, assets.filter((asset) => asset.asset_type === 'markscheme'), question.markscheme_image_path || question.markscheme_image_url)
+    return {
+      id: question.id,
+      questionNumber: question.question_number,
+      questionOrder: question.question_order,
+      marks: question.marks,
+      promptText: null,
+      questionImages: questionImages.map((image, index) => ({ url: image.url, alt: image.label || `Question ${question.question_number} image ${index + 1}` })),
+      markschemeImages: markschemeImages.map((image, index) => ({ url: image.url, alt: image.label || `Question ${question.question_number} mark scheme image ${index + 1}` })),
+      markschemeText: question.markscheme_text,
+    }
+  }))
+  const readerQuestions: FullPaperReaderQuestion[] = resolvedQuestions.filter((question) => question.questionImages.length > 0)
 
   return (
-    <div className="space-y-8">
-      <header>
-        <h1 className="font-headline text-4xl text-[#00152a]">{paper.title}</h1>
-        <p className="font-body text-[#43474d] mt-2">{firstRelation(paper.subjects)?.name} · {paper.year} {firstRelation(paper.exam_sessions)?.session_month}</p>
-      </header>
-
-      <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md space-y-3">
-        <h2 className="font-headline text-2xl text-[#00152a]">Paper resources</h2>
-        {paper.pdf_url && <a className="font-body text-sm text-[#735b2b] underline" href={paper.pdf_url} target="_blank">Open paper PDF</a>}
-        {paper.markscheme_url && <a className="font-body text-sm text-[#735b2b] underline block" href={paper.markscheme_url} target="_blank">Open markscheme PDF</a>}
-        {paper.markscheme_text && <p className="font-body text-sm text-[#43474d] whitespace-pre-wrap">{paper.markscheme_text}</p>}
-      </section>
-
-      <section className="bg-white border border-[#c3c6ce66] p-6 rounded-md">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-headline text-2xl text-[#00152a]">Questions from this paper</h2>
-          {paperTopics.length > 0 ? <PaperTopicFilterForm selectedTopic={selectedTopic} topics={paperTopics.map((topic) => ({ value: topic.id, label: topic.name }))} /> : null}
-        </div>
-        <div className="space-y-3">
-          {filteredQuestions.map((question) => {
-            const previewImage = question.context_image_url || question.image_url || question.secondary_image_url
-            const questionTopics = question.question_topics?.map((row) => firstRelation(row.topics)).filter((topic): topic is { id: string; name: string } => Boolean(topic?.id && topic?.name)) ?? []
-            return (
-              <Link key={question.id} href={`/dashboard/papers/question/${question.id}`} className="flex items-center justify-between gap-3 p-4 bg-[#f5f3ee] rounded-sm">
-                <div className="min-w-0">
-                  <p className="font-headline text-lg text-[#00152a]">Q{question.question_number} · {question.marks} marks</p>
-                  {questionTopics.length > 0 ? (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {questionTopics.map((topic) => (
-                        <span
-                          key={topic.id}
-                          className="inline-flex items-center rounded-sm border border-[#c3c6ce66] bg-white px-2 py-0.5 font-body text-xs text-[#43474d]"
-                        >
-                          {topic.name}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-                {previewImage ? (
-                  <img
-                    src={previewImage}
-                    alt={`Question ${question.question_number} preview`}
-                    className="h-12 w-12 rounded-sm object-cover border border-[#c3c6ce66] bg-white shrink-0"
-                  />
-                ) : null}
-              </Link>
-            )
-          })}
-          {!filteredQuestions.length && <p className="font-body text-sm text-[#43474d]">{selectedTopic ? 'No published questions for this topic in this paper.' : 'No published questions in this paper yet.'}</p>}
-        </div>
-      </section>
-    </div>
+    <FullPaperReader
+      paper={{
+        id: paper.id,
+        title: paper.title,
+        subjectName: firstRelation(paper.subjects)?.name,
+        year: paper.year,
+        session: paper.session || firstRelation(paper.exam_sessions)?.session_month,
+        paperCode: paper.paper_code,
+      }}
+      questions={readerQuestions}
+      backHref="/dashboard/papers"
+    />
   )
 }
