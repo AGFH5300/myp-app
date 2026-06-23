@@ -143,9 +143,8 @@ export function FullPaperReader({
         <main className="min-w-0">
           <div className="mx-auto max-w-[56rem] border border-[#d6d0c2] bg-white px-4 py-6 shadow-sm sm:px-8 md:px-12 md:py-10">
             <header className="border-b border-[#d6d0c2] pb-6 text-center">
-              <p className="font-label text-xs uppercase tracking-[0.22em] text-[#735b2b]">MYP Atlas reconstructed practice paper</p>
+              <p className="font-label text-xs uppercase tracking-[0.22em] text-[#735b2b]">MYP Atlas</p>
               <h2 className="mt-2 font-headline text-3xl text-[#00152a]">{paper.title}</h2>
-              <p className="mt-2 font-body text-sm text-[#43474d]">Reconstructed from stored question crops in paper order.</p>
             </header>
 
             <div className="divide-y divide-[#d6d0c2]">
