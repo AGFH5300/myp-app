@@ -7,6 +7,7 @@ import { type CSSProperties, DragEvent, type FormEvent, KeyboardEvent, ReactNode
 import { Eye, GripVertical, Trash2, Upload, ChevronUp, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { createQuestion, updateQuestion } from './actions'
+import { PdfCropPanel, PdfFileInput, type PdfFileState } from './pdf-cropper'
 
 export type PaperRelation<T> = T | T[] | null
 export type Paper = { id: string; title: string; year: number; subjects?: PaperRelation<{ id?: string | null; name?: string | null }>; exam_sessions?: PaperRelation<{ session_month?: string | null }> }
@@ -37,6 +38,7 @@ export type LocalPreview = { id: string; file: File; name: string; url: string }
 export type SelectOption = { value: string; label: string; helper?: string }
 export type PreviewItem = { token: string; title: string; url: string; subtitle?: string; canRemove?: boolean }
 export type LightboxState = { group: 'question' | 'markscheme'; index: number } | null
+type CropperTarget = 'question' | 'markscheme' | null
 
 const IMAGE_FILE_SIZE_LIMIT_BYTES = 8 * 1024 * 1024
 
@@ -313,7 +315,7 @@ function PreviewImage({ item, className, sizes = '88px' }: { item: PreviewItem; 
   return <Image src={item.url} alt={item.title} width={1400} height={900} sizes={sizes} unoptimized className={className} />
 }
 
-export function ImageUploadGroup({ title, name, fileKeyName, assetOrderName, existingAssets, fallbackUrl, fallbackTitle, files, setFiles, order, setOrder, onPreview }: { title: string; name: string; fileKeyName: string; assetOrderName: string; existingAssets: QuestionAsset[]; fallbackUrl?: string | null; fallbackTitle?: string; files: LocalPreview[]; setFiles: (files: LocalPreview[]) => void; order: string[]; setOrder: (order: string[]) => void; onPreview: (index: number) => void }) {
+export function ImageUploadGroup({ title, name, fileKeyName, assetOrderName, existingAssets, fallbackUrl, fallbackTitle, files, setFiles, order, setOrder, onPreview, onOpenCropper, cropperLabel, missingTitle, missingCropLabel }: { title: string; name: string; fileKeyName: string; assetOrderName: string; existingAssets: QuestionAsset[]; fallbackUrl?: string | null; fallbackTitle?: string; files: LocalPreview[]; setFiles: (files: LocalPreview[]) => void; order: string[]; setOrder: (order: string[]) => void; onPreview: (index: number) => void; onOpenCropper?: () => void; cropperLabel?: string; missingTitle?: string; missingCropLabel?: string }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dropActive, setDropActive] = useState(false)
   const [draggedToken, setDraggedToken] = useState<string | null>(null)
@@ -396,8 +398,25 @@ export function ImageUploadGroup({ title, name, fileKeyName, assetOrderName, exi
     setDropTarget(null)
   }
 
+  const hasVisibleImages = orderedItems.length > 0 || Boolean(fallbackUrl)
+
   return (
     <div>
+      {!hasVisibleImages && missingTitle ? (
+        <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-4">
+          <p className="font-body text-sm font-semibold text-amber-900">{missingTitle}</p>
+          <p className="mt-1 font-body text-xs text-amber-800">Use the PDF cropper to repair this asset, or upload an image if you already have one.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {onOpenCropper ? <button type="button" onClick={onOpenCropper} className="tsm-btn-primary">{missingCropLabel || 'Crop from PDF'}</button> : null}
+            <button type="button" onClick={() => inputRef.current?.click()} className="tsm-btn-secondary">Upload image instead</button>
+          </div>
+        </div>
+      ) : onOpenCropper ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md border border-blue-100 bg-blue-50/50 p-3">
+          <button type="button" onClick={onOpenCropper} className="tsm-btn-primary">{cropperLabel || 'Add from PDF cropper'}</button>
+          <button type="button" onClick={() => inputRef.current?.click()} className="tsm-btn-secondary">Upload image instead</button>
+        </div>
+      ) : null}
       <label htmlFor={`${name}-input`} onDragEnter={() => setDropActive(true)} onDragOver={(event) => { event.preventDefault(); setDropActive(true) }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropActive(false) }} onDrop={handleDrop} className={`relative block cursor-pointer overflow-hidden rounded-lg border-2 border-dashed p-5 text-center font-body text-sm text-[#43474d] transition focus-within:ring-2 focus-within:ring-blue-300 ${dropActive ? 'border-blue-500 bg-blue-100 shadow-inner' : 'border-blue-200 bg-blue-50/50 hover:border-blue-400 hover:bg-blue-50'}`}>
         <span className="block font-semibold text-[#00152a]">{title}</span>
         <span className="mt-2 block text-base font-semibold text-blue-800">Drag images here or click to upload</span>
@@ -506,6 +525,42 @@ export function orderedPreviewItems(assets: QuestionAsset[], files: LocalPreview
   return items
 }
 
+
+function cropPreviewFromFile(file: File): LocalPreview {
+  return { id: crypto.randomUUID(), file, name: file.name, url: URL.createObjectURL(file) }
+}
+
+function EditPdfCropperWorkbench({ target, questionPdf, markschemePdf, setQuestionPdf, setMarkschemePdf, onAddQuestionCrop, onAddMarkschemeCrop, onDone }: { target: Exclude<CropperTarget, null>; questionPdf: PdfFileState; markschemePdf: PdfFileState; setQuestionPdf: (value: PdfFileState) => void; setMarkschemePdf: (value: PdfFileState) => void; onAddQuestionCrop: (file: File) => void; onAddMarkschemeCrop: (file: File) => void; onDone: () => void }) {
+  const targetLabel = target === 'question' ? 'Adding question image' : 'Adding mark scheme image'
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 p-3 sm:p-5" role="dialog" aria-modal="true" aria-label="Edit question PDF cropper">
+      <div className="mx-auto max-w-7xl rounded-lg bg-white p-4 shadow-xl sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="font-label text-xs uppercase tracking-[.16em] text-[#735b2b]">Edit image repair</p>
+            <h2 className="font-headline text-3xl text-[#00152a]">{targetLabel}</h2>
+            <p className="mt-1 max-w-3xl font-body text-sm text-[#43474d]">Select local source PDFs for this edit session only. Crops are added to the form as new image assets; the full PDFs are not uploaded.</p>
+          </div>
+          <button type="button" onClick={onDone} className="tsm-btn-secondary">Done editing images</button>
+        </div>
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <PdfFileInput id="edit-question-paper-pdf" label="Question paper PDF" selectedHelper="Question paper PDF selected" value={questionPdf} onChange={setQuestionPdf} />
+          <PdfFileInput id="edit-markscheme-pdf" label="Mark scheme PDF" selectedHelper="Mark scheme PDF selected" value={markschemePdf} onChange={setMarkschemePdf} />
+        </div>
+        <div className="mt-5 space-y-5">
+          {(target === 'question' || questionPdf) ? (
+            <PdfCropPanel title="Question paper cropper" helper="Crop question prompt, table, graph, or continuation images from the question paper PDF." fileState={questionPdf} pdfType="paper" cropLabel="Question crop" addLabel="Add question crop to this question" onAddCrop={onAddQuestionCrop} nextFileName={() => `question-crop-${Date.now()}.png`} resetToken={0} />
+          ) : null}
+          {(target === 'markscheme' || markschemePdf) ? (
+            <PdfCropPanel title="Mark scheme cropper" helper="Crop mark scheme answer or rubric images from the mark scheme PDF." fileState={markschemePdf} pdfType="markscheme" cropLabel="Mark scheme crop" addLabel="Add mark scheme crop to this question" onAddCrop={onAddMarkschemeCrop} nextFileName={() => `mark-scheme-crop-${Date.now()}.png`} resetToken={0} />
+          ) : null}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function QuestionBankForm({
   mode,
   papers,
@@ -557,6 +612,9 @@ export function QuestionBankForm({
   const [lightbox, setLightbox] = useState<LightboxState>(null)
   const [openSelectId, setOpenSelectId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [cropperTarget, setCropperTarget] = useState<CropperTarget>(null)
+  const [questionPdf, setQuestionPdf] = useState<PdfFileState>(null)
+  const [markschemePdf, setMarkschemePdf] = useState<PdfFileState>(null)
   const questionFilesRef = useRef(questionFiles)
   const markschemeFilesRef = useRef(markschemeFiles)
 
@@ -572,6 +630,14 @@ export function QuestionBankForm({
     questionFilesRef.current.forEach((file) => URL.revokeObjectURL(file.url))
     markschemeFilesRef.current.forEach((file) => URL.revokeObjectURL(file.url))
   }, [])
+
+  useEffect(() => () => {
+    if (questionPdf?.url) URL.revokeObjectURL(questionPdf.url)
+  }, [questionPdf])
+
+  useEffect(() => () => {
+    if (markschemePdf?.url) URL.revokeObjectURL(markschemePdf.url)
+  }, [markschemePdf])
 
   useEffect(() => {
     if (selectedSubtopicIds.length === 1) setPrimaryTopicId(selectedSubtopicIds[0])
@@ -617,19 +683,36 @@ export function QuestionBankForm({
   const markschemeLightboxItems = orderedPreviewItems(existingMarkschemeAssets, markschemeFiles, markschemeOrder, 'Mark scheme image', markschemePreviewUrl, 'Mark scheme image 1')
   const hasExistingQuestionImage = Boolean(questionPreviewUrl || existingQuestionAssets.length)
   const hasQuestionImage = hasExistingQuestionImage || questionFiles.length > 0
+  const hasExistingMarkschemeImage = Boolean(markschemePreviewUrl || existingMarkschemeAssets.length)
+  const hasMarkschemeImage = hasExistingMarkschemeImage || markschemeFiles.length > 0
+  const isEditMode = mode === 'edit'
   const step1Complete = paperMode === 'existing' ? Boolean(subjectId && paperId) : Boolean(subjectId && newPaperTitle && newPaperYear && newPaperSession)
   const step2Complete = Boolean(questionNumber.trim())
   const step3Complete = hasQuestionImage
   const step4Complete = Boolean(topicGroupId && (selectedSubtopicIds.length || !subtopics.length))
-  const readyToSubmit = step1Complete && step2Complete && step3Complete && step4Complete
+  const readyToSubmit = isEditMode ? step1Complete && step2Complete : step1Complete && step2Complete && step3Complete && step4Complete
   const effectivePrimaryTopicId = selectedSubtopicIds.includes(primaryTopicId) ? primaryTopicId : selectedSubtopicIds[0] || topicGroupId
   const suggestedOrder = suggestedQuestionOrder(paperMode, paperId, paperQuestions)
   const orderReference = paperQuestionReference(paperMode, paperId, paperQuestions)
 
   const step1State: StepState = step1Complete ? 'complete' : 'current'
-  const step2State: StepState = !step1Complete ? 'locked' : step2Complete ? 'complete' : 'current'
-  const step3State: StepState = !step1Complete || !step2Complete ? 'locked' : step3Complete ? 'complete' : 'missing'
-  const step4State: StepState = !step1Complete || !step2Complete || !step3Complete ? 'locked' : step4Complete ? 'complete' : 'current'
+  const step2State: StepState = isEditMode ? (step2Complete ? 'complete' : 'missing') : !step1Complete ? 'locked' : step2Complete ? 'complete' : 'current'
+  const step3State: StepState = isEditMode ? (step3Complete ? 'complete' : 'missing') : !step1Complete || !step2Complete ? 'locked' : step3Complete ? 'complete' : 'missing'
+  const step4State: StepState = isEditMode ? (step4Complete ? 'complete' : 'missing') : !step1Complete || !step2Complete || !step3Complete ? 'locked' : step4Complete ? 'complete' : 'current'
+
+  function addQuestionCrop(file: File) {
+    const preview = cropPreviewFromFile(file)
+    setQuestionFiles((current) => [...current, preview])
+    setQuestionOrder((current) => [...current, `new:${preview.id}`])
+    toast.success('Question crop added')
+  }
+
+  function addMarkschemeCrop(file: File) {
+    const preview = cropPreviewFromFile(file)
+    setMarkschemeFiles((current) => [...current, preview])
+    setMarkschemeOrder((current) => [...current, `new:${preview.id}`])
+    toast.success('Mark scheme crop added')
+  }
 
   function openQuestionLightbox(index: number) {
     if (questionLightboxItems[index]?.url) setLightbox({ group: 'question', index })
@@ -716,11 +799,12 @@ export function QuestionBankForm({
         </div>
       </StepCard>
 
-      <StepCard step={3} title="Images" state={step3State} helper="Upload one or more question crops, plus any matching mark scheme images.">
-        {!hasQuestionImage ? <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 font-body text-sm text-amber-800">At least one question image is required before topics and publishing unlock.</p> : null}
+      <StepCard step={3} title="Images" state={step3State} helper={isEditMode ? 'Repair missing or incomplete images from local PDFs first, or upload image files as a fallback.' : 'Upload one or more question crops, plus any matching mark scheme images.'}>
+        {isEditMode && (!hasQuestionImage || !hasMarkschemeImage) ? <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 font-body text-sm text-amber-800">This question is incomplete. You can still edit every section and repair images in any order.</p> : null}
+        {!isEditMode && !hasQuestionImage ? <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 font-body text-sm text-amber-800">At least one question image is required before topics and publishing unlock.</p> : null}
         <div className="grid gap-5 md:grid-cols-2">
-          <ImageUploadGroup title="Question image" name="question_image_file" fileKeyName="question_file_key" assetOrderName="question_asset_order" existingAssets={existingQuestionAssets} fallbackUrl={existingQuestionAssets.length ? null : questionPreviewUrl} fallbackTitle="Question image 1" files={questionFiles} setFiles={setQuestionFiles} order={questionOrder} setOrder={setQuestionOrder} onPreview={openQuestionLightbox} />
-          <ImageUploadGroup title="Mark scheme image" name="markscheme_image_file" fileKeyName="markscheme_file_key" assetOrderName="markscheme_asset_order" existingAssets={existingMarkschemeAssets} fallbackUrl={existingMarkschemeAssets.length ? null : markschemePreviewUrl} fallbackTitle="Mark scheme image 1" files={markschemeFiles} setFiles={setMarkschemeFiles} order={markschemeOrder} setOrder={setMarkschemeOrder} onPreview={openMarkschemeLightbox} />
+          <ImageUploadGroup title="Question image" name="question_image_file" fileKeyName="question_file_key" assetOrderName="question_asset_order" existingAssets={existingQuestionAssets} fallbackUrl={existingQuestionAssets.length ? null : questionPreviewUrl} fallbackTitle="Question image 1" files={questionFiles} setFiles={setQuestionFiles} order={questionOrder} setOrder={setQuestionOrder} onPreview={openQuestionLightbox} onOpenCropper={isEditMode ? () => setCropperTarget('question') : undefined} cropperLabel="Add from PDF cropper" missingTitle="Question image missing" missingCropLabel="Crop from question paper PDF" />
+          <ImageUploadGroup title="Mark scheme image" name="markscheme_image_file" fileKeyName="markscheme_file_key" assetOrderName="markscheme_asset_order" existingAssets={existingMarkschemeAssets} fallbackUrl={existingMarkschemeAssets.length ? null : markschemePreviewUrl} fallbackTitle="Mark scheme image 1" files={markschemeFiles} setFiles={setMarkschemeFiles} order={markschemeOrder} setOrder={setMarkschemeOrder} onPreview={openMarkschemeLightbox} onOpenCropper={isEditMode ? () => setCropperTarget('markscheme') : undefined} cropperLabel="Add from PDF cropper" missingTitle="Mark scheme image missing" missingCropLabel="Crop from mark scheme PDF" />
         </div>
         <details className="mt-5 rounded-sm bg-[#f5f3ee] p-4">
           <summary className="cursor-pointer font-body font-semibold text-[#735b2b]">Advanced image and text options</summary>
@@ -768,13 +852,14 @@ export function QuestionBankForm({
 
       <div className="sticky bottom-4 z-10 rounded-md border border-[#c3c6ce66] bg-white/95 p-4 shadow-sm backdrop-blur">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className={`font-body text-sm font-semibold ${readyToSubmit ? 'text-emerald-700' : 'text-amber-800'}`}>{readyToSubmit ? 'Ready to save: all required steps are complete.' : 'Not ready yet: complete the highlighted required steps.'}</p>
+          <p className={`font-body text-sm font-semibold ${readyToSubmit ? 'text-emerald-700' : 'text-amber-800'}`}>{readyToSubmit ? (isEditMode ? 'Ready to save repair changes.' : 'Ready to save: all required steps are complete.') : (isEditMode ? 'Add the required paper and question number before saving. Other repair sections stay editable.' : 'Not ready yet: complete the highlighted required steps.')}</p>
           <div className="flex flex-wrap gap-3">
             <SubmitButton readyToSubmit={readyToSubmit} saving={saving} label={mode === 'new' ? 'Create question' : 'Save question'} />
             <Link href="/dashboard/admin/question-bank" className="tsm-btn-secondary">Cancel</Link>
           </div>
         </div>
       </div>
+      {cropperTarget ? <EditPdfCropperWorkbench target={cropperTarget} questionPdf={questionPdf} markschemePdf={markschemePdf} setQuestionPdf={setQuestionPdf} setMarkschemePdf={setMarkschemePdf} onAddQuestionCrop={addQuestionCrop} onAddMarkschemeCrop={addMarkschemeCrop} onDone={() => setCropperTarget(null)} /> : null}
       <Lightbox state={lightbox} questionItems={questionLightboxItems} markschemeItems={markschemeLightboxItems} onClose={() => setLightbox(null)} onMove={(index) => setLightbox((current) => current ? { ...current, index } : current)} />
     </form>
   )
