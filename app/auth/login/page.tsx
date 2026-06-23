@@ -6,8 +6,15 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { AuthShell } from '@/components/auth-shell'
+import { safeInternalReturnPath } from '@/lib/auth-redirect'
 
 const SIGNUP_DRAFT_KEY = 'myp_signup_profile'
+const DEFAULT_NEXT_PATH = '/dashboard'
+
+function readNextPath() {
+  if (typeof window === 'undefined') return DEFAULT_NEXT_PATH
+  return safeInternalReturnPath(new URLSearchParams(window.location.search).get('next'), DEFAULT_NEXT_PATH)
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -15,17 +22,11 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [nextPath, setNextPath] = useState('/dashboard')
+  const [nextPath] = useState(readNextPath)
   const router = useRouter()
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY)
-      const rawNext = new URLSearchParams(window.location.search).get('next')
-      if (rawNext?.startsWith('/') && !rawNext.startsWith('//')) {
-        setNextPath(rawNext)
-      }
-    }
+    window.sessionStorage.removeItem(SIGNUP_DRAFT_KEY)
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -74,7 +75,7 @@ export default function LoginPage() {
         {error && <p className="text-sm text-red-700">{error}</p>}
         <button type="submit" className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-sm bg-[#00152a] py-4 text-white transition-colors hover:bg-[#08284a] focus:outline-none focus:ring-2 focus:ring-[#00152a]/30 disabled:cursor-not-allowed disabled:opacity-70" disabled={loading || !email || !password}>{loading ? <><Loader2 className="size-4 animate-spin" /> Logging in...</> : 'Log in'}</button>
       </form>
-      <p className="mt-8 border-t border-[#c3c6ce55] pt-6 text-center font-body text-[#43474d]">Don&apos;t have an account?<Link href={`/auth/sign-up${nextPath !== '/dashboard' ? `?next=${encodeURIComponent(nextPath)}` : ''}`} className="ml-1 font-semibold text-[#00152a]">Sign Up</Link></p>
+      <p className="mt-8 border-t border-[#c3c6ce55] pt-6 text-center font-body text-[#43474d]">Don&apos;t have an account?<Link href={`/auth/sign-up${nextPath !== DEFAULT_NEXT_PATH ? `?next=${encodeURIComponent(nextPath)}` : ''}`} className="ml-1 font-semibold text-[#00152a]">Sign Up</Link></p>
     </AuthShell>
   )
 }

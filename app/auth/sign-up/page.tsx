@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthShell } from '@/components/auth-shell'
 import { isValidEmail } from '@/lib/auth-email'
 import { Spinner } from '@/components/ui/spinner'
+import { safeInternalReturnPath } from '@/lib/auth-redirect'
 
 type AvailabilityResponse = {
   status?: 'idle' | 'checking' | 'available' | 'invalid' | 'unavailable' | 'error'
@@ -40,6 +41,7 @@ const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,24}$/
 const VALIDATION_DEBOUNCE_MS = 600
 const AVAILABILITY_CACHE_SUCCESS_TTL_MS = 20 * 1000
 const AVAILABILITY_CACHE_ERROR_TTL_MS = 8 * 1000
+const DEFAULT_NEXT_PATH = '/onboarding'
 
 type CachedAvailabilityResult = {
   status: 'available' | 'invalid' | 'unavailable' | 'error'
@@ -93,7 +95,7 @@ export default function SignUpPage() {
     fullName: '',
     email: '',
   })
-  const [nextPath, setNextPath] = useState('/onboarding')
+  const [nextPath, setNextPath] = useState(DEFAULT_NEXT_PATH)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitAttempted, setSubmitAttempted] = useState(false)
@@ -107,7 +109,7 @@ export default function SignUpPage() {
   const usernameRef = useRef<HTMLInputElement>(null)
   const fullNameRef = useRef<HTMLInputElement>(null)
   const emailRef = useRef<HTMLInputElement>(null)
-  const nextPathRef = useRef('/onboarding')
+  const nextPathRef = useRef(DEFAULT_NEXT_PATH)
 
   const normalizedUsername = observedValues.username
   const normalizedEmail = observedValues.email
@@ -158,11 +160,9 @@ export default function SignUpPage() {
     }
 
     const params = new URLSearchParams(window.location.search)
-    const rawNext = params.get('next')
-    if (rawNext?.startsWith('/') && !rawNext.startsWith('//')) {
-      nextPathRef.current = rawNext
-      setNextPath(rawNext)
-    }
+    const safeNext = safeInternalReturnPath(params.get('next'), DEFAULT_NEXT_PATH)
+    nextPathRef.current = safeNext
+    setNextPath(safeNext)
 
     const shouldRestoreDraft = params.get('restoreDraft') === '1'
     const hasExplicitQueryValues = params.has('username') || params.has('fullName') || params.has('email')

@@ -1,11 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
+import { safeInternalReturnPath } from '@/lib/auth-redirect'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl
   const code = searchParams.get('code')
-  const rawNext = searchParams.get('next') ?? '/'
-  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/'
+  const next = safeInternalReturnPath(searchParams.get('next'), '/')
 
   if (code) {
     const supabase = await createClient()

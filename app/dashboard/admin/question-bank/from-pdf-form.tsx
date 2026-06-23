@@ -264,23 +264,15 @@ function PdfPageCanvas({ pdf, pageNumber, zoom, canUsePdf, crop, canAddCrop, add
   )
 }
 
-function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, onAddCrop, nextFileName, resetToken }: PdfCropPanelProps) {
+function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, onAddCrop, nextFileName }: PdfCropPanelProps) {
   const canvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map())
   const [pdf, setPdf] = useState<PdfDocumentProxy | null>(null)
   const [pageCount, setPageCount] = useState(0)
   const [zoom, setZoom] = useState(1.2)
   const [crop, setCrop] = useState<CropRect>(null)
   const [interaction, setInteraction] = useState<CropInteraction | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(Boolean(fileState?.url))
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setCrop(null)
-      setInteraction(null)
-    }, 0)
-    return () => window.clearTimeout(timer)
-  }, [resetToken])
 
   useEffect(() => {
     if (!crop) return
@@ -295,18 +287,10 @@ function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, addLabel, 
   }, [crop])
 
   useEffect(() => {
-    // Reset PDF viewer state when the local object URL changes.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPdf(null)
-    setPageCount(0)
-    setCrop(null)
-    setError(null)
-    canvasRefs.current.clear()
     const pdfUrl = fileState?.url ?? ''
     if (!pdfUrl) return
 
     let cancelled = false
-    setLoading(true)
     async function loadPdf() {
       try {
         const pdfjs = await import('pdfjs-dist')
@@ -1160,7 +1144,7 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
 
       <div ref={step3Ref}>
         <StepCard step={3} title="Crop question images" state={!step2Complete ? 'locked' : step3Complete ? 'complete' : 'current'} helper="Crop every part needed to answer this question.">
-          <PdfCropPanel title="Paper PDF cropper" helper="Use this for question text, diagrams, tables, graphs, and continuation pages." fileState={paperFile} pdfType="paper" cropLabel="Question crop" addLabel="Add crop to question images" onAddCrop={addQuestionCrop} nextFileName={() => `question-${questionNumber.trim() || 'untitled'}-crop-${questionFiles.length + 1}.png`} resetToken={paperCropResetToken} />
+          <PdfCropPanel key={`paper-${paperFile?.url ?? 'none'}-${paperCropResetToken}`} title="Paper PDF cropper" helper="Use this for question text, diagrams, tables, graphs, and continuation pages." fileState={paperFile} pdfType="paper" cropLabel="Question crop" addLabel="Add crop to question images" onAddCrop={addQuestionCrop} nextFileName={() => `question-${questionNumber.trim() || 'untitled'}-crop-${questionFiles.length + 1}.png`} resetToken={paperCropResetToken} />
           <div className="mt-5">
             <ImageUploadGroup title="Question image" name="question_image_file" fileKeyName="question_file_key" assetOrderName="question_asset_order" existingAssets={[]} files={questionFiles} setFiles={updateQuestionFiles} order={questionOrder} setOrder={setQuestionOrder} onPreview={(index) => setLightbox({ group: 'question', index })} />
           </div>
@@ -1168,7 +1152,7 @@ export function QuestionFromPdfForm({ papers, subjects, topics, paperQuestions =
       </div>
 
       <StepCard step={4} title="Crop mark scheme images" state={!step3Complete ? 'locked' : step4Complete ? 'complete' : 'current'} helper="Crop the matching mark scheme parts for this one question.">
-        <PdfCropPanel title="Mark scheme PDF cropper" helper="Use this for mark allocations, method notes, and answer continuations." fileState={markschemeFile} pdfType="markscheme" cropLabel="Mark scheme crop" addLabel="Add crop to mark scheme images" onAddCrop={addMarkschemeCrop} nextFileName={() => `markscheme-${questionNumber.trim() || 'untitled'}-crop-${markschemeFiles.length + 1}.png`} resetToken={markschemeCropResetToken} />
+        <PdfCropPanel key={`markscheme-${markschemeFile?.url ?? 'none'}-${markschemeCropResetToken}`} title="Mark scheme PDF cropper" helper="Use this for mark allocations, method notes, and answer continuations." fileState={markschemeFile} pdfType="markscheme" cropLabel="Mark scheme crop" addLabel="Add crop to mark scheme images" onAddCrop={addMarkschemeCrop} nextFileName={() => `markscheme-${questionNumber.trim() || 'untitled'}-crop-${markschemeFiles.length + 1}.png`} resetToken={markschemeCropResetToken} />
         <div className="mt-5">
           <ImageUploadGroup title="Mark scheme image" name="markscheme_image_file" fileKeyName="markscheme_file_key" assetOrderName="markscheme_asset_order" existingAssets={[]} files={markschemeFiles} setFiles={setMarkschemeFiles} order={markschemeOrder} setOrder={setMarkschemeOrder} onPreview={(index) => setLightbox({ group: 'markscheme', index })} />
         </div>

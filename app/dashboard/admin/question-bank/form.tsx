@@ -204,12 +204,17 @@ export function SearchableSelect({ id, name, label, value, options, placeholder,
   const selected = options.find((option) => option.value === value)
   const filtered = options.filter((option) => `${option.label} ${option.helper ?? ''}`.toLowerCase().includes(query.toLowerCase()))
 
+  const safeActiveIndex = Math.min(activeIndex, Math.max(0, filtered.length - 1))
+
+  if (activeIndex !== safeActiveIndex) {
+    setActiveIndex(safeActiveIndex)
+  }
+
   useEffect(() => {
     if (!open) return
-    setActiveIndex(0)
     const focusTimer = window.setTimeout(() => searchRef.current?.focus(), 0)
     return () => window.clearTimeout(focusTimer)
-  }, [open, query])
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -239,13 +244,14 @@ export function SearchableSelect({ id, name, label, value, options, placeholder,
       event.preventDefault()
       setOpenSelectId(id)
       setActiveIndex((current) => {
-        const next = event.key === 'ArrowDown' ? current + 1 : current - 1
+        const base = open ? current : -1
+        const next = event.key === 'ArrowDown' ? base + 1 : base - 1
         return Math.max(0, Math.min(filtered.length - 1, next))
       })
     }
-    if (event.key === 'Enter' && open && filtered[activeIndex]) {
+    if (event.key === 'Enter' && open && filtered[safeActiveIndex]) {
       event.preventDefault()
-      choose(filtered[activeIndex].value)
+      choose(filtered[safeActiveIndex].value)
     }
     if (event.key === 'Escape') setOpenSelectId(null)
   }
@@ -261,10 +267,10 @@ export function SearchableSelect({ id, name, label, value, options, placeholder,
       {required && !value ? <span className="sr-only">Required</span> : null}
       {open ? (
         <div className="absolute z-30 mt-2 w-full rounded-md border border-[#c3c6ce66] bg-white p-2 shadow-lg">
-          <input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search..." className="tsm-input mb-2 w-full" />
+          <input ref={searchRef} value={query} onChange={(event) => { setQuery(event.target.value); setActiveIndex(0) }} placeholder="Search..." className="tsm-input mb-2 w-full" />
           <div role="listbox" aria-labelledby={`${id}-label`} className="max-h-64 overflow-y-auto">
             {filtered.map((option, index) => (
-              <button key={option.value} type="button" role="option" aria-selected={option.value === value} onMouseDown={(event) => event.preventDefault()} onClick={() => choose(option.value)} className={`block w-full rounded-sm px-3 py-2 text-left transition ${option.value === value ? 'bg-blue-600 text-white' : index === activeIndex ? 'bg-blue-50 text-[#00152a]' : 'text-[#00152a] hover:bg-blue-50'}`}>
+              <button key={option.value} type="button" role="option" aria-selected={option.value === value} onMouseDown={(event) => event.preventDefault()} onClick={() => choose(option.value)} className={`block w-full rounded-sm px-3 py-2 text-left transition ${option.value === value ? 'bg-blue-600 text-white' : index === safeActiveIndex ? 'bg-blue-50 text-[#00152a]' : 'text-[#00152a] hover:bg-blue-50'}`}>
                 <span className="block font-semibold">{option.label}</span>
                 {option.helper ? <span className={`block text-xs ${option.value === value ? 'text-blue-50' : 'text-[#6f737b]'}`}>{option.helper}</span> : null}
               </button>

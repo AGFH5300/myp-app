@@ -97,12 +97,12 @@ export default function OnboardingPage() {
 
           <div className="mt-8 grid md:grid-cols-2 gap-6">
             <SearchableSelect id="onboarding-myp-year" label="MYP year" value={mypYear} onChange={setMypYear} placeholder="Choose MYP year" clearLabel="Clear year" emptyText="No matching years found." options={[{ value: '3', label: 'MYP 3' }, { value: '4', label: 'MYP 4' }, { value: '5', label: 'MYP 5' }, { value: 'other', label: 'Other' }]} openSelectId={openSelectId} setOpenSelectId={setOpenSelectId} />
-            <div><label className="font-label text-xs uppercase tracking-widest text-[#43474d]">School</label><input className="tsm-input" value={school} onChange={(e) => setSchool(e.target.value)} placeholder="Your school" required /></div>
+            <div><label htmlFor="onboarding-school" className="font-label text-xs uppercase tracking-widest text-[#43474d]">School</label><input id="onboarding-school" className="tsm-input" value={school} onChange={(e) => setSchool(e.target.value)} placeholder="Your school" required /></div>
           </div>
 
           <div className="mt-8">
-            <label className="font-label text-xs uppercase tracking-widest text-[#43474d]">Subjects to focus on</label>
-            <div className="grid sm:grid-cols-2 gap-3 mt-3">
+            <p id="onboarding-subjects-label" className="font-label text-xs uppercase tracking-widest text-[#43474d]">Subjects to focus on</p>
+            <div className="grid sm:grid-cols-2 gap-3 mt-3" aria-labelledby="onboarding-subjects-label">
               {subjects.map((subject) => {
                 const active = chosenSubjects.includes(subject.id)
                 return (
