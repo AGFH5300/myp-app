@@ -6,41 +6,23 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  audit:
+  audit-and-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Regenerate lockfile with pnpm 9
-        run: npx --yes pnpm@9.15.0 install --lockfile-only --no-frozen-lockfile
-      - name: Commit generated lockfile for this remediation branch
-        if: github.event_name == 'pull_request' && github.head_ref == 'fix/dependabot-2026-06'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add pnpm-lock.yaml
-          git diff --cached --quiet || git commit -m "fix(deps): update pnpm lockfile for security pins"
-          git push origin "HEAD:${GITHUB_HEAD_REF}"
-      - name: Install locked dependencies with the project package manager
-        run: |
-          corepack enable
-          pnpm install --frozen-lockfile
-      - name: Create production dependency audit
-        run: pnpm audit --prod --json > audit-production.json || true
-      - name: Create full dependency audit
-        run: pnpm audit --json > audit-full.json || true
-      - name: Upload audit results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dependency-audit
-          path: audit-*.json
-          if-no-files-found: error
-          retention-days: 7
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Audit production dependencies
+        run: pnpm audit --prod
+      - name: Audit all dependencies
+        run: pnpm audit
+      - name: Build application
+        run: pnpm build
