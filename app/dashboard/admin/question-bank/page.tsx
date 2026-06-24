@@ -21,23 +21,51 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
   if (profile?.role !== 'admin') redirect('/dashboard')
 
-  const [{ data: questions }, { data: subjects }, { data: papers }, { data: topics }] = await Promise.all([
-    supabase
-      .from('questions')
-      .select('id,paper_id,question_number,question_order,marks,is_published,is_reviewed,question_image_path,markscheme_image_path,image_url,markscheme_image_url,papers(id,title,year,subject_id,is_published,subjects(id,name),exam_sessions(session_month)),question_topics(is_primary,topics(id,name,parent_topic_id,subject_id,is_active)),question_assets(asset_type,storage_path,public_url)')
-      .order('created_at', { ascending: false })
-      .limit(200),
-    supabase.from('subjects').select('id,name').order('name'),
-    supabase.from('papers').select('id,title,year,subject_id,subjects(id,name),exam_sessions(session_month)').order('year', { ascending: false }).order('title'),
-    supabase.from('topics').select('id,name,parent_topic_id,subject_id,is_active,sort_order').eq('is_active', true).not('subject_id', 'is', null).order('sort_order').order('name'),
-  ])
-
   const search = stringParam(params, 'q').toLowerCase()
   const subjectFilter = stringParam(params, 'subject')
   const paperFilter = stringParam(params, 'paper')
   const topicFilter = stringParam(params, 'topic')
   const statusFilter = stringParam(params, 'status')
-  const warningFilter = stringParam(params, 'warning') as WarningFilter | ''
+  const warningFilter = stringParam(params, 'warning') as WarningFilter | 'all' | ''
+  const questionSelect = 'id,paper_id,question_number,question_order,marks,is_published,is_reviewed,question_image_path,markscheme_image_path,image_url,markscheme_image_url,papers(id,title,year,subject_id,is_published,subjects(id,name),exam_sessions(session_month)),question_topics(is_primary,topics(id,name,parent_topic_id,subject_id,is_active)),question_assets(asset_type,storage_path,public_url)'
+
+  const [{ data: subjects }, { data: papers }, { data: topics }] = await Promise.all([
+    supabase.from('subjects').select('id,name').order('name'),
+    supabase.from('papers').select('id,title,year,subject_id,subjects(id,name),exam_sessions(session_month)').order('year', { ascending: false }).order('title'),
+    supabase.from('topics').select('id,name,parent_topic_id,subject_id,is_active,sort_order').eq('is_active', true).not('subject_id', 'is', null).order('sort_order').order('name'),
+  ])
+
+  const filteredPaperIds = (papers ?? [])
+    .filter((paper) => (!paperFilter || paper.id === paperFilter) && (!subjectFilter || paper.subject_id === subjectFilter))
+    .map((paper) => paper.id)
+  const searchMatchingPaperIds = search
+    ? (papers ?? [])
+      .filter((paper) => filteredPaperIds.includes(paper.id))
+      .filter((paper) => {
+        const session = relationValue<string>(paper.exam_sessions, 'session_month')
+        const subjectName = relationValue<string>(paper.subjects, 'name')
+        const haystack = [paper.title, paper.year, session, subjectName].filter(Boolean).join(' ').toLowerCase()
+        return haystack.includes(search)
+      })
+      .map((paper) => paper.id)
+    : []
+  const questionPaperIds = searchMatchingPaperIds.length ? searchMatchingPaperIds : filteredPaperIds
+
+  let questionQuery = supabase
+    .from('questions')
+    .select(questionSelect)
+    .order('created_at', { ascending: false })
+
+  if (paperFilter || subjectFilter || searchMatchingPaperIds.length) {
+    if (questionPaperIds.length) {
+      questionQuery = questionQuery.in('paper_id', questionPaperIds)
+    } else {
+      questionQuery = questionQuery.eq('paper_id', '__no_matching_paper__')
+    }
+  }
+  if (search && !searchMatchingPaperIds.length) questionQuery = questionQuery.ilike('question_number', `%${search}%`)
+
+  const { data: questions } = await questionQuery.limit(200)
   const topicsById = new Map<string, TopicRef>((topics ?? []).map((topic) => [topic.id, topic]))
   const orderCounts = new Map<string, number>()
 
@@ -75,20 +103,18 @@ export default async function AdminQuestionBankPage({ searchParams }: { searchPa
 
   const filteredQuestions = rows.filter((question) => {
     const rawQuestion = (questions ?? []).find((item) => item.id === question.id)
-    const paper = Array.isArray(rawQuestion?.papers) ? rawQuestion?.papers[0] : rawQuestion?.papers
     const questionTopics = rawQuestion?.question_topics ?? []
     const haystack = [question.paperTitle, question.paperMeta, question.subjectName, question.questionNumber, question.topicSummary]
       .filter(Boolean)
       .join(' ')
       .toLowerCase()
     if (search && !haystack.includes(search)) return false
-    if (subjectFilter && paper?.subject_id !== subjectFilter) return false
-    if (paperFilter && paper?.id !== paperFilter) return false
     if (topicFilter && !questionTopics.some((row) => relationValue<string>(row.topics, 'id') === topicFilter || relationValue<string>(row.topics, 'parent_topic_id') === topicFilter)) return false
     if (statusFilter === 'draft' && question.isPublished) return false
     if (statusFilter === 'published' && !question.isPublished) return false
     if (statusFilter === 'needs-review' && !question.needsReview) return false
-    if (warningFilter && !question.warnings.some((warning) => warningKey(warning) === warningFilter)) return false
+    if (warningFilter === 'all' && !question.warnings.some((warning) => ['missing-markscheme', 'missing-topic', 'missing-subtopic', 'missing-question-image'].includes(warningKey(warning) ?? ''))) return false
+    if (warningFilter && warningFilter !== 'all' && !question.warnings.some((warning) => warningKey(warning) === warningFilter)) return false
     return true
   })
 

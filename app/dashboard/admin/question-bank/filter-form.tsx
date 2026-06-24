@@ -19,7 +19,7 @@ const statusFilters = [
 ]
 
 const warningFilters = [
-  { value: '', label: 'All warnings' },
+  { value: 'all', label: 'All warnings' },
   { value: 'missing-markscheme', label: 'Missing mark scheme' },
   { value: 'missing-topic', label: 'Missing topic' },
   { value: 'missing-subtopic', label: 'Missing subtopic' },
