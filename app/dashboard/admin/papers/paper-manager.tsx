@@ -1,10 +1,10 @@
 'use client'
 
-import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { SearchableSelect, type SearchableSelectOption } from '@/components/searchable-select'
+import { ConfirmDialog, PendingActionLink, PendingLabel } from '@/components/operation-feedback'
 import { updatePaperDetails, updatePaperPublication } from './actions'
 
 export type AdminPaperRow = {
@@ -139,6 +139,8 @@ export function PaperManager({ papers, subjects }: { papers: AdminPaperRow[]; su
   const [warning, setWarning] = useState<WarningFilter>('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [confirming, setConfirming] = useState<{ paper: AdminPaperRow; publish: boolean } | null>(null)
+  const [operationError, setOperationError] = useState<string | null>(null)
+  const [openingAction, setOpeningAction] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -159,10 +161,12 @@ export function PaperManager({ papers, subjects }: { papers: AdminPaperRow[]; su
 
   function runPublication(paper: AdminPaperRow, publish: boolean, confirmed = false) {
     if (!confirmed && publish && paper.needsReviewQuestions > 0) {
+      setOperationError(null)
       setConfirming({ paper, publish })
       return
     }
     if (!confirmed && !publish) {
+      setOperationError(null)
       setConfirming({ paper, publish })
       return
     }
@@ -173,6 +177,7 @@ export function PaperManager({ papers, subjects }: { papers: AdminPaperRow[]; su
         router.refresh()
         setConfirming(null)
       } else {
+        setOperationError(result.message)
         toast.error(result.message)
       }
     })
@@ -199,16 +204,17 @@ export function PaperManager({ papers, subjects }: { papers: AdminPaperRow[]; su
         <div className="mt-4 flex flex-wrap items-center gap-3"><button type="button" onClick={() => { setQuery(''); setSubject(''); setStatus(''); setWarning('') }} className="tsm-btn-secondary">Clear</button><p className="font-body text-sm text-[#43474d]">{visiblePapers.length} shown</p></div>
       </div>
 
-      {confirming ? (
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-4 font-body text-sm text-amber-900">
-          <p className="font-semibold">{confirming.publish ? 'This paper has questions that need review. Publish paper anyway?' : 'Students will no longer see this paper.'}</p>
-          <p className="mt-1">Students only see published paper + published questions.</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" onClick={() => runPublication(confirming.paper, confirming.publish, true)} disabled={isPending} className="rounded-md bg-amber-700 px-3 py-2 font-semibold text-white hover:bg-amber-800 disabled:opacity-60">{isPending ? 'Saving…' : confirming.publish ? 'Publish anyway' : 'Unpublish paper'}</button>
-            <button type="button" onClick={() => setConfirming(null)} disabled={isPending} className="rounded-md border border-amber-300 bg-white px-3 py-2 font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-60">Cancel</button>
-          </div>
-        </div>
-      ) : null}
+      <ConfirmDialog
+        open={Boolean(confirming)}
+        title={confirming?.publish ? 'Publish paper with review issues?' : 'Unpublish paper?'}
+        body={confirming?.publish ? 'This paper still has questions that need review. Students will only see published questions, but you should resolve the flagged items before sharing the paper.' : 'Students will no longer be able to access this paper. Published questions inside it will remain saved but hidden until the paper is published again.'}
+        confirmLabel={confirming?.publish ? 'Publish paper' : 'Unpublish paper'}
+        pendingLabel={confirming?.publish ? 'Publishing…' : 'Unpublishing…'}
+        pending={isPending}
+        error={operationError}
+        onClose={() => { setConfirming(null); setOperationError(null) }}
+        onConfirm={() => { if (confirming) runPublication(confirming.paper, confirming.publish, true) }}
+      />
 
       <div className="space-y-4">
         {visiblePapers.map((paper) => (
@@ -221,11 +227,11 @@ export function PaperManager({ papers, subjects }: { papers: AdminPaperRow[]; su
                 <p className="mt-2 font-body text-xs font-semibold text-blue-900">Students only see published paper + published questions.</p>
               </div>
               <div className="grid gap-2 sm:grid-cols-2 xl:min-w-[28rem]">
-                <Link href={`/dashboard/admin/question-bank/from-pdf?paperId=${paper.id}`} className="tsm-btn-primary justify-center text-center">Continue adding</Link>
-                <Link href={`/dashboard/admin/question-bank?paper=${paper.id}`} className="tsm-btn-secondary justify-center text-center">Review questions</Link>
-                <Link href={`/dashboard/admin/papers/${paper.id}/preview`} className="tsm-btn-secondary justify-center text-center">Preview as student</Link>
-                <button type="button" onClick={() => setEditingId(editingId === paper.id ? null : paper.id)} className="tsm-btn-secondary justify-center">Edit paper details</button>
-                {paper.isPublished ? <button type="button" onClick={() => runPublication(paper, false)} className="tsm-btn-secondary justify-center">Unpublish paper</button> : <button type="button" onClick={() => runPublication(paper, true)} className="tsm-btn-primary justify-center">Publish paper</button>}
+                <PendingActionLink href={`/dashboard/admin/question-bank/from-pdf?paperId=${paper.id}`} onStart={() => setOpeningAction(`add-${paper.id}`)} className="tsm-btn-primary justify-center text-center"><PendingLabel pending={openingAction === `add-${paper.id}`} pendingText="Opening…">Continue adding</PendingLabel></PendingActionLink>
+                <PendingActionLink href={`/dashboard/admin/question-bank?paper=${paper.id}`} onStart={() => setOpeningAction(`review-${paper.id}`)} className="tsm-btn-secondary justify-center text-center"><PendingLabel pending={openingAction === `review-${paper.id}`} pendingText="Opening…">Review questions</PendingLabel></PendingActionLink>
+                <PendingActionLink href={`/dashboard/admin/papers/${paper.id}/preview`} onStart={() => setOpeningAction(`preview-${paper.id}`)} className="tsm-btn-secondary justify-center text-center"><PendingLabel pending={openingAction === `preview-${paper.id}`} pendingText="Opening…">Preview as student</PendingLabel></PendingActionLink>
+                <button type="button" onClick={() => setEditingId(editingId === paper.id ? null : paper.id)} className="tsm-btn-secondary justify-center">{editingId === paper.id ? 'Close paper details' : 'Edit paper details'}</button>
+                {paper.isPublished ? <button type="button" onClick={() => runPublication(paper, false)} disabled={isPending} className="tsm-btn-secondary justify-center disabled:cursor-not-allowed disabled:opacity-60">Unpublish paper</button> : <button type="button" onClick={() => runPublication(paper, true)} disabled={isPending} className="tsm-btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-60">Publish paper</button>}
               </div>
             </div>
 
