@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useMemo, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -106,6 +106,18 @@ export function TopicManager({ subjects, topics, questionTopics, initialSubjectI
     setMergeTargetId('')
   }
 
+  function selectGroup(groupId: string) {
+    setSelectedGroupId(groupId)
+    setMergeSourceId('')
+    setMergeTargetId('')
+  }
+
+  function selectGroupWithKeyboard(event: KeyboardEvent<HTMLElement>, groupId: string) {
+    if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return
+    event.preventDefault()
+    selectGroup(groupId)
+  }
+
   return (
     <div className="space-y-8">
       {(notice || error) ? <p className={`rounded-md border px-4 py-3 font-body text-sm ${error ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>{error || notice}</p> : null}
@@ -136,14 +148,21 @@ export function TopicManager({ subjects, topics, questionTopics, initialSubjectI
             {groups.map((group, index) => {
               const childCount = subjectTopics.filter((topic) => topic.parent_topic_id === group.id).length
               return (
-                <article key={group.id} className={`rounded-md border p-4 ${group.id === activeSelectedGroupId ? 'border-[#735b2b] bg-[#fbf9f4]' : 'border-[#c3c6ce66] bg-white'}`}>
-                  <button type="button" onClick={() => { setSelectedGroupId(group.id); setMergeSourceId(''); setMergeTargetId('') }} className="block w-full rounded-sm text-left focus:outline-none focus:ring-2 focus:ring-[#735b2b]/30">
-                    <span className="flex flex-wrap items-start justify-between gap-3">
-                      <strong className="min-w-0 flex-1 break-words font-headline text-2xl leading-tight text-[#00152a]" title={group.name}>{group.name}</strong>
-                      <StatusBadge active={group.is_active !== false} />
-                    </span>
-                    <span className="mt-2 block font-body text-sm text-[#43474d]">{childCount} subtopic{childCount === 1 ? '' : 's'} · {groupQuestionCount(group.id)} question{groupQuestionCount(group.id) === 1 ? '' : 's'}</span>
-                  </button>
+                <article
+                  key={group.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Select topic group: ${group.name}`}
+                  aria-pressed={group.id === activeSelectedGroupId}
+                  onClick={() => selectGroup(group.id)}
+                  onKeyDown={(event) => selectGroupWithKeyboard(event, group.id)}
+                  className={`cursor-pointer rounded-md border p-4 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#735b2b]/40 focus-visible:ring-offset-2 ${group.id === activeSelectedGroupId ? 'border-[#d4c39f] bg-[#fbf6ea] shadow-[inset_4px_0_0_#735b2b]' : 'border-[#c3c6ce66] bg-white hover:border-[#d4c39f] hover:bg-[#fbf9f4]'}`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <strong className={`min-w-0 flex-1 break-words font-headline text-2xl leading-tight ${group.id === activeSelectedGroupId ? 'text-[#735b2b]' : 'text-[#00152a]'}`} title={group.name}>{group.name}</strong>
+                    <StatusBadge active={group.is_active !== false} />
+                  </div>
+                  <p className="mt-2 font-body text-sm text-[#43474d]">{childCount} subtopic{childCount === 1 ? '' : 's'} · {groupQuestionCount(group.id)} question{groupQuestionCount(group.id) === 1 ? '' : 's'}</p>
                   <TopicActions topic={group} subjectId={subjectId} groupId={activeSelectedGroupId} index={index} lastIndex={groups.length - 1} />
                 </article>
               )
@@ -214,7 +233,7 @@ function TopicActions({ topic, subjectId, groupId, index, lastIndex }: { topic: 
   const isSubtopic = Boolean(topic.parent_topic_id)
 
   return (
-    <div className="mt-4 space-y-4 border-t border-[#c3c6ce66] pt-4">
+    <div className="mt-4 space-y-4 border-t border-[#c3c6ce66] pt-4" onClick={(event) => event.stopPropagation()}>
       <div className="flex flex-wrap items-center gap-2">
         <button className="tsm-btn-secondary px-3 py-2" type="button" onClick={() => setIsRenaming(true)}>Rename</button>
         <TopicActionForm action={reorderTopic}>
