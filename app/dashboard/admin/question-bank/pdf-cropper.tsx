@@ -2,6 +2,7 @@
 
 import { type CSSProperties, type DragEvent, type MouseEvent, type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RotateCcw, Upload, ZoomIn, ZoomOut } from 'lucide-react'
+import { PendingLabel } from '@/components/operation-feedback'
 import { toast } from 'sonner'
 
 type LocalPreview = { id: string; file: File; name: string; url: string }
@@ -139,7 +140,7 @@ export function PdfFileInput({ id, label, selectedHelper, value, onChange }: { i
   )
 }
 
-function PdfPageCanvas({ pdf, pageNumber, zoom, canUsePdf, crop, canAddCrop, addLabel, invalidMessage, onBeginCrop, onBeginMoveCrop, onBeginResizeCrop, onUpdateCrop, onFinishCrop, onAddCrop, registerCanvas, onRenderError }: { pdf: PdfDocumentProxy; pageNumber: number; zoom: number; canUsePdf: boolean; crop: CropRect; canAddCrop: boolean; addLabel: string; invalidMessage: string | null; onBeginCrop: (event: MouseEvent<HTMLDivElement>, pageNumber: number) => void; onBeginMoveCrop: (event: MouseEvent<HTMLDivElement>, crop: ActiveCropRect) => void; onBeginResizeCrop: (event: MouseEvent<HTMLButtonElement>, crop: ActiveCropRect, handle: CropHandle) => void; onUpdateCrop: (event: MouseEvent<HTMLDivElement>, pageNumber: number) => void; onFinishCrop: () => void; onAddCrop: () => void; registerCanvas: (pageNumber: number, canvas: HTMLCanvasElement | null) => void; onRenderError: () => void }) {
+function PdfPageCanvas({ pdf, pageNumber, zoom, canUsePdf, crop, canAddCrop, addLabel, addingCrop, invalidMessage, onBeginCrop, onBeginMoveCrop, onBeginResizeCrop, onUpdateCrop, onFinishCrop, onAddCrop, registerCanvas, onRenderError }: { pdf: PdfDocumentProxy; pageNumber: number; zoom: number; canUsePdf: boolean; crop: CropRect; canAddCrop: boolean; addLabel: string; addingCrop: boolean; invalidMessage: string | null; onBeginCrop: (event: MouseEvent<HTMLDivElement>, pageNumber: number) => void; onBeginMoveCrop: (event: MouseEvent<HTMLDivElement>, crop: ActiveCropRect) => void; onBeginResizeCrop: (event: MouseEvent<HTMLButtonElement>, crop: ActiveCropRect, handle: CropHandle) => void; onUpdateCrop: (event: MouseEvent<HTMLDivElement>, pageNumber: number) => void; onFinishCrop: () => void; onAddCrop: () => void; registerCanvas: (pageNumber: number, canvas: HTMLCanvasElement | null) => void; onRenderError: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null)
   const [rendering, setRendering] = useState(false)
@@ -229,8 +230,8 @@ function PdfPageCanvas({ pdf, pageNumber, zoom, canUsePdf, crop, canAddCrop, add
               ))}
             </div>
             <div className="absolute z-10 max-w-[220px]" style={{ left: floatingLeft, top: floatingTop }} onMouseDown={(event) => event.stopPropagation()}>
-              <button type="button" onClick={onAddCrop} disabled={!canAddCrop} className="rounded-md bg-blue-700 px-3 py-2 font-body text-xs font-semibold text-white shadow-lg transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600">
-                {addLabel}
+              <button type="button" onClick={onAddCrop} disabled={!canAddCrop || addingCrop} className="inline-flex items-center gap-2 rounded-md bg-blue-700 px-3 py-2 font-body text-xs font-semibold text-white shadow-lg transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600">
+                <PendingLabel pending={addingCrop} pendingText="Adding crop…">{addLabel}</PendingLabel>
               </button>
               {invalidMessage ? <p className="mt-1 rounded bg-white/95 px-2 py-1 font-body text-xs font-semibold text-amber-800 shadow-sm">{invalidMessage}</p> : null}
             </div>
@@ -249,6 +250,7 @@ export function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, add
   const [crop, setCrop] = useState<CropRect>(null)
   const [interaction, setInteraction] = useState<CropInteraction | null>(null)
   const [loading, setLoading] = useState(Boolean(fileState?.url))
+  const [addingCrop, setAddingCrop] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -402,7 +404,7 @@ export function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, add
   }
 
   function addCrop() {
-    if (!canAddCrop || !crop) return
+    if (!canAddCrop || !crop || addingCrop) return
     const canvas = canvasRefs.current.get(crop.pageNumber)
     if (!canvas) return
     const cssWidth = Number.parseFloat(canvas.style.width) || canvas.width
@@ -417,19 +419,22 @@ export function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, add
     output.width = sw
     output.height = sh
     output.getContext('2d')?.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh)
+    setAddingCrop(true)
     output.toBlob((blob) => {
       if (!blob) {
         toast.error('Could not create the crop image.')
+        setAddingCrop(false)
         return
       }
       onAddCrop(new File([blob], nextFileName(), { type: 'image/png' }))
       setCrop(null)
       toast.success(`${cropLabel} added from page ${crop.pageNumber}.`)
+      setAddingCrop(false)
     }, 'image/png')
   }
 
   const canUsePdf = Boolean(pdf && !loading && !error)
-  const canAddCrop = Boolean(crop && crop.width >= MIN_CROP_SIZE && crop.height >= MIN_CROP_SIZE && canUsePdf)
+  const canAddCrop = Boolean(crop && crop.width >= MIN_CROP_SIZE && crop.height >= MIN_CROP_SIZE && canUsePdf && !addingCrop)
   const canZoomOut = canUsePdf && zoom > 0.7
   const canResetZoom = canUsePdf && zoom !== 1.2
   const canZoomIn = canUsePdf && zoom < 2.4
@@ -454,7 +459,8 @@ export function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, add
         <span><b>{pageCount ? `${pageCount} page${pageCount === 1 ? '' : 's'}` : 'No pages loaded'}</b></span>
         <span><b>Zoom {Math.round(zoom * 100)}%</b></span>
         {crop ? <span className="font-semibold text-blue-700">Current crop: page {crop.pageNumber}</span> : null}
-        {loading ? <span className="font-semibold text-blue-700">Loading…</span> : null}
+        {loading ? <span className="font-semibold text-blue-700" aria-live="polite">Loading PDF…</span> : null}
+        {addingCrop ? <span className="font-semibold text-blue-700" aria-live="polite">Adding crop…</span> : null}
       </div>
       {error ? <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 font-body text-sm text-red-700">{error}</p> : null}
       {!fileState ? <p className="mt-4 rounded-md border border-slate-200 bg-white px-4 py-8 text-center font-body text-sm text-slate-500">Select a local PDF in Step 2 to enable cropping.</p> : null}
@@ -463,14 +469,14 @@ export function PdfCropPanel({ title, helper, fileState, pdfType, cropLabel, add
           {pdf ? (
             <div className="space-y-5">
               {pageNumbers.map((pageNumber) => (
-                <PdfPageCanvas key={`${fileState.url}-${pageNumber}`} pdf={pdf} pageNumber={pageNumber} zoom={zoom} canUsePdf={canUsePdf} crop={crop} canAddCrop={canAddCrop} addLabel={floatingAddLabel} invalidMessage={cropInvalidMessage} onBeginCrop={beginCrop} onBeginMoveCrop={beginMoveCrop} onBeginResizeCrop={beginResizeCrop} onUpdateCrop={updateCrop} onFinishCrop={finishCrop} onAddCrop={addCrop} registerCanvas={registerCanvas} onRenderError={handleRenderError} />
+                <PdfPageCanvas key={`${fileState.url}-${pageNumber}`} pdf={pdf} pageNumber={pageNumber} zoom={zoom} canUsePdf={canUsePdf} crop={crop} canAddCrop={canAddCrop} addLabel={floatingAddLabel} addingCrop={addingCrop} invalidMessage={cropInvalidMessage} onBeginCrop={beginCrop} onBeginMoveCrop={beginMoveCrop} onBeginResizeCrop={beginResizeCrop} onUpdateCrop={updateCrop} onFinishCrop={finishCrop} onAddCrop={addCrop} registerCanvas={registerCanvas} onRenderError={handleRenderError} />
               ))}
             </div>
           ) : <p className="rounded-md border border-slate-200 bg-white px-4 py-8 text-center font-body text-sm text-slate-500">Loading PDF pages…</p>}
         </div>
       ) : null}
       <div className="mt-4 flex flex-wrap gap-3">
-        <button type="button" onClick={addCrop} disabled={!canAddCrop} className="tsm-btn-primary disabled:cursor-not-allowed disabled:opacity-50">{addLabel}</button>
+        <button type="button" onClick={addCrop} disabled={!canAddCrop || addingCrop} className="tsm-btn-primary disabled:cursor-not-allowed disabled:opacity-50"><PendingLabel pending={addingCrop} pendingText="Adding crop…">{addLabel}</PendingLabel></button>
         <button type="button" onClick={() => setCrop(null)} disabled={!crop} className="tsm-btn-secondary disabled:cursor-not-allowed disabled:opacity-50">Clear current crop</button>
       </div>
     </div>

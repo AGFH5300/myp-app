@@ -1,9 +1,9 @@
 'use client'
 
-import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { ConfirmDialog, PendingActionLink, PendingLabel } from '@/components/operation-feedback'
 import { batchUpdateQuestionPublication } from './actions'
 
 export type QuestionBankRow = {
@@ -39,7 +39,10 @@ function warningBadge(label: string, key?: string) {
 export function QuestionBankList({ questions }: { questions: QuestionBankRow[] }) {
   const router = useRouter()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [confirmPublish, setConfirmPublish] = useState(false)
+  const [confirming, setConfirming] = useState<{ publish: boolean } | null>(null)
+  const [operationError, setOperationError] = useState<string | null>(null)
+  const [pendingBatch, setPendingBatch] = useState<'publish' | 'unpublish' | null>(null)
+  const [openingAction, setOpeningAction] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const visibleIds = useMemo(() => questions.map((question) => question.id), [questions])
   const selectedQuestions = useMemo(() => questions.filter((question) => selectedIds.includes(question.id)), [questions, selectedIds])
@@ -48,39 +51,47 @@ export function QuestionBankList({ questions }: { questions: QuestionBankRow[] }
 
   function toggleQuestion(questionId: string) {
     setSelectedIds((current) => current.includes(questionId) ? current.filter((id) => id !== questionId) : [...current, questionId])
-    setConfirmPublish(false)
+    setConfirming(null)
   }
 
   function selectAllVisible() {
     setSelectedIds((current) => Array.from(new Set([...current, ...visibleIds])))
-    setConfirmPublish(false)
+    setConfirming(null)
   }
 
   function clearSelection() {
     setSelectedIds([])
-    setConfirmPublish(false)
+    setConfirming(null)
+  }
+
+  function requestBatch(publish: boolean) {
+    if (!selectedIds.length || isPending) return
+    setOperationError(null)
+    setConfirming({ publish })
   }
 
   function runBatch(publish: boolean) {
     if (!selectedIds.length || isPending) return
-    if (publish && selectedNeedsReview && !confirmPublish) {
-      setConfirmPublish(true)
-      return
-    }
 
     const ids = selectedIds
+    setPendingBatch(publish ? 'publish' : 'unpublish')
     startTransition(async () => {
       const result = await batchUpdateQuestionPublication(ids, publish)
       if (result.ok) {
         toast.success(publish ? 'Questions published' : 'Questions unpublished')
         setSelectedIds([])
-        setConfirmPublish(false)
+        setConfirming(null)
+        setOperationError(null)
         router.refresh()
       } else {
-        toast.error(result.message || 'Could not update selected questions.')
+        const message = result.message || 'Could not update selected questions.'
+        setOperationError(message)
+        toast.error(message)
       }
+      setPendingBatch(null)
     })
   }
+
 
   return (
     <div className="space-y-4">
@@ -105,7 +116,7 @@ export function QuestionBankList({ questions }: { questions: QuestionBankRow[] }
                   <td className="py-4 pr-4"><span className="block max-w-[18rem] text-sm leading-5">{question.topicSummary || <span className="text-amber-800">Not tagged</span>}</span></td>
                   <td className="py-4 pr-4"><div className="flex flex-wrap gap-2">{question.isPublished ? statusBadge('Published', 'green', `${question.id}-published`) : statusBadge('Draft', 'grey', `${question.id}-draft`)}{question.needsReview ? statusBadge('Needs review', 'amber', `${question.id}-needs-review`) : statusBadge('Ready', 'green', `${question.id}-ready`)}</div></td>
                   <td className="py-4 pr-4"><div className="flex max-w-xs flex-wrap gap-1.5">{question.warnings.length ? question.warnings.map((warning, index) => warningBadge(warning, `${question.id}-${warning}-${index}`)) : <span className="text-xs text-[#6f737b]">No warnings</span>}</div></td>
-                  <td className="py-4 pr-4"><div className="flex min-w-36 flex-col items-start gap-2"><Link href={`/dashboard/admin/question-bank/${question.id}/edit`} className="tsm-btn-secondary w-full justify-center text-center">Edit</Link><Link href={`/dashboard/admin/question-bank/${question.id}/preview`} className="tsm-btn-secondary w-full justify-center text-center">Preview as student</Link></div></td>
+                  <td className="py-4 pr-4"><div className="flex min-w-36 flex-col items-start gap-2"><PendingActionLink href={`/dashboard/admin/question-bank/${question.id}/edit`} onStart={() => setOpeningAction(`edit-${question.id}`)} className="tsm-btn-secondary w-full justify-center text-center"><PendingLabel pending={openingAction === `edit-${question.id}`} pendingText="Opening…">Edit</PendingLabel></PendingActionLink><PendingActionLink href={`/dashboard/admin/question-bank/${question.id}/preview`} onStart={() => setOpeningAction(`preview-${question.id}`)} className="tsm-btn-secondary w-full justify-center text-center"><PendingLabel pending={openingAction === `preview-${question.id}`} pendingText="Opening…">Preview as student</PendingLabel></PendingActionLink></div></td>
                 </tr>
               )
             })}
@@ -121,21 +132,24 @@ export function QuestionBankList({ questions }: { questions: QuestionBankRow[] }
             <div className="flex flex-wrap gap-3">
               <button type="button" onClick={selectAllVisible} disabled={allVisibleSelected || isPending} className="rounded-md border border-blue-200 bg-white px-3 py-2 font-body text-sm font-semibold text-blue-800 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60">{allVisibleSelected ? 'All visible selected' : 'Select all visible'}</button>
               <button type="button" onClick={clearSelection} disabled={isPending} className="rounded-md border border-[#c3c6ce66] bg-white px-3 py-2 font-body text-sm font-semibold text-[#43474d] hover:bg-[#f5f3ee] disabled:cursor-not-allowed disabled:opacity-60">Clear selection</button>
-              <button type="button" onClick={() => runBatch(true)} disabled={isPending} className="tsm-btn-primary disabled:cursor-not-allowed disabled:opacity-60">{isPending ? 'Saving…' : 'Publish selected'}</button>
-              <button type="button" onClick={() => runBatch(false)} disabled={isPending} className="tsm-btn-secondary disabled:cursor-not-allowed disabled:opacity-60">{isPending ? 'Saving…' : 'Unpublish selected'}</button>
+              <button type="button" onClick={() => requestBatch(true)} disabled={isPending} className="tsm-btn-primary disabled:cursor-not-allowed disabled:opacity-60"><PendingLabel pending={pendingBatch === 'publish'} pendingText="Publishing…">Publish selected</PendingLabel></button>
+              <button type="button" onClick={() => requestBatch(false)} disabled={isPending} className="tsm-btn-secondary disabled:cursor-not-allowed disabled:opacity-60"><PendingLabel pending={pendingBatch === 'unpublish'} pendingText="Unpublishing…">Unpublish selected</PendingLabel></button>
             </div>
           </div>
-          {confirmPublish ? (
-            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 font-body text-sm text-amber-900">
-              <p className="font-semibold">Some selected questions need review. Publish anyway?</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" onClick={() => runBatch(true)} disabled={isPending} className="rounded-md bg-amber-700 px-3 py-2 font-semibold text-white hover:bg-amber-800 disabled:opacity-60">Yes, publish anyway</button>
-                <button type="button" onClick={() => setConfirmPublish(false)} disabled={isPending} className="rounded-md border border-amber-300 bg-white px-3 py-2 font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-60">Cancel</button>
-              </div>
-            </div>
-          ) : null}
-        </div>
+      </div>
       ) : null}
+
+      <ConfirmDialog
+        open={Boolean(confirming)}
+        title={confirming?.publish && selectedNeedsReview ? 'Publish selected questions with review issues?' : confirming?.publish ? 'Publish selected questions?' : 'Unpublish selected questions?'}
+        body={confirming?.publish && selectedNeedsReview ? 'Some selected questions still need review. Students will only see questions from published papers, but you should resolve flagged items before sharing them.' : confirming?.publish ? 'Selected questions will be visible to students when their paper is also published.' : 'Selected questions will be hidden from students but remain saved in the question bank.'}
+        confirmLabel={confirming?.publish ? 'Publish selected questions' : 'Unpublish selected questions'}
+        pendingLabel={confirming?.publish ? 'Publishing…' : 'Unpublishing…'}
+        pending={isPending}
+        error={operationError}
+        onClose={() => { setConfirming(null); setOperationError(null) }}
+        onConfirm={() => { if (confirming) runBatch(confirming.publish) }}
+      />
     </div>
   )
 }
