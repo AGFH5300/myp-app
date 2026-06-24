@@ -8,6 +8,8 @@ const manrope = Manrope({ subsets: ['latin'], variable: '--font-manrope' })
 
 const siteTitle = 'MYP Atlas'
 const siteDescription = 'MYP Atlas provides real MYP eAssessment past papers, real questions, and real markschemes from 2016 to 2025.'
+const lightIconScheme = `(${['prefers', 'color', 'scheme'].join('-')}: light)`
+const darkIconScheme = `(${['prefers', 'color', 'scheme'].join('-')}: dark)`
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://mypatlas.com'),
@@ -19,8 +21,10 @@ export const metadata: Metadata = {
   applicationName: siteTitle,
   keywords: ['MYP', 'eAssessment', 'past papers', 'markscheme', '2016', '2025', 'IB Middle Years Programme'],
   icons: {
-    icon: [{ url: '/myp-atlas-icon.svg', type: 'image/svg+xml' }],
-    shortcut: ['/myp-atlas-icon.svg'],
+    icon: [
+      { url: '/myp-atlas-icon.svg?v=3', type: 'image/svg+xml', media: lightIconScheme },
+      { url: '/myp-atlas-icon-light.svg?v=1', type: 'image/svg+xml', media: darkIconScheme },
+    ],
   },
 }
 
