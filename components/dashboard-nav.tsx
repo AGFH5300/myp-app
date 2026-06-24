@@ -50,7 +50,7 @@ export function DashboardNav({ user, profile, collapsed = false, onCollapsedChan
       <nav className={`hidden md:flex fixed left-0 top-0 h-full bg-[#f5f3ee] flex-col py-8 z-40 border-r border-[#c3c6ce33] transition-[width] duration-200 ${collapsed ? 'w-[4.5rem]' : 'w-64'}`} aria-label="Dashboard navigation">
         {collapsed ? (
           <div className="mb-8 flex flex-col items-center">
-            <button type="button" onClick={() => onCollapsedChange?.(false)} aria-label="Open sidebar" title="Open sidebar" className="group relative flex size-11 items-center justify-center rounded-md border border-[#c3c6ce66] bg-white text-[#43474d] transition hover:bg-[#fbf9f4] hover:text-[#00152a] focus:outline-none focus:ring-2 focus:ring-[#735b2b] focus:ring-offset-2 focus:ring-offset-[#f5f3ee]">
+            <button type="button" onClick={() => onCollapsedChange?.(false)} aria-label="Open sidebar" title="Open sidebar" className="group relative flex size-11 items-center justify-center rounded-md text-[#43474d] transition hover:bg-[#ffffff] hover:text-[#00152a]">
               <BrandMark className="h-7 w-auto transition-opacity group-hover:opacity-0 group-focus:opacity-0" />
               <PanelLeftOpen className="absolute size-5 opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100" aria-hidden="true" />
               <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-sm bg-[#00152a] px-2 py-1 font-body text-xs font-semibold text-white opacity-0 shadow-md transition group-hover:opacity-100 group-focus:opacity-100">Open sidebar</span>
@@ -59,7 +59,7 @@ export function DashboardNav({ user, profile, collapsed = false, onCollapsedChan
         ) : (
           <div className="mb-12 flex items-center justify-between px-8">
             <BrandWordmark className="text-xl" href="/dashboard" />
-            <button type="button" onClick={() => onCollapsedChange?.(true)} aria-label="Collapse sidebar" title="Collapse sidebar" className="rounded-sm border border-[#c3c6ce66] bg-white p-2 text-[#43474d] transition hover:text-[#00152a] focus:outline-none focus:ring-2 focus:ring-[#735b2b]">
+            <button type="button" onClick={() => onCollapsedChange?.(true)} aria-label="Collapse sidebar" title="Collapse sidebar" className="rounded-sm p-2 text-[#43474d] transition hover:text-[#00152a] hover:bg-[#ffffff]">
               <PanelLeftClose className="size-5" aria-hidden="true" />
             </button>
           </div>
