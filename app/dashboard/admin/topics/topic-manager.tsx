@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useMemo, useState, type FormEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -231,17 +231,18 @@ function TopicActions({ topic, subjectId, groupId, index, lastIndex }: { topic: 
   const [isRenaming, setIsRenaming] = useState(false)
   const isInactive = topic.is_active === false
   const isSubtopic = Boolean(topic.parent_topic_id)
+  const stopCardSelection = (event: MouseEvent<HTMLElement>) => event.stopPropagation()
 
   return (
-    <div className="mt-4 space-y-4 border-t border-[#c3c6ce66] pt-4" onClick={(event) => event.stopPropagation()}>
+    <div className="mt-4 space-y-4 border-t border-[#c3c6ce66] pt-4">
       <div className="flex flex-wrap items-center gap-2">
-        <button className="tsm-btn-secondary px-3 py-2" type="button" onClick={() => setIsRenaming(true)}>Rename</button>
+        <button className="tsm-btn-secondary px-3 py-2" type="button" onClick={(event) => { event.stopPropagation(); setIsRenaming(true) }}>Rename</button>
         <TopicActionForm action={reorderTopic}>
           {(pending) => <>
             <HiddenContext subjectId={subjectId} groupId={groupId} />
             <input type="hidden" name="topic_id" value={topic.id} />
             <input type="hidden" name="direction" value="up" />
-            <button className="tsm-btn-secondary px-3 py-2" disabled={pending || index === 0} type="submit" aria-label={`Move ${topic.name} up`} title="Move up"><PendingLabel pending={pending} pendingText="Updating…"><ChevronUp className="size-4" aria-hidden="true" />Up</PendingLabel></button>
+            <button className="tsm-btn-secondary px-3 py-2" disabled={pending || index === 0} type="submit" aria-label={`Move ${topic.name} up`} title="Move up" onClick={stopCardSelection}><PendingLabel pending={pending} pendingText="Updating…"><ChevronUp className="size-4" aria-hidden="true" />Up</PendingLabel></button>
           </>}
         </TopicActionForm>
         <TopicActionForm action={reorderTopic}>
@@ -249,7 +250,7 @@ function TopicActions({ topic, subjectId, groupId, index, lastIndex }: { topic: 
             <HiddenContext subjectId={subjectId} groupId={groupId} />
             <input type="hidden" name="topic_id" value={topic.id} />
             <input type="hidden" name="direction" value="down" />
-            <button className="tsm-btn-secondary px-3 py-2" disabled={pending || index === lastIndex} type="submit" aria-label={`Move ${topic.name} down`} title="Move down"><PendingLabel pending={pending} pendingText="Updating…"><ChevronDown className="size-4" aria-hidden="true" />Down</PendingLabel></button>
+            <button className="tsm-btn-secondary px-3 py-2" disabled={pending || index === lastIndex} type="submit" aria-label={`Move ${topic.name} down`} title="Move down" onClick={stopCardSelection}><PendingLabel pending={pending} pendingText="Updating…"><ChevronDown className="size-4" aria-hidden="true" />Down</PendingLabel></button>
           </>}
         </TopicActionForm>
         <TopicActionForm action={toggleTopicActive}>
@@ -257,7 +258,7 @@ function TopicActions({ topic, subjectId, groupId, index, lastIndex }: { topic: 
             <HiddenContext subjectId={subjectId} groupId={groupId} />
             <input type="hidden" name="topic_id" value={topic.id} />
             <input type="hidden" name="next_active" value={isInactive ? 'true' : 'false'} />
-            <button className={`${isInactive ? 'tsm-btn-primary' : 'tsm-btn-secondary'} px-3 py-2`} type="submit" disabled={pending}><PendingLabel pending={pending} pendingText="Updating…">{isInactive ? 'Reactivate' : 'Deactivate'}</PendingLabel></button>
+            <button className={`${isInactive ? 'tsm-btn-primary' : 'tsm-btn-secondary'} px-3 py-2`} type="submit" disabled={pending} onClick={stopCardSelection}><PendingLabel pending={pending} pendingText="Updating…">{isInactive ? 'Reactivate' : 'Deactivate'}</PendingLabel></button>
           </>}
         </TopicActionForm>
       </div>
@@ -267,12 +268,12 @@ function TopicActions({ topic, subjectId, groupId, index, lastIndex }: { topic: 
           {(pending) => <>
             <HiddenContext subjectId={subjectId} groupId={groupId} />
             <input type="hidden" name="topic_id" value={topic.id} />
-            <label className="font-body text-sm text-[#43474d]">
+            <label className="font-body text-sm text-[#43474d]" onClick={stopCardSelection}>
               Rename {isSubtopic ? 'subtopic' : 'group'}
-              <input name="name" required disabled={pending} defaultValue={topic.name} className="tsm-input mt-1 min-w-0 disabled:opacity-50" aria-label={`Rename ${topic.name}`} />
+              <input name="name" required disabled={pending} defaultValue={topic.name} className="tsm-input mt-1 min-w-0 disabled:opacity-50" aria-label={`Rename ${topic.name}`} onClick={stopCardSelection} />
             </label>
-            <button className="tsm-btn-primary w-full sm:w-auto" type="submit" disabled={pending}><PendingLabel pending={pending} pendingText="Saving…">Save</PendingLabel></button>
-            <button className="tsm-btn-secondary w-full sm:w-auto" type="button" disabled={pending} onClick={() => setIsRenaming(false)}>Cancel</button>
+            <button className="tsm-btn-primary w-full sm:w-auto" type="submit" disabled={pending} onClick={stopCardSelection}><PendingLabel pending={pending} pendingText="Saving…">Save</PendingLabel></button>
+            <button className="tsm-btn-secondary w-full sm:w-auto" type="button" disabled={pending} onClick={(event) => { event.stopPropagation(); setIsRenaming(false) }}>Cancel</button>
           </>}
         </TopicActionForm>
       ) : null}
