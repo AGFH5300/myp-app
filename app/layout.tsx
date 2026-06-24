@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: '/myp-atlas-icon.svg?v=3', type: 'image/svg+xml', media: lightIconScheme },
-      { url: '/api/icon-light?v=2', type: 'image/svg+xml', media: darkIconScheme },
+      { url: '/myp-atlas-icon-light.svg?v=2', type: 'image/svg+xml', media: darkIconScheme },
     ],
   },
 }
