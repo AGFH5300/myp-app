@@ -40,8 +40,7 @@ export function FullPaperReader({
   const [currentId, setCurrentId] = useState(questions[0]?.id ?? '')
   const [markSchemeOpen, setMarkSchemeOpen] = useState(false)
   const [openSectionKey, setOpenSectionKey] = useState<string>(() => questions[0] ? questionSectionKey(questions[0].questionNumber) : '')
-  const currentIndex = Math.max(0, questions.findIndex((question) => question.id === currentId))
-  const currentQuestion = questions[currentIndex] ?? questions[0]
+  const currentQuestion = questions.find((question) => question.id === currentId) ?? questions[0]
   const metadata = [paper.subjectName, paper.session, paper.year, paper.paperCode].filter(Boolean).join(' · ')
 
   useEffect(() => {
@@ -199,10 +198,8 @@ export function FullPaperReader({
 
             {!questions.length ? <p className="py-10 text-center font-body text-[#43474d]">No questions are available for this paper.</p> : null}
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#d6d0c2] pt-6">
-              <button type="button" disabled={currentIndex <= 0} onClick={() => scrollToQuestion(questions[currentIndex - 1].id)} className="tsm-btn-secondary disabled:cursor-not-allowed disabled:opacity-50">Previous question</button>
+            <div className="flex justify-center border-t border-[#d6d0c2] pt-6">
               <Link href={backHref} className="tsm-btn-secondary">Back to paper list</Link>
-              <button type="button" disabled={currentIndex >= questions.length - 1} onClick={() => scrollToQuestion(questions[currentIndex + 1].id)} className="tsm-btn-primary disabled:cursor-not-allowed disabled:opacity-50">Next question</button>
             </div>
           </div>
         </main>
