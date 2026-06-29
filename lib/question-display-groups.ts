@@ -29,10 +29,8 @@ function combineText(first: string | null | undefined, second: string | null | u
 }
 
 /**
- * Combines an explicitly linked continuation with its earlier source question.
- * The continuation remains a database question for marks and markscheme data,
- * but the paper reader renders one shared visual block instead of a duplicate
- * image or an incorrect "Question image missing" state.
+ * Renders linked continuation subquestions as one visual block while retaining
+ * their individual database records, marks, and markscheme assets.
  */
 export function groupQuestionsForReader(questions: ReaderQuestionWithDisplayGroup[]): ReaderQuestion[] {
   const grouped: ReaderQuestion[] = []
