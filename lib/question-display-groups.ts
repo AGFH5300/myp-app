@@ -13,6 +13,7 @@ export type ReaderQuestionWithDisplayGroup = {
   questionImages: ReaderImage[]
   markschemeImages: ReaderImage[]
   markschemeText?: string | null
+  imageLayout?: 'stack' | 'side-by-side'
   displayWithQuestionId?: string | null
 }
 
@@ -42,11 +43,12 @@ export function groupQuestionsForReader(questions: ReaderQuestionWithDisplayGrou
 
     if (sourceIndex === -1) {
       const { displayWithQuestionId: _displayWithQuestionId, ...readerQuestion } = question
-      grouped.push(readerQuestion)
+      grouped.push({ ...readerQuestion, imageLayout: readerQuestion.imageLayout ?? 'stack' })
       continue
     }
 
     const source = grouped[sourceIndex]
+    const hasImagesOnBothSides = source.questionImages.length > 0 && question.questionImages.length > 0
     grouped[sourceIndex] = {
       ...source,
       questionNumber: `${source.questionNumber} and ${question.questionNumber}`,
@@ -54,6 +56,7 @@ export function groupQuestionsForReader(questions: ReaderQuestionWithDisplayGrou
       questionImages: [...source.questionImages, ...question.questionImages],
       markschemeImages: [...source.markschemeImages, ...question.markschemeImages],
       markschemeText: combineText(source.markschemeText, question.markschemeText),
+      imageLayout: hasImagesOnBothSides ? 'side-by-side' : source.imageLayout ?? 'stack',
     }
   }
 
