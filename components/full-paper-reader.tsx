@@ -15,6 +15,7 @@ export type FullPaperReaderQuestion = {
   questionImages: ReaderImage[]
   markschemeImages: ReaderImage[]
   markschemeText?: string | null
+  imageLayout?: 'stack' | 'side-by-side'
 }
 
 export type FullPaperReaderPaper = {
@@ -184,7 +185,7 @@ export function FullPaperReader({
                 <section key={question.id} id={`question-${question.id}`} aria-label={`Question ${question.questionNumber || '—'}`} className="scroll-mt-32 py-6">
                   <h3 className="sr-only">Question {question.questionNumber || '—'}</h3>
                   {question.questionImages.length ? (
-                    <div className="space-y-1">
+                    <div className={question.imageLayout === 'side-by-side' ? 'grid grid-cols-2 items-start gap-0' : 'space-y-1'}>
                       {question.questionImages.map((image, index) => <img key={`${image.url}-${index}`} src={image.url} alt={image.alt} className="h-auto w-full object-contain" />)}
                     </div>
                   ) : adminPreview ? (
