@@ -39,3 +39,34 @@ Before replacing any legacy image:
 Do not add copyrighted source PDFs, crop PNGs, or confidential markschemes to
 this public GitHub repository. Store reviewed assets in a private, authorized
 location until licensing and access are confirmed.
+
+## All-subject offline archive discovery
+
+The larger rebuild additionally uses these scripts, with **private** input and
+output paths outside this repository:
+
+1. `audit_exam_corpus.py`: verify PDF integrity and create tentative pairs by
+   exact subject/session folders. A folder association is never answer verification.
+2. `index_exam_pages.py`: OCR every page, retaining per-file checkpoints.
+3. `rescue_exam_ocr.py`: supplement hard-to-read image-only question pages with
+   high-resolution OCR. Results require review.
+4. `build_question_registry.py`: identify provisional question/subquestion
+   labels, candidate marks, continuation pages and tentative markscheme pages.
+5. `render_all_question_assets.py`: produce private first-pass PNGs, source
+   references, regions, checksums and per-paper checkpoints. A narrow or
+   ambiguous crop may deliberately fall back to the full source page.
+6. `verify_exam_asset_coverage.py`: flag missing or implausibly small PNGs,
+   absent markscheme links and question-number gaps.
+
+The **source inventory** is a private JSON file with a `files` array, each
+containing `id`, `subject`, `folder`, `name`, `bytes` and `url`. Downloaded PDFs
+are named `<Drive file id>.pdf`; the already retrieved Extended Maths sources
+may instead be named by their original PDF filenames. Use the scripts' `--help`
+options to pass those local directories. The offline tools require Python 3,
+PyMuPDF, Pillow, Tesseract and Poppler. No source material or generated crops
+belong in Git.
+
+Automated association is a *discovery aid*. Publication requires a person to
+verify all parts, diagrams, mark allocations, shared context, continuing pages
+and the exact marking criteria; `RESTORE_FAILED` Supabase projects cannot be
+import targets. Do not substitute a markscheme from another session or level.
