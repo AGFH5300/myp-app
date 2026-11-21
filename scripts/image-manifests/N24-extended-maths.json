@@ -1,0 +1,40 @@
+{
+  "paper_code": "N24-Extended-Maths",
+  "sources": {
+    "question": {
+      "filename": "N24-Extended-Maths.pdf",
+      "sha256": "32fd07e6d487070923783b3cfacadf2eff3014c2a51f2307a186442a50e41a8c"
+    },
+    "markscheme": {
+      "filename": "N24-Extended-Maths-Mark-Scheme.pdf",
+      "sha256": "45f618bf0e9516b4dd6fce88d561d54c02ed3c3aa3d0f7378565e16a16a75bdd"
+    }
+  },
+  "questions": [
+    {
+      "question_key": "Q1a",
+      "question": [
+        {"source": "question", "page": 1, "region": [0.067, 0.303, 0.502, 0.369]},
+        {"source": "question", "page": 2, "region": [0.094, 0.314, 0.470, 0.637]}
+      ],
+      "markscheme": [{"source": "markscheme", "page": 5, "region": [0.05, 0.338, 0.954, 0.525]}]
+    },
+    {
+      "question_key": "Q1b",
+      "question": [
+        {"source": "question", "page": 2, "region": [0.094, 0.314, 0.470, 0.637]},
+        {"source": "question", "page": 1, "region": [0.512, 0.364, 0.936, 0.507]}
+      ],
+      "markscheme": [{"source": "markscheme", "page": 5, "region": [0.05, 0.525, 0.954, 0.565]}]
+    },
+    {
+      "question_key": "Q1c",
+      "notes": "Paper labels the part c; the official markscheme page 5 labels its 3-mark answer d. Confirm association manually before publishing.",
+      "question": [
+        {"source": "question", "page": 2, "region": [0.094, 0.314, 0.470, 0.637]},
+        {"source": "question", "page": 2, "region": [0.515, 0.380, 0.936, 0.518]}
+      ],
+      "markscheme": [{"source": "markscheme", "page": 5, "region": [0.05, 0.565, 0.954, 0.701]}]
+    }
+  ]
+}
