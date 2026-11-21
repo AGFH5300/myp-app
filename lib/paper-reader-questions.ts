@@ -8,6 +8,7 @@ type SourceQuestion = {
   question_number: string
   question_order: number | null
   marks: number | null
+  prompt_text: string | null
   image_url: string | null
   question_image_path: string | null
   markscheme_text: string | null
@@ -33,6 +34,7 @@ export async function resolvePaperReaderQuestions(supabase: any, questions: Sour
       questionNumber: question.question_number,
       questionOrder: question.question_order,
       marks: question.marks,
+      promptText: question.prompt_text,
       questionImages: questionImages.map((image, index) => ({ url: image.url, alt: image.label || `Question ${question.question_number} image ${index + 1}` })),
       markschemeImages: markschemeImages.map((image, index) => ({ url: image.url, alt: image.label || `Question ${question.question_number} mark scheme image ${index + 1}` })),
       markschemeText: question.markscheme_text,
