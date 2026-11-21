@@ -1,6 +1,8 @@
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 import fitz
 
@@ -8,7 +10,8 @@ import fitz
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from audit_exam_corpus import role_of  # noqa: E402
 from build_question_registry import candidate_labels  # noqa: E402
-from render_all_question_assets import image_regions  # noqa: E402
+from build_private_import_manifest import paper_identity  # noqa: E402
+from render_all_question_assets import image_regions, write_png  # noqa: E402
 
 
 class SourceClassificationTests(unittest.TestCase):
@@ -28,6 +31,20 @@ class QuestionLabelTests(unittest.TestCase):
     def test_markscheme_standalone_parts(self):
         labels = candidate_labels("Tarea 1\n1a\n1b", scheme=True)
         self.assertEqual([x["key"] for x in labels], ["Q1", "Q1a", "Q1b"])
+
+
+class OfflineImportTests(unittest.TestCase):
+    def test_past_math_paper_uses_level_and_session(self):
+        info = paper_identity("Mathematics", "Maths Extended/Past Papers/2024/Nov", "sourceid")
+        self.assertEqual((info["session_year"], info["session_month"], info["level"]),
+                         (2024, "Nov", "Extended"))
+        self.assertTrue(info["proposed_paper_code"].startswith("MYP-MATHEMATICS-2024-Nov-"))
+
+    def test_mock_has_no_invented_session(self):
+        info = paper_identity("Biology", "Mock Papers/Biology Mock 4", "sourceid")
+        self.assertIsNone(info["session_year"])
+        self.assertIsNone(info["session_month"])
+        self.assertEqual(info["source_kind"], "MOCK")
 
 
 class CropRegionTests(unittest.TestCase):
@@ -57,6 +74,28 @@ class CropRegionTests(unittest.TestCase):
         self.assertGreater(regions["Q1a"][0].x1, 330)
         self.assertGreater(regions["Q1b"][0].x1, 590)
         self.assertIsNotNone(context)
+
+    def test_poppler_recovers_when_mupdf_cannot_render(self):
+        with tempfile.TemporaryDirectory() as folder:
+            pdf_path = Path(folder) / "broken-render.pdf"
+            output_path = Path(folder) / "crop.png"
+            doc = fitz.open()
+            doc.new_page(width=595, height=842).insert_text((90, 150), "Question 1a")
+            doc.save(pdf_path)
+            doc.close()
+
+            def fail_pixmap(**_):
+                raise RuntimeError("Invalid bandwriter header dimensions/setup")
+
+            simulated = SimpleNamespace(rect=fitz.Rect(0, 0, 595, 842), number=0,
+                                        parent=SimpleNamespace(name=str(pdf_path)),
+                                        get_pixmap=fail_pixmap)
+            digest = write_png(simulated, fitz.Rect(60, 90, 240, 200), output_path, 2)
+            self.assertEqual(len(digest), 64)
+            self.assertTrue(output_path.is_file())
+            from PIL import Image
+            with Image.open(output_path) as img:
+                self.assertEqual(img.size, (360, 220))
 
 
 if __name__ == "__main__":

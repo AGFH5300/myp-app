@@ -14,9 +14,11 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 from pathlib import Path
 
 import fitz
+from PIL import Image
 
 from build_question_registry import candidate_labels
 
@@ -141,9 +143,35 @@ def image_regions(page, entries):
 
 
 def write_png(page, rect, output_path, scale):
-    pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=rect, alpha=False)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    pix.save(output_path)
+    try:
+        pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=rect, alpha=False)
+        pix.save(output_path)
+    except Exception as original_error:
+        # Some MYP 2016 PDFs display in Poppler but their image streams trigger
+        # MuPDF's "Invalid bandwriter header dimensions/setup" exception.
+        # Render the exact source page via a second engine before declaring the
+        # question image missing. Keep its original PDF/page/rect provenance.
+        source_pdf = page.parent.name
+        if not source_pdf:
+            raise original_error
+        with tempfile.TemporaryDirectory(prefix="myp-pdf-render-") as tmpdir:
+            prefix = Path(tmpdir) / "page"
+            dpi = max(72, round(72 * scale))
+            subprocess.run(["pdftoppm", "-f", str(page.number + 1),
+                            "-l", str(page.number + 1), "-r", str(dpi),
+                            "-singlefile", "-png", source_pdf, str(prefix)],
+                           check=True, timeout=90, stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL)
+            with Image.open(prefix.with_suffix(".png")) as rendered:
+                x_scale = rendered.width / page.rect.width
+                y_scale = rendered.height / page.rect.height
+                bounds = (max(0, int(rect.x0 * x_scale)),
+                          max(0, int(rect.y0 * y_scale)),
+                          min(rendered.width, int(rect.x1 * x_scale + 0.999)),
+                          min(rendered.height, int(rect.y1 * y_scale + 0.999)))
+                with rendered.crop(bounds) as crop:
+                    crop.save(output_path)
     return hashlib.sha256(output_path.read_bytes()).hexdigest()
 
 

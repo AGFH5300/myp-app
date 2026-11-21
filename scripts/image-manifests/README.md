@@ -54,9 +54,23 @@ output paths outside this repository:
    labels, candidate marks, continuation pages and tentative markscheme pages.
 5. `render_all_question_assets.py`: produce private first-pass PNGs, source
    references, regions, checksums and per-paper checkpoints. A narrow or
-   ambiguous crop may deliberately fall back to the full source page.
+   ambiguous crop may deliberately fall back to the full source page. If a
+   damaged historical PDF cannot render with MuPDF, the script retries that
+   exact page with Poppler.
 6. `verify_exam_asset_coverage.py`: flag missing or implausibly small PNGs,
    absent markscheme links and question-number gaps.
+7. `build_private_import_manifest.py`: create a **private, non-executable**
+   JSON + CSV handoff mapping candidate questions and rendered assets to the
+   planned paper/question fields. It never invents live UUIDs, uploads assets,
+   or marks an unreviewed item publishable. Run it after rendering and QA:
+
+```bash
+python3 scripts/build_private_import_manifest.py \
+  --registry /private/question_registry.json \
+  --audit /private/corpus_audit.json \
+  --asset-root /private/all_subject_assets \
+  --output /private/supabase_import_handoff.json
+```
 
 The **source inventory** is a private JSON file with a `files` array, each
 containing `id`, `subject`, `folder`, `name`, `bytes` and `url`. Downloaded PDFs
