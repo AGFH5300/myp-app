@@ -19,6 +19,10 @@ export type ReaderQuestionWithDisplayGroup = {
 
 export type ReaderQuestion = Omit<ReaderQuestionWithDisplayGroup, 'displayWithQuestionId'>
 
+export function hasRenderableQuestionContent(question: Pick<ReaderQuestion, 'questionImages' | 'promptText'>) {
+  return question.questionImages.length > 0 || Boolean(question.promptText?.trim())
+}
+
 function combineMarks(first: number | null, second: number | null) {
   if (first === null) return second
   if (second === null) return first
@@ -53,6 +57,7 @@ export function groupQuestionsForReader(questions: ReaderQuestionWithDisplayGrou
       ...source,
       questionNumber: `${source.questionNumber} and ${question.questionNumber}`,
       marks: combineMarks(source.marks, question.marks),
+      promptText: combineText(source.promptText, question.promptText),
       questionImages: [...source.questionImages, ...question.questionImages],
       markschemeImages: [...source.markschemeImages, ...question.markschemeImages],
       markschemeText: combineText(source.markschemeText, question.markschemeText),

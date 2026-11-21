@@ -188,10 +188,10 @@ export function FullPaperReader({
                     <div className={question.imageLayout === 'side-by-side' ? 'grid grid-cols-2 items-start gap-0' : 'space-y-1'}>
                       {question.questionImages.map((image, index) => <img key={`${image.url}-${index}`} src={image.url} alt={image.alt} className="h-auto w-full object-contain" />)}
                     </div>
-                  ) : adminPreview ? (
-                    <p className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 font-body text-sm font-semibold text-amber-900">Question image missing</p>
                   ) : question.promptText ? (
                     <p className="whitespace-pre-wrap font-body text-[#00152a]">{question.promptText}</p>
+                  ) : adminPreview ? (
+                    <p className="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 font-body text-sm font-semibold text-amber-900">Question image missing</p>
                   ) : null}
                 </section>
               ))}
