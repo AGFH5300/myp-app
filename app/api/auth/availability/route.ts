@@ -4,7 +4,7 @@ import { isValidEmail } from '@/lib/auth-email'
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,24}$/
 type AvailabilityStatus = 'available' | 'unavailable' | 'invalid' | 'error'
-const availabilityDebugEnabled = process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_SIGNUP_DEBUG === 'true'
+const availabilityDebugEnabled = process.env.NODE_ENV === 'development'
 
 function jsonResponse(
   status: AvailabilityStatus,
