@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { isValidEmail } from '@/lib/auth-email'
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,24}$/
-const signupDebugEnabled = process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_SIGNUP_DEBUG === 'true'
+const signupDebugEnabled = process.env.NODE_ENV === 'development'
 
 type SignupRequest = {
   username?: string
