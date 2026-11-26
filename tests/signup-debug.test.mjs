@@ -42,3 +42,22 @@ test('production signup RPC failures never expose debug details despite public f
   assert.equal(Object.hasOwn(r.body,'debug'),false);
   assert.equal(JSON.stringify(r.body).includes('private_schema'),false);
 });
+
+test('production OTP delivery errors do not echo provider diagnostics to anonymous clients',async()=>{
+  const original=globalThis.__mypAuthMock;
+  globalThis.__mypAuthMock={
+    rpc:async()=>({data:true,error:null}),
+    auth:{signInWithOtp:async()=>({error:{message:'provider_internal_secret_fixture'}})},
+  };
+  try {
+    const r=await startSignup(new Request('https://fixture.invalid/api/auth/start-signup',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:'student_123',fullName:'Synthetic Student',email:'student@example.invalid'}),
+    }));
+    assert.equal(r.status,400);
+    assert.equal(JSON.stringify(r.body).includes('provider_internal_secret_fixture'),false);
+    assert.equal(Object.hasOwn(r.body,'debug'),false);
+  } finally {
+    globalThis.__mypAuthMock=original;
+  }
+});
