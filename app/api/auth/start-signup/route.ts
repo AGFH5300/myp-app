@@ -108,7 +108,7 @@ export async function POST(request: Request) {
   })
 
   if (otpError) {
-    return jsonResponse({ ok: false, message: otpError.message, field: 'form', debug: { path: 'otp_send_failed' } }, 400)
+    return jsonResponse({ ok: false, message: 'Could not send a verification code right now.', field: 'form', debug: { path: 'otp_send_failed' } }, 400)
   }
 
   return jsonResponse({ ok: true, message: 'Verification code sent.', debug: { path: 'otp_sent' } })
